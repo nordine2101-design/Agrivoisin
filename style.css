@@ -1149,3 +1149,112 @@ a {
     }
 }
    
+/* === AMELIORATION DESIGN AGRIVOISIN === */
+
+/* Logo plus visible et plus chaleureux */
+.logo {
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: -2px;
+}
+
+/* Boutons plus premium */
+.btn-dark {
+    background: #6b8f5f;
+    border-radius: 14px;
+    padding: 14px 24px;
+}
+
+.btn-dark:hover {
+    background: #56754c;
+}
+
+
+/* Cartes produits professionnelles */
+.product {
+    border-radius: 22px;
+    border: 1px solid #ece8dd;
+    box-shadow: 0 8px 25px rgba(50,60,45,.06);
+    overflow: hidden;
+}
+
+.product:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 18px 40px rgba(50,60,45,.12);
+}
+
+
+.product-image {
+    height: 270px;
+}
+
+
+.product-image img {
+    object-fit: cover;
+}
+
+
+/* Texte produit */
+.product-body {
+    padding: 22px;
+}
+
+.product-body h3 {
+    font-size: 22px;
+    margin-top: 10px;
+    color:#283126;
+}
+
+.product-body p {
+    font-size:14px;
+    color:#70786f;
+}
+
+
+/* Bouton fiche produit */
+.product-button {
+    background:#e9f1e5;
+    color:#4c6848;
+    border-radius:12px;
+    padding:13px;
+    font-size:12px;
+}
+
+
+/* Catégories plus modernes */
+.category {
+    border-radius:20px;
+    padding:25px 12px;
+}
+
+.category-icon {
+    background:#f7f2e7;
+}
+
+
+/* Hero image plus haut de gamme */
+.hero-card {
+    border-radius:28px;
+    box-shadow:0 20px 45px rgba(40,50,40,.12);
+}
+
+
+/* Section produits */
+.section-heading h2,
+.center-heading h2 {
+    font-size:36px;
+}
+
+
+/* Mobile logo */
+@media(max-width:700px){
+
+.logo {
+    font-size:31px;
+}
+
+.product-image {
+    height:250px;
+}
+
+}

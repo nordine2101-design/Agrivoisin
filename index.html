@@ -2,74 +2,539 @@
 
 <html lang="fr">
 
-<head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>AgriVoisin</title> <link rel="stylesheet" href="style.css"> </head>
+<head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <meta name="description" content="AgriVoisin - Achetez et vendez des produits locaux directement entre voisins."> <title>AgriVoisin — Le local entre voisins</title> <link rel="stylesheet" href="style.css"> </head>
 
 <body>
 
-<header class="header"> <div class="logo"> 🌱 <strong>AgriVoisin</strong> </div>
+<!-- HEADER -->
+<header class="header">
+    <div class="header-inner">
 
-<nav class="nav">
-    <a href="#">Acheter</a>
-    <a href="#">Vendre</a>
-    <a href="#">Mon compte</a>
-    <a href="#">🛒 Panier</a>
-</nav>
+        <a href="#" class="logo">
+            <span class="logo-icon">🌱</span>
+            <span>Agri<span>Voisin</span></span>
+        </a>
 
+        <nav class="nav">
+            <a href="#produits">Acheter</a>
+            <a href="#vendre">Vendre</a>
+            <a href="#categories">Catégories</a>
+            <a href="#connexion">Mon compte</a>
+        </nav>
+
+        <a href="#vendre" class="header-button">
+            Vendre un produit
+        </a>
+
+    </div>
 </header>
 
+
+<!-- HERO -->
 <main>
 
-<section class="hero">
-    <h1>Les produits de vos voisins</h1>
-    <p>Découvrez des fruits, légumes et produits locaux près de chez vous.</p>
+    <section class="hero">
 
-    <div class="search">
-        <input type="text" placeholder="Que recherchez-vous ?">
-        <button>Rechercher</button>
-    </div>
-</section>
+        <div class="hero-content">
 
-<section class="categories">
-    <h2>Catégories</h2>
-
-    <div class="category-list">
-        <div class="category">🍎 Fruits</div>
-        <div class="category">🥕 Légumes</div>
-        <div class="category">🥚 Œufs</div>
-        <div class="category">🍯 Produits de la ferme</div>
-    </div>
-</section>
-
-<section class="products-section">
-    <h2>Produits proches de vous</h2>
-
-    <div class="products">
-
-        <div class="product">
-            <img src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337" alt="Tomates">
-            <div class="product-content">
-                <h3>🍅 Tomates anciennes</h3>
-                <p class="price">4,50 € / kg</p>
-                <p class="location">📍 Lunéville - 3 km</p>
-                <button>Voir le produit</button>
+            <div class="hero-badge">
+                🌿 Le marché local entre voisins
             </div>
+
+            <h1>
+                Les bons produits sont
+                <span>juste à côté.</span>
+            </h1>
+
+            <p class="hero-text">
+                Achetez directement auprès de vos voisins,
+                découvrez les producteurs près de chez vous
+                et donnez une seconde vie à vos récoltes.
+            </p>
+
+            <div class="search-box">
+
+                <div class="search-input">
+                    <span>🔎</span>
+                    <input
+                        type="text"
+                        placeholder="Que recherchez-vous ?"
+                    >
+                </div>
+
+                <div class="search-location">
+                    <span>📍</span>
+                    <input
+                        type="text"
+                        placeholder="Votre ville"
+                    >
+                </div>
+
+                <button class="search-button">
+                    Rechercher
+                </button>
+
+            </div>
+
+            <div class="hero-links">
+                <span>Recherches populaires :</span>
+                <a href="#">Tomates</a>
+                <a href="#">Œufs</a>
+                <a href="#">Miel</a>
+                <a href="#">Légumes</a>
+            </div>
+
         </div>
 
-        <div class="product">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Carrots_of_many_colors.jpg" alt="Carottes">
-            <div class="product-content">
-                <h3>🥕 Carottes bio</h3>
-                <p class="price">2,00 € / kg</p>
-                <p class="location">📍 Nancy - 5 km</p>
-                <button>Voir le produit</button>
+        <div class="hero-visual">
+
+            <div class="hero-card main-card">
+                <div class="hero-card-image">
+                    <img
+                        src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337"
+                        alt="Tomates fraîches"
+                    >
+                </div>
+
+                <div class="hero-card-content">
+                    <div>
+                        <strong>Tomates anciennes</strong>
+                        <small>Récoltées aujourd'hui</small>
+                    </div>
+
+                    <strong class="hero-price">4,50 €</strong>
+                </div>
             </div>
+
+            <div class="floating-card floating-top">
+                <span>🥕</span>
+                <div>
+                    <strong>Produits locaux</strong>
+                    <small>près de chez vous</small>
+                </div>
+            </div>
+
+            <div class="floating-card floating-bottom">
+                <span>📍</span>
+                <div>
+                    <strong>3 km</strong>
+                    <small>de Lunéville</small>
+                </div>
+            </div>
+
         </div>
 
-    </div>
-</section>
+    </section>
+
+
+    <!-- CATEGORIES -->
+    <section class="categories-section" id="categories">
+
+        <div class="section-heading">
+            <div>
+                <span class="section-label">EXPLORER</span>
+                <h2>Qu'est-ce que vous cherchez ?</h2>
+            </div>
+
+            <a href="#" class="see-all">
+                Voir toutes les catégories →
+            </a>
+        </div>
+
+        <div class="category-grid">
+
+            <a href="#" class="category-card">
+                <div class="category-icon fruit">🍎</div>
+                <strong>Fruits</strong>
+                <span>Produits frais</span>
+            </a>
+
+            <a href="#" class="category-card">
+                <div class="category-icon vegetable">🥕</div>
+                <strong>Légumes</strong>
+                <span>Du jardin</span>
+            </a>
+
+            <a href="#" class="category-card">
+                <div class="category-icon eggs">🥚</div>
+                <strong>Œufs</strong>
+                <span>Direct producteur</span>
+            </a>
+
+            <a href="#" class="category-card">
+                <div class="category-icon honey">🍯</div>
+                <strong>Miel &amp; produits</strong>
+                <span>De la ferme</span>
+            </a>
+
+            <a href="#" class="category-card">
+                <div class="category-icon plants">🌱</div>
+                <strong>Plants &amp; graines</strong>
+                <span>Pour le jardin</span>
+            </a>
+
+            <a href="#" class="category-card">
+                <div class="category-icon homemade">🧺</div>
+                <strong>Fait maison</strong>
+                <span>Près de chez vous</span>
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <!-- PRODUCTS -->
+    <section class="products-section" id="produits">
+
+        <div class="section-heading">
+            <div>
+                <span class="section-label">AUTOUR DE VOUS</span>
+                <h2>Les produits de vos voisins</h2>
+            </div>
+
+            <a href="#" class="see-all">
+                Voir tous les produits →
+            </a>
+        </div>
+
+        <div class="product-grid">
+
+            <!-- PRODUIT 1 -->
+            <article class="product-card">
+
+                <div class="product-image">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337"
+                        alt="Tomates anciennes"
+                    >
+
+                    <span class="product-badge">
+                        Nouveau
+                    </span>
+
+                    <button class="favorite" aria-label="Ajouter aux favoris">
+                        ♡
+                    </button>
+
+                </div>
+
+                <div class="product-info">
+
+                    <div class="product-category">
+                        LÉGUMES
+                    </div>
+
+                    <h3>Tomates anciennes</h3>
+
+                    <p class="product-description">
+                        Tomates fraîchement récoltées, cultivées localement.
+                    </p>
+
+                    <div class="product-bottom">
+
+                        <div>
+                            <strong class="product-price">4,50 €</strong>
+                            <span class="unit">/ kg</span>
+                        </div>
+
+                        <span class="distance">
+                            📍 3 km
+                        </span>
+
+                    </div>
+
+                    <button class="product-button">
+                        Voir le produit
+                    </button>
+
+                </div>
+
+            </article>
+
+
+            <!-- PRODUIT 2 -->
+            <article class="product-card">
+
+                <div class="product-image">
+
+                    <img
+                        src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Carrots_of_many_colors.jpg"
+                        alt="Carottes bio"
+                    >
+
+                    <button class="favorite" aria-label="Ajouter aux favoris">
+                        ♡
+                    </button>
+
+                </div>
+
+                <div class="product-info">
+
+                    <div class="product-category">
+                        LÉGUMES
+                    </div>
+
+                    <h3>Carottes bio</h3>
+
+                    <p class="product-description">
+                        Carottes croquantes cultivées sans traitement.
+                    </p>
+
+                    <div class="product-bottom">
+
+                        <div>
+                            <strong class="product-price">2,00 €</strong>
+                            <span class="unit">/ kg</span>
+                        </div>
+
+                        <span class="distance">
+                            📍 5 km
+                        </span>
+
+                    </div>
+
+                    <button class="product-button">
+                        Voir le produit
+                    </button>
+
+                </div>
+
+            </article>
+
+
+            <!-- PRODUIT 3 -->
+            <article class="product-card">
+
+                <div class="product-image">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1587049352846-4a222e784d38"
+                        alt="Miel local"
+                    >
+
+                    <button class="favorite" aria-label="Ajouter aux favoris">
+                        ♡
+                    </button>
+
+                </div>
+
+                <div class="product-info">
+
+                    <div class="product-category">
+                        FERME
+                    </div>
+
+                    <h3>Miel de fleurs</h3>
+
+                    <p class="product-description">
+                        Miel local récolté auprès des ruches du secteur.
+                    </p>
+
+                    <div class="product-bottom">
+
+                        <div>
+                            <strong class="product-price">8,50 €</strong>
+                            <span class="unit">/ pot</span>
+                        </div>
+
+                        <span class="distance">
+                            📍 7 km
+                        </span>
+
+                    </div>
+
+                    <button class="product-button">
+                        Voir le produit
+                    </button>
+
+                </div>
+
+            </article>
+
+
+            <!-- PRODUIT 4 -->
+            <article class="product-card">
+
+                <div class="product-image">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1500595046743-cd271d694d30"
+                        alt="Œufs fermiers"
+                    >
+
+                    <button class="favorite" aria-label="Ajouter aux favoris">
+                        ♡
+                    </button>
+
+                </div>
+
+                <div class="product-info">
+
+                    <div class="product-category">
+                        FERME
+                    </div>
+
+                    <h3>Œufs fermiers</h3>
+
+                    <p class="product-description">
+                        Œufs frais provenant directement de la ferme.
+                    </p>
+
+                    <div class="product-bottom">
+
+                        <div>
+                            <strong class="product-price">3,50 €</strong>
+                            <span class="unit">/ 6</span>
+                        </div>
+
+                        <span class="distance">
+                            📍 4 km
+                        </span>
+
+                    </div>
+
+                    <button class="product-button">
+                        Voir le produit
+                    </button>
+
+                </div>
+
+            </article>
+
+        </div>
+
+    </section>
+
+
+    <!-- HOW IT WORKS -->
+    <section class="how-section">
+
+        <div class="how-intro">
+            <span class="section-label">SIMPLE &amp; LOCAL</span>
+            <h2>AgriVoisin, ça marche comment ?</h2>
+            <p>
+                Une façon simple de vendre et d'acheter localement,
+                directement entre voisins.
+            </p>
+        </div>
+
+        <div class="steps">
+
+            <div class="step">
+                <div class="step-number">01</div>
+                <div class="step-icon">🔎</div>
+                <h3>Je cherche</h3>
+                <p>
+                    Je trouve les produits disponibles
+                    autour de moi.
+                </p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">02</div>
+                <div class="step-icon">🤝</div>
+                <h3>Je contacte</h3>
+                <p>
+                    J'échange avec le vendeur
+                    et je choisis mon produit.
+                </p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">03</div>
+                <div class="step-icon">🧺</div>
+                <h3>Je récupère</h3>
+                <p>
+                    Je récupère ma commande
+                    directement auprès du voisin.
+                </p>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- SELL CTA -->
+    <section class="sell-section" id="vendre">
+
+        <div class="sell-content">
+
+            <span class="section-label">VOUS AVEZ À VENDRE ?</span>
+
+            <h2>
+                Votre jardin produit plus
+                que vous ne pouvez manger ?
+            </h2>
+
+            <p>
+                Proposez vos surplus, vos récoltes ou vos produits
+                faits maison aux personnes de votre quartier.
+            </p>
+
+            <a href="#" class="sell-button">
+                Publier une annonce →
+            </a>
+
+        </div>
+
+        <div class="sell-illustration">
+            🌱
+        </div>
+
+    </section>
 
 </main>
 
-<footer> <p>© 2026 AgriVoisin — Acheter local, vendre près de chez vous.</p> </footer>
+
+<!-- FOOTER -->
+<footer class="footer">
+
+    <div class="footer-inner">
+
+        <div class="footer-brand">
+
+            <a href="#" class="logo footer-logo">
+                <span class="logo-icon">🌱</span>
+                <span>Agri<span>Voisin</span></span>
+            </a>
+
+            <p>
+                Le marché local entre voisins.
+                Achetez, vendez et partagez près de chez vous.
+            </p>
+
+        </div>
+
+        <div class="footer-column">
+            <h4>AgriVoisin</h4>
+            <a href="#">À propos</a>
+            <a href="#">Comment ça marche</a>
+            <a href="#">Nous contacter</a>
+        </div>
+
+        <div class="footer-column">
+            <h4>Acheter</h4>
+            <a href="#">Tous les produits</a>
+            <a href="#">Catégories</a>
+            <a href="#">Produits proches</a>
+        </div>
+
+        <div class="footer-column">
+            <h4>Vendre</h4>
+            <a href="#">Déposer une annonce</a>
+            <a href="#">Conseils vendeurs</a>
+            <a href="#">Aide</a>
+        </div>
+
+    </div>
+
+    <div class="footer-bottom">
+        © 2026 AgriVoisin — Tous droits réservés.
+    </div>
+
+</footer>
 
 </body> </html>

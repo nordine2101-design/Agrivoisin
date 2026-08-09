@@ -70,3 +70,7 @@ nav a {
     transform: scale(1.05);
     transition: 0.3s;
 }
+.product img {
+    width: 100%;
+    border-radius: 10px;
+}

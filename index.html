@@ -1,1 +1,219 @@
-<!DOCTYPE html> <html lang="fr"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>AgriVoisin - Produits locaux près de chez vous</title> <style> * { box-sizing: border-box; margin: 0; padding: 0; } body { font-family: Arial, Helvetica, sans-serif; background: #f6f8f3; color: #263326; } header { background: white; border-bottom: 1px solid #e1e7dc; position: sticky; top: 0; z-index: 100; } .header-container { max-width: 1200px; margin: auto; padding: 16px 25px; display: flex; justify-content: space-between; align-items: center; } .logo { font-size: 28px; font-weight: 800; color: #2f6b35; text-decoration: none; } .logo span { color: #8cae45; } nav { display: flex; gap: 24px; align-items: center; } nav a { color: #354235; text-decoration: none; font-weight: 600; } .hero { background: linear-gradient( rgba(236,245,227,.95), rgba(248,247,235,.97) ); padding: 70px 20px; text-align: center; } .badge { display: inline-block; background: #e1efd5; color: #39703d; padding: 8px 15px; border-radius: 30px; font-weight: bold; margin-bottom: 20px; } .hero h1 { font-size: 50px; line-height: 1.1; color: #285c30; margin-bottom: 20px; } .hero h1 span { color: #789b3c; } .hero p { max-width: 750px; margin: auto; font-size: 19px; color: #596358; } .search-box { max-width: 900px; margin: 35px auto 0; background: white; padding: 12px; border-radius: 14px; display: flex; gap: 10px; box-shadow: 0 10px 35px rgba(48,71,45,.12); } .search-box input { flex: 1; border: none; outline: none; padding: 15px; font-size: 16px; } .search-box button { border: none; background: #397b40; color: white; padding: 0 25px; border-radius: 9px; font-weight: bold; cursor: pointer; } .section { max-width: 1200px; margin: auto; padding: 65px 25px; } .section-title { text-align: center; margin-bottom: 35px; } .section-title h2 { color: #285c30; font-size: 34px; margin-bottom: 10px; } .section-title p { color: #687267; } .categories { display: grid; grid-template-columns: repeat(5,1fr); gap: 18px; } .category { background: white; border: 1px solid #e2e8df; border-radius: 16px; padding: 25px 12px; text-align: center; cursor: pointer; transition: .2s; } .category:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,.07); } .category-icon { font-size: 42px; margin-bottom: 10px; } .category h3 { color: #334a35; font-size: 16px; } .catalogue-box { margin-top: 40px; background: white; border: 1px solid #e2e8df; border-radius: 18px; padding: 30px; display: none; } .catalogue-box.active { display: block; } .catalogue-box h3 { color: #285c30; margin-bottom: 20px; font-size: 25px; } .select-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; } select { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid #ccd6c7; background: white; font-size: 16px; } .products-list { margin-top: 25px; display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; } .product { background: #f4f8ef; border: 1px solid #dfe8d8; border-radius: 10px; padding: 13px; cursor: pointer; font-weight: 600; color: #365b39; } .product:hover { background: #e8f1df; } .selected-product { margin-top: 25px; padding: 18px; background: #e4f0dc; border-radius: 12px; color: #315c35; display: none; font-weight: bold; } .subcategory { margin-top: 25px; } .subcategory-title { font-size: 18px; color: #315c35; font-weight: bold; margin-bottom: 12px; } .annonces { display: grid; grid-template-columns: repeat(4,1fr); gap: 20px; } .annonce { background: white; border-radius: 16px; overflow: hidden; border: 1px solid #e3e8df; } .annonce-image { height: 165px; background: #eef5e7; display: flex; align-items: center; justify-content: center; font-size: 70px; } .annonce-content { padding: 20px; } .annonce-content h3 { color: #304632; margin-bottom: 7px; } .location { color: #687267; font-size: 14px; margin-bottom: 12px; } .annonce-content p { color: #596358; font-size: 14px; } .annonce-bottom { margin-top: 18px; display: flex; justify-content: space-between; align-items: center; } .price { color: #2f7438; font-weight: bold; font-size: 18px; } .buy-button { background: #397b40; color: white; border: none; padding: 9px 13px; border-radius: 8px; cursor: pointer; } .seller { max-width: 1150px; margin: 0 auto 70px; padding: 55px 30px; border-radius: 22px; background: #285c30; color: white; text-align: center; } .seller h2 { font-size: 34px; margin-bottom: 12px; } .seller p { max-width: 700px; margin: auto auto 25px; font-size: 18px; } .seller-button { display: inline-block; background: white; color: #285c30; text-decoration: none; padding: 14px 24px; border-radius: 10px; font-weight: bold; } footer { background: #202a21; color: white; padding: 40px 25px; } .footer-container { max-width: 1100px; margin: auto; display: flex; justify-content: space-between; gap: 25px; } .footer-logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; } footer p { color: #b9c1b9; } @media(max-width:1000px) { .categories { grid-template-columns: repeat(3,1fr); } .annonces { grid-template-columns: repeat(2,1fr); } .products-list { grid-template-columns: repeat(3,1fr); } } @media(max-width:650px) { .header-container { flex-direction: column; gap: 15px; } nav { gap: 12px; flex-wrap: wrap; justify-content: center; } .hero h1 { font-size: 35px; } .search-box { flex-direction: column; } .search-box button { padding: 14px; } .categories { grid-template-columns: 1fr 1fr; } .annonces { grid-template-columns: 1fr; } .select-row { grid-template-columns: 1fr; } .products-list { grid-template-columns: 1fr 1fr; } } </style> </head> <body> <header> <div class="header-container"> <a href="#" class="logo"> 🌱 Agri<span>Voisin</span> </a> <nav> <a href="#">Accueil</a> <a href="#catalogue">Produits</a> <a href="#annonces">Acheter</a> <a href="#vendre">Vendre</a> </nav> </div> </header> <section class="hero"> <div class="badge"> 🌱 L'économie locale commence près de chez vous </div> <h1> Les produits de nos voisins,<br> <span>près de chez nous.</span> </h1> <p> Fruits, légumes, œufs, confitures, jus, smoothies et produits locaux directement auprès des habitants et producteurs de votre secteur. </p> <div class="search-box"> <input id="searchInput" type="text" placeholder="Rechercher : pomme, tomate, confiture, jus..." > <button onclick="searchProduct()"> 🔎 Rechercher </button> </div> </section> <section class="section" id="catalogue"> <div class="section-title"> <h2>Que recherchez-vous ?</h2> <p> Choisissez une catégorie puis découvrez les produits disponibles. </p> </div> <div class="categories"> <div class="category" onclick="openCatalogue('fruits')"> <div class="category-icon">🍎</div> <h3>Fruits</h3> </div> <div class="category" onclick="openCatalogue('legumes')"> <div class="category-icon">🥕</div> <h3>Légumes</h3> </div> <div class="category" onclick="showMessage('oeufs')"> <div class="category-icon">🥚</div> <h3>Œufs</h3> </div> <div class="category" onclick="openPreparations()"> <div class="category-icon">🍓</div> <h3> Confitures, boissons & préparations maison </h3> </div> <div class="category" onclick="showMessage('autres')"> <div class="category-icon">🧺</div> <h3>Autres produits</h3> </div> </div> <div class="catalogue-box" id="catalogueBox"> <h3 id="catalogueTitle"> 🍎 Catalogue </h3> <div id="territoryArea"> <div class="select-row"> <select id="territorySelect" onchange="loadProducts()"> <option value=""> Choisissez votre territoire </option> <option value="metropole"> 🇫🇷 France métropolitaine </option> <option value="guadeloupe"> 🇬🇵 Guadeloupe </option> <option value="martinique"> 🇲🇶 Martinique </option> <option value="guyane"> 🇬🇫 Guyane </option> <option value="reunion"> 🇷🇪 La Réunion </option> <option value="mayotte"> 🇾🇹 Mayotte </option> </select> <select id="productSelect" onchange="selectProduct()"> <option value=""> Choisissez un produit </option> </select> </div> </div> <div class="products-list" id="productsList"></div> <div class="selected-product" id="selectedProduct"></div> </div> </section> <section class="section" id="annonces"> <div class="section-title"> <h2>Quelques produits disponibles</h2> <p> Découvrez les premières annonces AgriVoisin. </p> </div> <div class="annonces"> <div class="annonce"> <div class="annonce-image"> 🍅 </div> <div class="annonce-content"> <h3>Tomates du jardin</h3> <div class="location"> 📍 Lunéville — 2 km </div> <p> Tomates fraîchement récoltées. Panier de 2 kg. </p> <div class="annonce-bottom"> <div class="price"> 4 € / panier </div> <button class="buy-button" onclick="alert('Annonce : Tomates du jardin')"> Voir </button> </div> </div> </div> <div class="annonce"> <div class="annonce-image"> 🍎 </div> <div class="annonce-content"> <h3>Pommes du verger</h3> <div class="location"> 📍 Lunéville — 5 km </div> <p> Pommes fraîchement récoltées. </p> <div class="annonce-bottom"> <div class="price"> 2,50 € / kg </div> <button class="buy-button" onclick="alert('Annonce : Pommes du verger')"> Voir </button> </div> </div> </div> <div class="annonce"> <div class="annonce-image"> 🥚 </div> <div class="annonce-content"> <h3>Œufs fermiers</h3> <div class="location"> 📍 Lunéville — 7 km </div> <p> Œufs frais issus d'un petit élevage familial. </p> <div class="annonce-bottom"> <div class="price"> 3 € / 6 </div> <button class="buy-button" onclick="alert('Annonce : Œufs fermiers')"> Voir </button> </div> </div> </div> <div class="annonce"> <div class="annonce-image"> 🍓 </div> <div class="annonce-content"> <h3>Confiture de fruits du jardin</h3> <div class="location"> 📍 Lunéville — 4 km </div> <p> Confiture maison préparée avec les fruits du jardin. </p> <div class="annonce-bottom"> <div class="price"> 4,50 € / pot </div> <button class="buy-button" onclick="alert('Annonce : Confiture de fruits du jardin')"> Voir </button> </div> </div> </div> </div> </section> <section class="seller" id="vendre"> <h2> Vous avez une récolte à vendre ? </h2> <p> Pommes, tomates, courgettes, œufs, confitures, jus, smoothies ou autres produits : proposez vos produits aux habitants de votre secteur. </p> <a href="#" class="seller-button" onclick="showMessage('annonce')"> 🌱 Déposer une annonce </a> </section> <footer> <div class="footer-container"> <div> <div class="footer-logo"> 🌱 AgriVoisin </div> <p> Les produits locaux entre voisins. </p> </div> <div> <p> © 2026 AgriVoisin </p> </div> </div> </footer> <script> /* ========================= CATALOGUE FRUITS ========================= */ const catalogue = { fruits: { metropole: [ "Abricot", "Amande", "Cassis", "Cerise", "Châtaigne", "Coing", "Figue", "Fraise", "Framboise", "Groseille", "Kiwi", "Melon", "Mûre", "Myrtille", "Noisette", "Noix", "Olive", "Pêche", "Nectarine", "Pastèque", "Poire", "Pomme", "Prune", "Mirabelle", "Quetsche", "Reine-claude", "Raisin", "Rhubarbe" ], guadeloupe: [ "Banane", "Banane plantain", "Ananas", "Avocat", "Abricot pays", "Citron", "Lime", "Clémentine", "Mandarine", "Orange", "Pamplemousse", "Goyave", "Litchi", "Mangue", "Maracuja", "Corossol", "Pomme cannelle", "Noix de coco" ], martinique: [ "Banane", "Banane plantain", "Goyave", "Ananas", "Citron", "Lime", "Orange", "Noix de coco", "Maracudja", "Avocat", "Abricot pays", "Mangue", "Mangot", "Clémentine", "Mandarine" ], guyane: [ "Banane", "Banane plantain", "Ananas", "Mangue", "Maracuja", "Goyave", "Papaye", "Corossol", "Orange", "Citron", "Lime", "Pamplemousse", "Avocat", "Pastèque", "Melon", "Noix de coco", "Carambole", "Fruit à pain", "Cupuaçu", "Ramboutan" ], reunion: [ "Banane", "Ananas", "Mangue", "Litchi", "Avocat", "Papaye", "Goyave", "Fruit de la passion", "Citron", "Lime", "Orange", "Mandarine", "Clémentine", "Pamplemousse", "Noix de coco", "Pitaya", "Carambole", "Longane" ], mayotte: [ "Banane", "Banane plantain", "Mangue", "Papaye", "Ananas", "Litchi", "Goyave", "Corossol", "Fruit de la passion", "Orange", "Citron", "Mandarine", "Pamplemousse", "Noix de coco", "Carambole", "Pastèque", "Jacquier", "Fruit à pain" ] }, /* ========================= CATALOGUE LÉGUMES ========================= */ legumes: { metropole: [ "Ail", "Artichaut", "Asperge", "Aubergine", "Betterave", "Blette", "Brocoli", "Carotte", "Céleri branche", "Céleri-rave", "Champignon", "Chou blanc", "Chou rouge", "Chou vert", "Chou-fleur", "Chou de Bruxelles", "Chou kale", "Chou-rave", "Concombre", "Courgette", "Échalote", "Endive", "Épinard", "Fenouil", "Haricot vert", "Haricot sec", "Laitue", "Mâche", "Maïs doux", "Navet", "Oignon", "Panais", "Petit pois", "Pois gourmand", "Poivron", "Piment", "Poireau", "Pois chiche", "Pomme de terre", "Potiron", "Potimarron", "Courge", "Radis", "Roquette", "Rutabaga", "Salsifis", "Scarole", "Salade", "Tomate", "Topinambour", "Fève", "Lentille" ], guadeloupe: [ "Aubergine", "Banane plantain", "Carotte", "Chou", "Christophine", "Concombre", "Courgette", "Giraumon", "Gombo", "Igname", "Manioc", "Patate douce", "Piment", "Poivron", "Salade", "Tomate", "Melon", "Pastèque", "Oignon", "Persil", "Taro" ], martinique: [ "Tomate", "Melon", "Salade", "Christophine", "Banane plantain", "Concombre", "Giraumon", "Chou", "Pastèque", "Courgette", "Aubergine", "Poivron", "Piment", "Oignon pays", "Navet", "Gombo", "Persil", "Patate douce", "Manioc", "Igname", "Taro" ], guyane: [ "Manioc", "Patate douce", "Igname", "Taro", "Banane plantain", "Aubergine", "Concombre", "Courgette", "Giraumon", "Gombo", "Tomate", "Poivron", "Piment", "Chou", "Salade", "Haricot", "Maïs", "Gingembre", "Curcuma", "Oignon", "Carotte", "Pastèque", "Melon" ], reunion: [ "Pomme de terre", "Patate douce", "Manioc", "Taro", "Chouchou", "Giraumon", "Tomate", "Courgette", "Aubergine", "Concombre", "Chou", "Salade", "Carotte", "Oignon", "Ail", "Haricot", "Pois", "Poivron", "Piment", "Gingembre", "Curcuma", "Maïs", "Radis", "Betterave" ], mayotte: [ "Manioc", "Patate douce", "Taro", "Igname", "Banane plantain", "Chouchou", "Gombo", "Tomate", "Aubergine", "Concombre", "Courgette", "Giraumon", "Piment", "Poivron", "Salade", "Chou", "Maïs", "Haricot", "Oignon", "Gingembre", "Curcuma" ] } }; /* ========================= PRÉPARATIONS MAISON ========================= */ const preparations = { "🍓 Confitures & gelées": [ "Confiture de fraise", "Confiture de framboise", "Confiture de mûre", "Confiture de myrtille", "Confiture de cassis", "Confiture de groseille", "Confiture de cerise", "Confiture d'abricot", "Confiture de pêche", "Confiture de nectarine", "Confiture de prune", "Confiture de mirabelle", "Confiture de quetsche", "Confiture de reine-claude", "Confiture de poire", "Confiture de pomme", "Confiture de figue", "Confiture de coing", "Confiture de raisin", "Confiture de melon", "Confiture de pastèque", "Confiture de rhubarbe", "Confiture de mangue", "Confiture de papaye", "Confiture d'ananas", "Confiture de banane", "Confiture de goyave", "Confiture de litchi", "Confiture de fruit de la passion", "Confiture de coco", "Confiture de corossol", "Confiture de carambole", "Confiture de pitaya" ], "🍓 Mélanges de fruits": [ "Fraise - rhubarbe", "Framboise - rhubarbe", "Fraise - framboise", "Fruits rouges", "Pomme - cannelle", "Poire - vanille", "Abricot - vanille", "Pêche - abricot", "Prune - mirabelle", "Mangue - passion", "Ananas - coco", "Mangue - vanille", "Goyave - passion", "Banane - vanille" ], "🧃 Jus de fruits maison": [ "Jus de pomme", "Jus de poire", "Jus de raisin", "Jus de cerise", "Jus de fraise", "Jus de framboise", "Jus de pêche", "Jus d'abricot", "Jus de prune", "Jus d'orange", "Jus de citron", "Jus de pamplemousse", "Jus de mangue", "Jus d'ananas", "Jus de goyave", "Jus de fruit de la passion", "Jus de papaye", "Jus de pastèque", "Jus multifruits", "Jus de fruits du jardin" ], "🥤 Smoothies maison": [ "Smoothie fraise - banane", "Smoothie fraise - framboise", "Smoothie fruits rouges", "Smoothie mangue - passion", "Smoothie mangue - banane", "Smoothie ananas - mangue", "Smoothie ananas - coco", "Smoothie banane - fraise", "Smoothie pêche - abricot", "Smoothie pomme - poire", "Smoothie fruits du jardin", "Smoothie tropical" ], "🍎 Compotes & coulis": [ "Compote de pomme", "Compote de poire", "Compote de pêche", "Compote de fruits rouges", "Compote de fruits du jardin", "Coulis de fraise", "Coulis de framboise", "Coulis de fruits rouges", "Coulis de mangue", "Coulis de fruit de la passion" ], "🌿 Autres préparations maison": [ "Chutney maison", "Sirop de fruits maison", "Fruits au sirop", "Pâte de fruits", "Fruits séchés", "Autre préparation maison" ] }; let currentCategory = ""; /* ========================= OUVRIR FRUITS / LÉGUMES ========================= */ function openCatalogue(category) { currentCategory = category; const box = document.getElementById("catalogueBox"); const title = document.getElementById("catalogueTitle"); box.classList.add("active"); document.getElementById("territoryArea").style.display = "block"; if(category === "fruits") { title.textContent = "🍎 Catalogue des fruits"; } else { title.textContent = "🥕 Catalogue des légumes"; } document.getElementById("territorySelect").value = ""; document.getElementById("productSelect").innerHTML = '<option value="">Choisissez un produit</option>'; document.getElementById("productsList").innerHTML = ""; document.getElementById("selectedProduct").style.display = "none"; box.scrollIntoView({ behavior: "smooth" }); } /* ========================= PRÉPARATIONS MAISON ========================= */ function openPreparations() { const box = document.getElementById("catalogueBox"); const title = document.getElementById("catalogueTitle"); box.classList.add("active"); document.getElementById("territoryArea").style.display = "none"; title.textContent = "🍓 Confitures, boissons & préparations maison"; const list = document.getElementById("productsList"); list.innerHTML = ""; document.getElementById("selectedProduct").style.display = "none"; Object.keys(preparations).forEach(function(category) { const container = document.createElement("div"); container.className = "subcategory"; const heading = document.createElement("div"); heading.className = "subcategory-title"; heading.textContent = category; container.appendChild(heading); const products = document.createElement("div"); products.className = "products-list"; preparations[category].forEach(function(product) { const item = document.createElement("div"); item.className = "product"; item.textContent = product; item.onclick = function() { const selected = document.getElementById("selectedProduct"); selected.textContent = "🍓 Produit sélectionné : " + product; selected.style.display = "block"; }; products.appendChild(item); }); container.appendChild(products); list.appendChild(container); }); box.scrollIntoView({ behavior: "smooth" }); } /* ========================= CHARGER PRODUITS ========================= */ function loadProducts() { const territory = document.getElementById("territorySelect").value; const select = document.getElementById("productSelect"); const list = document.getElementById("productsList"); select.innerHTML = '<option value="">Choisissez un produit</option>'; list.innerHTML = ""; document.getElementById("selectedProduct").style.display = "none"; if(!territory) return; const products = catalogue[currentCategory][territory]; products.forEach(function(product) { const option = document.createElement("option"); option.value = product; option.textContent = product; select.appendChild(option); const button = document.createElement("div"); button.className = "product"; button.textContent = product; button.onclick = function() { select.value = product; selectProduct(); }; list.appendChild(button); }); } /* ========================= SÉLECTION PRODUIT ========================= */ function selectProduct() { const product = document.getElementById("productSelect").value; const territory = document.getElementById("territorySelect"); const selected = document.getElementById("selectedProduct"); if(!product) { selected.style.display = "none"; return; } const territoryName = territory.options[ territory.selectedIndex ].text; selected.innerHTML = "🌱 Produit sélectionné : " + product + " — " + territoryName; selected.style.display = "block"; } /* ========================= RECHERCHE ========================= */ function searchProduct() { const search = document.getElementById("searchInput") .value .toLowerCase() .trim(); if(!search) { alert( "Écrivez le nom d'un produit à rechercher." ); return; } let found = []; Object.keys(catalogue).forEach(function(category) { Object.keys(catalogue[category]).forEach(function(territory) { catalogue[category][territory].forEach(function(product) { if(product.toLowerCase().includes(search)) { found.push(product); } }); }); }); Object.keys(preparations).forEach(function(category) { preparations[category].forEach(function(product) { if(product.toLowerCase().includes(search)) { found.push(product); } }); }); found = [...new Set(found)]; if(found.length === 0) { alert( "Aucun produit trouvé dans le catalogue AgriVoisin." ); } else { alert( "Produits trouvés :\n\n" + found.join("\n") ); } } /* ========================= AUTRES CATÉGORIES ========================= */ function showMessage(category) { if(category === "oeufs") { alert( "🥚 La catégorie Œufs sera bientôt disponible." ); } if(category === "autres") { alert( "🧺 La catégorie Autres produits sera bientôt disponible." ); } if(category === "annonce") { alert( "🌱 La création complète d'une annonce sera notre prochaine étape." ); } } </script> </body> </html>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriVoisin</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #f7f7f7;
+}
+
+/* HEADER */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 40px;
+  background: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.logo {
+  font-weight: bold;
+  font-size: 22px;
+  color: #2e7d32;
+}
+
+nav a {
+  margin: 0 15px;
+  text-decoration: none;
+  color: #333;
+}
+
+.auth button {
+  margin-left: 10px;
+  padding: 8px 15px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.signup {
+  background: #2e7d32;
+  color: white;
+}
+
+/* HERO */
+.hero {
+  text-align: center;
+  padding: 80px 20px;
+  background: linear-gradient(#4caf50, #2e7d32);
+  color: white;
+}
+
+.hero h1 {
+  font-size: 40px;
+}
+
+.search-bar {
+  margin-top: 20px;
+}
+
+.search-bar input {
+  padding: 12px;
+  width: 250px;
+  border-radius: 6px;
+  border: none;
+}
+
+.search-bar button {
+  padding: 12px;
+  border: none;
+  background: #1b5e20;
+  color: white;
+  border-radius: 6px;
+}
+
+/* CATEGORIES */
+.categories {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 30px;
+  flex-wrap: wrap;
+}
+
+.cat {
+  background: white;
+  padding: 15px;
+  border-radius: 10px;
+  width: 120px;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* PRODUCTS */
+.products {
+  padding: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+.card-content {
+  padding: 15px;
+}
+
+.price {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.card button {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  background: #2e7d32;
+  color: white;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+/* FOOTER */
+footer {
+  text-align: center;
+  padding: 30px;
+  background: #eee;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">🌱 AgriVoisin</div>
+  <nav>
+    <a href="#">Explorer</a>
+    <a href="#">Vendre</a>
+  </nav>
+  <div class="auth">
+    <button>Se connecter</button>
+    <button class="signup">S'inscrire</button>
+  </div>
+</header>
+
+<section class="hero">
+  <h1>Le frais, tout près de chez vous</h1>
+  <p>Achetez directement à vos voisins</p>
+  <div class="search-bar">
+    <input placeholder="Tomates, œufs, miel...">
+    <button>Rechercher</button>
+  </div>
+</section>
+
+<section class="categories">
+  <div class="cat">🍅 Fruits</div>
+  <div class="cat">🥚 Œufs</div>
+  <div class="cat">🌱 Plantes</div>
+  <div class="cat">🌸 Fleurs</div>
+  <div class="cat">🍯 Maison</div>
+</section>
+
+<section class="products">
+
+  <div class="card">
+    <img src="https://images.unsplash.com/photo-1567306226416-28f0efdc88ce">
+    <div class="card-content">
+      <h3>Tomates du jardin</h3>
+      <p class="price">4€ / panier</p>
+      <p>Lunéville · 2 km</p>
+      <button>Voir</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <img src="https://images.unsplash.com/photo-1589927986089-35812388d1f4">
+    <div class="card-content">
+      <h3>Œufs frais</h3>
+      <p class="price">3€ / boîte</p>
+      <p>Lunéville · 1 km</p>
+      <button>Voir</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <img src="https://images.unsplash.com/photo-1587049352846-4a222e784d38">
+    <div class="card-content">
+      <h3>Miel maison</h3>
+      <p class="price">6€ / pot</p>
+      <p>Lunéville · 5 km</p>
+      <button>Voir</button>
+    </div>
+  </div>
+
+</section>
+
+<footer>
+  <p>© 2026 AgriVoisin</p>
+</footer>
+
+</body>
+</html>
+

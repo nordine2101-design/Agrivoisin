@@ -1,65 +1,75 @@
 <!DOCTYPE html>
+
 <html lang="fr">
 
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AgriVoisin</title>
-
-<link rel="stylesheet" href="style.css">
-</head>
+<head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>AgriVoisin</title> <link rel="stylesheet" href="style.css"> </head>
 
 <body>
 
-<header>
-<h1>🌱 AgriVoisin</h1>
+<header class="header"> <div class="logo"> 🌱 <strong>AgriVoisin</strong> </div>
 
-<nav>
-<a href="#">Acheter</a>
-<a href="#">Vendre</a>
-<a href="#">Mon compte</a>
-<a href="#">Panier</a>
+<nav class="nav">
+    <a href="#">Acheter</a>
+    <a href="#">Vendre</a>
+    <a href="#">Mon compte</a>
+    <a href="#">🛒 Panier</a>
 </nav>
+
 </header>
 
-<h2>Les produits de vos voisins</h2>
+<main>
 
-<div class="products">
+<section class="hero">
+    <h1>Les produits de vos voisins</h1>
+    <p>Découvrez des fruits, légumes et produits locaux près de chez vous.</p>
 
-  <div class="product">
-    <img src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337" alt="Tomates">
-    <h3>🍅 Tomates anciennes</h3>
-    <p>4,50 € / kg</p>
-    <p>📍 Lunéville - 3 km</p>
-    <button>Voir le produit</button>
-  </div>
+    <div class="search">
+        <input type="text" placeholder="Que recherchez-vous ?">
+        <button>Rechercher</button>
+    </div>
+</section>
 
-  <div class="product">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Carrots_of_many_colors.jpg" alt="Carottes">
-    <h3>🥕 Carottes bio</h3>
-    <p>2,00 € / kg</p>
-    <p>📍 Nancy - 5 km</p>
-    <button>Voir le produit</button>
-  </div>
+<section class="categories">
+    <h2>Catégories</h2>
 
-</div>
+    <div class="category-list">
+        <div class="category">🍎 Fruits</div>
+        <div class="category">🥕 Légumes</div>
+        <div class="category">🥚 Œufs</div>
+        <div class="category">🍯 Produits de la ferme</div>
+    </div>
+</section>
 
-  
-<div class="product">
- <img src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337" alt="Tomates">
-<h3>🍅 Tomates anciennes</h3>
-<p>4,50 € / kg</p>
-<p>📍 Lunéville - 3 km</p>
-<button>Voir le produit</button>
-</div>
-<div class="product">
-<img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Carrots_of_many_colors.jpg" alt="Carottes">
-<h3>🥕 Carottes bio</h3>
-<p>2,00 € / kg</p>
-<p>📍 Nancy - 5 km</p>
-<button>Voir le produit</button>
-</div>
+<section class="products-section">
+    <h2>Produits proches de vous</h2>
 
+    <div class="products">
 
-</body>
-</html>
+        <div class="product">
+            <img src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337" alt="Tomates">
+            <div class="product-content">
+                <h3>🍅 Tomates anciennes</h3>
+                <p class="price">4,50 € / kg</p>
+                <p class="location">📍 Lunéville - 3 km</p>
+                <button>Voir le produit</button>
+            </div>
+        </div>
+
+        <div class="product">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/7/7e/Carrots_of_many_colors.jpg" alt="Carottes">
+            <div class="product-content">
+                <h3>🥕 Carottes bio</h3>
+                <p class="price">2,00 € / kg</p>
+                <p class="location">📍 Nancy - 5 km</p>
+                <button>Voir le produit</button>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+</main>
+
+<footer> <p>© 2026 AgriVoisin — Acheter local, vendre près de chez vous.</p> </footer>
+
+</body> </html>

@@ -66,3 +66,7 @@ nav a {
     flex-wrap: wrap;
     justify-content: center;
 }
+.product:hover {
+    transform: scale(1.05);
+    transition: 0.3s;
+}

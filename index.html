@@ -1,26 +1,10 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>AgriVoisin — Le frais tout près.</title>
-
-    <meta
-        name="description"
-        content="AgriVoisin permet d'acheter et de vendre des produits locaux directement entre voisins partout en France."
-    >
-
-    <link rel="stylesheet" href="style.css">
-</head>
-
 <body>
 
 <header class="header">
     <div class="container header-inner">
 
-        <a href="#" class="logo">
-            AgriVoisin
+        <a href="#" class="logo" aria-label="AgriVoisin">
+            <span>A</span><span>g</span><span>r</span><span>i</span><span>V</span><span>o</span><span>i</span><span>s</span><span>i</span><span>n</span>
         </a>
 
         <nav class="nav">
@@ -39,678 +23,536 @@
 
 <main>
 
-    <!-- HERO -->
+<section class="hero">
 
-    <section class="hero">
+    <div class="container hero-grid">
 
-        <div class="container hero-grid">
+        <div class="hero-content">
 
-            <div class="hero-content">
+            <span class="label">
+                LE MARCHÉ ENTRE VOISINS
+            </span>
 
-                <span class="label">
-                    LE MARCHÉ LOCAL ENTRE VOISINS
-                </span>
+            <h1>
+                Le frais
+                <span>tout près.</span>
+            </h1>
 
-                <h1>
-                    Le frais
-                    <span>tout près.</span>
-                </h1>
+            <p>
+                Trouvez facilement des produits proposés
+                par des particuliers et producteurs partout en France.
+            </p>
 
-                <p>
-                    Trouvez facilement des fruits, légumes, œufs,
-                    produits du jardin et produits locaux proposés
-                    par des vendeurs près de chez vous.
-                </p>
+            <div class="search">
 
-                <div class="search">
+                <div class="search-input">
+                    <span>⌕</span>
+                    <input
+                        id="searchInput"
+                        type="text"
+                        placeholder="Que recherchez-vous ?"
+                    >
+                </div>
 
-                    <div class="search-input">
-                        <span>⌕</span>
-                        <input
-                            id="searchInput"
-                            type="text"
-                            placeholder="Que recherchez-vous ?"
-                        >
-                    </div>
+                <div class="search-input location">
+                    <span>⌖</span>
+                    <input
+                        id="locationInput"
+                        type="text"
+                        placeholder="Ville ou code postal"
+                    >
+                </div>
 
-                    <div class="search-input location">
-                        <span>⌖</span>
-                        <input
-                            id="locationInput"
-                            type="text"
-                            placeholder="Ville ou code postal"
-                        >
-                    </div>
+                <button class="btn btn-dark" id="searchButton">
+                    Rechercher
+                </button>
 
-                    <button class="btn btn-dark" id="searchButton">
-                        Rechercher
+            </div>
+
+            <div class="quick-search">
+                <span>Recherches populaires :</span>
+                <button data-search="Tomates">Tomates</button>
+                <button data-search="Carottes">Carottes</button>
+                <button data-search="Œuf">Œuf</button>
+            </div>
+
+        </div>
+
+
+        <div class="hero-card">
+
+            <div class="hero-visual">
+                <img
+                    src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=1200&q=85"
+                    alt="Tomates"
+                >
+            </div>
+
+            <div class="hero-product">
+
+                <div>
+                    <strong>Tomates</strong>
+                    <span>Produit disponible</span>
+                </div>
+
+                <strong>4,50 € / kg</strong>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<section class="section" id="categories">
+
+    <div class="container">
+
+        <div class="section-heading">
+
+            <div>
+                <span class="label">EXPLORER</span>
+                <h2>Que recherchez-vous ?</h2>
+            </div>
+
+            <button class="text-button" id="showAll">
+                Voir tous les produits →
+            </button>
+
+        </div>
+
+
+        <div class="categories">
+
+            <button class="category" data-category="Fruits">
+                <span class="category-icon">🍎</span>
+                <strong>Fruits</strong>
+            </button>
+
+            <button class="category" data-category="Légumes">
+                <span class="category-icon">🥕</span>
+                <strong>Légumes</strong>
+            </button>
+
+            <button class="category" data-category="Œuf">
+                <span class="category-icon">🥚</span>
+                <strong>Œuf</strong>
+            </button>
+
+            <button class="category" data-category="Miel">
+                <span class="category-icon">🍯</span>
+                <strong>Miel</strong>
+            </button>
+
+            <button class="category" data-category="Plants">
+                <span class="category-icon">🌱</span>
+                <strong>Plants</strong>
+            </button>
+
+            <button class="category" data-category="Autres">
+                <span class="category-icon">🧺</span>
+                <strong>Autres</strong>
+            </button>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<section class="section products-section" id="produits">
+
+    <div class="container">
+
+        <div class="section-heading">
+
+            <div>
+                <span class="label">ANNONCES</span>
+                <h2>Produits disponibles</h2>
+            </div>
+
+            <span class="result-count" id="resultCount"></span>
+
+        </div>
+
+
+        <div class="products" id="productsGrid">
+
+
+            <!-- TOMATES -->
+
+            <article
+                class="product"
+                data-name="Tomates"
+                data-category="Légumes"
+                data-location="France"
+            >
+
+                <div class="product-image">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=900&q=85"
+                        alt="Tomates"
+                    >
+
+                    <button
+                        class="favorite"
+                        aria-label="Ajouter aux favoris"
+                    >
+                        ♡
                     </button>
 
                 </div>
 
-                <div class="quick-search">
-                    <span>Recherches populaires :</span>
-                    <button data-search="Tomates">Tomates</button>
-                    <button data-search="Carottes">Carottes</button>
-                    <button data-search="Œufs">Œufs</button>
-                    <button data-search="Miel">Miel</button>
+
+                <div class="product-body">
+
+                    <span class="product-category">
+                        LÉGUMES
+                    </span>
+
+                    <h3>Tomates</h3>
+
+                    <p>
+                        Tomates fraîches.
+                    </p>
+
+                    <div class="product-bottom">
+
+                        <strong>
+                            4,50 € <small>/ kg</small>
+                        </strong>
+
+                        <span>
+                            France
+                        </span>
+
+                    </div>
+
+                    <button class="product-button view-product">
+                        Voir le produit
+                    </button>
+
                 </div>
+
+            </article>
+
+
+            <!-- CAROTTES -->
+
+            <article
+                class="product"
+                data-name="Carottes"
+                data-category="Légumes"
+                data-location="France"
+            >
+
+                <div class="product-image">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1445282768818-728615cc910a?auto=format&fit=crop&w=900&q=85"
+                        alt="Carottes"
+                    >
+
+                    <button
+                        class="favorite"
+                        aria-label="Ajouter aux favoris"
+                    >
+                        ♡
+                    </button>
+
+                </div>
+
+
+                <div class="product-body">
+
+                    <span class="product-category">
+                        LÉGUMES
+                    </span>
+
+                    <h3>Carottes</h3>
+
+                    <p>
+                        Carottes fraîches.
+                    </p>
+
+                    <div class="product-bottom">
+
+                        <strong>
+                            2,00 € <small>/ kg</small>
+                        </strong>
+
+                        <span>
+                            France
+                        </span>
+
+                    </div>
+
+                    <button class="product-button view-product">
+                        Voir le produit
+                    </button>
+
+                </div>
+
+            </article>
+
+
+            <!-- OEUF -->
+
+            <article
+                class="product"
+                data-name="Œuf"
+                data-category="Œuf"
+                data-location="France"
+            >
+
+                <div class="product-image">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=900&q=85"
+                        alt="Œuf"
+                    >
+
+                    <button
+                        class="favorite"
+                        aria-label="Ajouter aux favoris"
+                    >
+                        ♡
+                    </button>
+
+                </div>
+
+
+                <div class="product-body">
+
+                    <span class="product-category">
+                        ŒUF
+                    </span>
+
+                    <h3>Œuf</h3>
+
+                    <p>
+                        Œuf frais.
+                    </p>
+
+                    <div class="product-bottom">
+
+                        <strong>
+                            3,50 € <small>/ unité</small>
+                        </strong>
+
+                        <span>
+                            France
+                        </span>
+
+                    </div>
+
+                    <button class="product-button view-product">
+                        Voir le produit
+                    </button>
+
+                </div>
+
+            </article>
+
+
+            <!-- MIEL -->
+
+            <article
+                class="product"
+                data-name="Miel"
+                data-category="Miel"
+                data-location="France"
+            >
+
+                <div class="product-image">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=900&q=85"
+                        alt="Miel"
+                    >
+
+                    <button
+                        class="favorite"
+                        aria-label="Ajouter aux favoris"
+                    >
+                        ♡
+                    </button>
+
+                </div>
+
+
+                <div class="product-body">
+
+                    <span class="product-category">
+                        PRODUIT
+                    </span>
+
+                    <h3>Miel</h3>
+
+                    <p>
+                        Miel.
+                    </p>
+
+                    <div class="product-bottom">
+
+                        <strong>
+                            8,50 € <small>/ pot</small>
+                        </strong>
+
+                        <span>
+                            France
+                        </span>
+
+                    </div>
+
+                    <button class="product-button view-product">
+                        Voir le produit
+                    </button>
+
+                </div>
+
+            </article>
+
+        </div>
+
+
+        <div class="empty-state" id="emptyState">
+
+            <strong>Aucun produit trouvé.</strong>
+
+            <p>
+                Essayez une autre recherche.
+            </p>
+
+            <button class="btn btn-dark" id="resetSearch">
+                Voir tous les produits
+            </button>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<section class="how" id="comment-ca-marche">
+
+    <div class="container">
+
+        <div class="center-heading">
+
+            <span class="label">
+                COMMENT ÇA MARCHE ?
+            </span>
+
+            <h2>
+                Simple, local, entre voisins.
+            </h2>
+
+        </div>
+
+
+        <div class="steps">
+
+            <div class="step">
+
+                <span>01</span>
+
+                <div class="step-icon">
+                    ⌕
+                </div>
+
+                <h3>Je recherche</h3>
+
+                <p>
+                    Je recherche un produit.
+                </p>
 
             </div>
 
 
-            <div class="hero-card">
+            <div class="step">
 
-                <div class="hero-visual tomato-large">
-                    <svg viewBox="0 0 600 430" aria-label="Tomates">
-                        <rect width="600" height="430" fill="#f1eee7"/>
-                        <ellipse cx="300" cy="335" rx="205" ry="42" fill="#d8d2c5"/>
+                <span>02</span>
 
-                        <circle cx="225" cy="235" r="92" fill="#d94a3d"/>
-                        <circle cx="375" cy="235" r="92" fill="#e25743"/>
-                        <circle cx="300" cy="175" r="92" fill="#d94338"/>
-
-                        <path
-                            d="M300 90 L280 125 L245 112 L260 150 L220 160 L280 170 L300 135 L320 170 L380 160 L340 150 L355 112 L320 125 Z"
-                            fill="#58733d"
-                        />
-                    </svg>
+                <div class="step-icon">
+                    ♡
                 </div>
 
-                <div class="hero-product">
-                    <div>
-                        <strong>Tomates anciennes</strong>
-                        <span>Produit local · Disponible maintenant</span>
-                    </div>
+                <h3>Je choisis</h3>
 
-                    <strong>4,50 € / kg</strong>
+                <p>
+                    Je découvre les annonces.
+                </p>
+
+            </div>
+
+
+            <div class="step">
+
+                <span>03</span>
+
+                <div class="step-icon">
+                    🤝
                 </div>
+
+                <h3>Je contacte</h3>
+
+                <p>
+                    Je contacte le vendeur.
+                </p>
 
             </div>
 
         </div>
 
-    </section>
+    </div>
 
+</section>
 
-    <!-- CATEGORIES -->
 
-    <section class="section" id="categories">
+<section class="sell">
 
-        <div class="container">
+    <div class="container">
 
-            <div class="section-heading">
+        <div class="sell-box">
 
-                <div>
-                    <span class="label">EXPLORER</span>
-                    <h2>Que recherchez-vous ?</h2>
-                </div>
-
-                <button class="text-button" id="showAll">
-                    Voir tous les produits →
-                </button>
-
-            </div>
-
-
-            <div class="categories">
-
-                <button class="category" data-category="Fruits">
-                    <span class="category-icon">🍎</span>
-                    <strong>Fruits</strong>
-                    <small>Fruits frais</small>
-                </button>
-
-                <button class="category" data-category="Légumes">
-                    <span class="category-icon">🥕</span>
-                    <strong>Légumes</strong>
-                    <small>Du jardin</small>
-                </button>
-
-                <button class="category" data-category="Œufs">
-                    <span class="category-icon">🥚</span>
-                    <strong>Œufs</strong>
-                    <small>Fermiers</small>
-                </button>
-
-                <button class="category" data-category="Miel">
-                    <span class="category-icon">🍯</span>
-                    <strong>Miel</strong>
-                    <small>Apiculteurs</small>
-                </button>
-
-                <button class="category" data-category="Plants">
-                    <span class="category-icon">🌱</span>
-                    <strong>Plants</strong>
-                    <small>Jardinage</small>
-                </button>
-
-                <button class="category" data-category="Autres">
-                    <span class="category-icon">🧺</span>
-                    <strong>Autres</strong>
-                    <small>Produits locaux</small>
-                </button>
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- PRODUITS -->
-
-    <section class="section products-section" id="produits">
-
-        <div class="container">
-
-            <div class="section-heading">
-
-                <div>
-                    <span class="label">ANNONCES</span>
-                    <h2>Produits disponibles</h2>
-                </div>
-
-                <span class="result-count" id="resultCount"></span>
-
-            </div>
-
-
-            <div class="products" id="productsGrid">
-
-
-                <!-- TOMATES -->
-
-                <article
-                    class="product"
-                    data-name="Tomates anciennes"
-                    data-category="Légumes"
-                    data-location="France"
-                >
-
-                    <div class="product-image">
-
-                        <svg viewBox="0 0 600 420" aria-label="Tomates anciennes">
-
-                            <rect width="600" height="420" fill="#f3eee5"/>
-
-                            <ellipse
-                                cx="300"
-                                cy="335"
-                                rx="210"
-                                ry="38"
-                                fill="#d9d0c0"
-                            />
-
-                            <circle cx="220" cy="235" r="90" fill="#d94c3e"/>
-                            <circle cx="380" cy="235" r="90" fill="#e05a43"/>
-                            <circle cx="300" cy="170" r="90" fill="#c94035"/>
-
-                            <path
-                                d="M300 80 L282 120 L245 105 L260 145 L215 160 L280 170 L300 135 L320 170 L385 160 L340 145 L355 105 L318 120 Z"
-                                fill="#55733c"
-                            />
-
-                        </svg>
-
-                        <span class="tag">Nouveau</span>
-
-                        <button class="favorite" aria-label="Ajouter aux favoris">
-                            ♡
-                        </button>
-
-                    </div>
-
-                    <div class="product-body">
-
-                        <span class="product-category">
-                            LÉGUMES
-                        </span>
-
-                        <h3>Tomates</h3>
-
-                        <p>
-                            Tomates fraîches cultivées localement.
-                        </p>
-
-                        <div class="product-bottom">
-
-                            <strong>
-                                4,50 € <small>/ kg</small>
-                            </strong>
-
-                            <span>
-                                France
-                            </span>
-
-                        </div>
-
-                        <button class="product-button view-product">
-                            Voir le produit
-                        </button>
-
-                    </div>
-
-                </article>
-
-
-                <!-- CAROTTES -->
-
-                <article
-                    class="product"
-                    data-name="Carottes bio"
-                    data-category="Légumes"
-                    data-location="France"
-                >
-
-                    <div class="product-image">
-
-                        <svg viewBox="0 0 600 420" aria-label="Carottes">
-
-                            <rect width="600" height="420" fill="#f0eee6"/>
-
-                            <ellipse
-                                cx="300"
-                                cy="345"
-                                rx="210"
-                                ry="35"
-                                fill="#d8d3c6"
-                            />
-
-                            <path
-                                d="M205 125 L245 130 L220 320 Q205 350 190 320 Z"
-                                fill="#ed7434"
-                            />
-
-                            <path
-                                d="M280 105 L320 108 L305 325 Q300 350 285 325 Z"
-                                fill="#f1843d"
-                            />
-
-                            <path
-                                d="M355 125 L395 130 L410 320 Q395 350 380 320 Z"
-                                fill="#e66d2e"
-                            />
-
-                            <path
-                                d="M220 135 C195 105 185 90 170 72"
-                                stroke="#4e7040"
-                                stroke-width="13"
-                                fill="none"
-                                stroke-linecap="round"
-                            />
-
-                            <path
-                                d="M235 135 C235 100 240 80 250 60"
-                                stroke="#5d7a45"
-                                stroke-width="13"
-                                fill="none"
-                                stroke-linecap="round"
-                            />
-
-                            <path
-                                d="M375 135 C400 105 410 85 430 65"
-                                stroke="#4f713f"
-                                stroke-width="13"
-                                fill="none"
-                                stroke-linecap="round"
-                            />
-
-                        </svg>
-
-                        <button class="favorite" aria-label="Ajouter aux favoris">
-                            ♡
-                        </button>
-
-                    </div>
-
-                    <div class="product-body">
-
-                        <span class="product-category">
-                            LÉGUMES
-                        </span>
-
-                       <h3>Œuf</h3>
-
-                        <p>
-                            Carottes fraîches récoltées localement.
-                        </p>
-
-                        <div class="product-bottom">
-
-                            <strong>
-                                2,00 € <small>/ kg</small>
-                            </strong>
-
-                            <span>
-                                France
-                            </span>
-
-                        </div>
-
-                        <button class="product-button view-product">
-                            Voir le produit
-                        </button>
-
-                    </div>
-
-                </article>
-
-
-                <!-- OEUFS -->
-
-                <article
-                    class="product"
-                    data-name="Œufs fermiers"
-                    data-category="Œufs"
-                    data-location="France"
-                >
-
-                    <div class="product-image">
-
-                        <svg viewBox="0 0 600 420" aria-label="Œufs fermiers">
-
-                            <rect width="600" height="420" fill="#f3efe7"/>
-
-                            <ellipse
-                                cx="300"
-                                cy="345"
-                                rx="205"
-                                ry="35"
-                                fill="#d8d0c1"
-                            />
-
-                            <path
-                                d="M175 210 Q175 165 210 165 H390 Q425 165 425 210 V295 Q425 325 395 325 H205 Q175 325 175 295 Z"
-                                fill="#d9a96d"
-                            />
-
-                            <path
-                                d="M185 190 H415"
-                                stroke="#b88650"
-                                stroke-width="9"
-                            />
-
-                            <ellipse cx="225" cy="205" rx="45" ry="55" fill="#fffdf6"/>
-                            <ellipse cx="300" cy="205" rx="45" ry="55" fill="#fffdf6"/>
-                            <ellipse cx="375" cy="205" rx="45" ry="55" fill="#fffdf6"/>
-
-                            <ellipse cx="225" cy="205" rx="25" ry="31" fill="#f4ead6"/>
-                            <ellipse cx="300" cy="205" rx="25" ry="31" fill="#f4ead6"/>
-                            <ellipse cx="375" cy="205" rx="25" ry="31" fill="#f4ead6"/>
-
-                        </svg>
-
-                        <button class="favorite" aria-label="Ajouter aux favoris">
-                            ♡
-                        </button>
-
-                    </div>
-
-                    <div class="product-body">
-
-                        <span class="product-category">
-                            FERME
-                        </span>
-
-                        <h3>Œufs fermiers</h3>
-
-                        <p>
-                            Œufs frais provenant d'un élevage local.
-                        </p>
-
-                        <div class="product-bottom">
-
-                            <strong>
-                                3,50 € <small>/ 6</small>
-                            </strong>
-
-                            <span>
-                                France
-                            </span>
-
-                        </div>
-
-                        <button class="product-button view-product">
-                            Voir le produit
-                        </button>
-
-                    </div>
-
-                </article>
-
-
-                <!-- MIEL -->
-
-                <article
-                    class="product"
-                    data-name="Miel local"
-                    data-category="Miel"
-                    data-location="France"
-                >
-
-                    <div class="product-image">
-
-                        <svg viewBox="0 0 600 420" aria-label="Miel local">
-
-                            <rect width="600" height="420" fill="#f2eee4"/>
-
-                            <ellipse
-                                cx="300"
-                                cy="345"
-                                rx="180"
-                                ry="32"
-                                fill="#d7d0c1"
-                            />
-
-                            <rect
-                                x="215"
-                                y="135"
-                                width="170"
-                                height="190"
-                                rx="20"
-                                fill="#e7a936"
-                            />
-
-                            <rect
-                                x="215"
-                                y="135"
-                                width="170"
-                                height="45"
-                                rx="20"
-                                fill="#b57a32"
-                            />
-
-                            <rect
-                                x="240"
-                                y="205"
-                                width="120"
-                                height="70"
-                                rx="8"
-                                fill="#fff4d6"
-                            />
-
-                            <text
-                                x="300"
-                                y="237"
-                                text-anchor="middle"
-                                font-size="24"
-                                font-family="Arial"
-                                font-weight="bold"
-                                fill="#60411d"
-                            >
-                                MIEL
-                            </text>
-
-                            <text
-                                x="300"
-                                y="260"
-                                text-anchor="middle"
-                                font-size="12"
-                                font-family="Arial"
-                                fill="#765329"
-                            >
-                                LOCAL
-                            </text>
-
-                        </svg>
-
-                        <button class="favorite" aria-label="Ajouter aux favoris">
-                            ♡
-                        </button>
-
-                    </div>
-
-                    <div class="product-body">
-
-                        <span class="product-category">
-                            PRODUIT LOCAL
-                        </span>
-
-                        <h3>Miel local</h3>
-
-                        <p>
-                            Miel récolté par un apiculteur local.
-                        </p>
-
-                        <div class="product-bottom">
-
-                            <strong>
-                                8,50 € <small>/ pot</small>
-                            </strong>
-
-                            <span>
-                                France
-                            </span>
-
-                        </div>
-
-                        <button class="product-button view-product">
-                            Voir le produit
-                        </button>
-
-                    </div>
-
-                </article>
-
-            </div>
-
-
-            <div class="empty-state" id="emptyState">
-                <strong>Aucun produit trouvé.</strong>
-                <p>Essayez une autre recherche ou catégorie.</p>
-                <button class="btn btn-dark" id="resetSearch">
-                    Voir tous les produits
-                </button>
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- COMMENT ÇA MARCHE -->
-
-    <section class="how" id="comment-ca-marche">
-
-        <div class="container">
-
-            <div class="center-heading">
+            <div>
 
                 <span class="label">
-                    COMMENT ÇA MARCHE ?
+                    VOUS AVEZ UN PRODUIT À VENDRE ?
                 </span>
 
                 <h2>
-                    Simple, local, entre voisins.
+                    Publiez votre annonce sur AgriVoisin.
                 </h2>
 
+                <p>
+                    Présentez vos produits aux acheteurs.
+                </p>
+
+                <button class="btn btn-light" id="openSellBottom">
+                    Déposer une annonce
+                </button>
+
             </div>
 
-
-            <div class="steps">
-
-                <div class="step">
-                    <span>01</span>
-                    <div class="step-icon">⌕</div>
-                    <h3>Je recherche</h3>
-                    <p>
-                        Je recherche un produit disponible
-                        près de chez moi.
-                    </p>
-                </div>
-
-                <div class="step">
-                    <span>02</span>
-                    <div class="step-icon">♡</div>
-                    <h3>Je choisis</h3>
-                    <p>
-                        Je découvre l'annonce et les informations
-                        du vendeur.
-                    </p>
-                </div>
-
-                <div class="step">
-                    <span>03</span>
-                    <div class="step-icon">🤝</div>
-                    <h3>Je contacte</h3>
-                    <p>
-                        Je contacte le vendeur et organise
-                        la remise du produit.
-                    </p>
-                </div>
-
+            <div class="sell-mark">
+                AV
             </div>
 
         </div>
 
-    </section>
+    </div>
 
-
-    <!-- VENDRE -->
-
-    <section class="sell">
-
-        <div class="container">
-
-            <div class="sell-box">
-
-                <div>
-
-                    <span class="label">
-                        VOUS AVEZ QUELQUE CHOSE À VENDRE ?
-                    </span>
-
-                    <h2>
-                        Donnez une valeur à vos récoltes
-                        et à vos produits.
-                    </h2>
-
-                    <p>
-                        Publiez votre annonce et faites découvrir
-                        vos produits aux acheteurs de votre secteur.
-                    </p>
-
-                    <button class="btn btn-light" id="openSellBottom">
-                        Déposer une annonce
-                    </button>
-
-                </div>
-
-                <div class="sell-mark">
-                    AV
-                </div>
-
-            </div>
-
-        </div>
-
-    </section>
+</section>
 
 </main>
 
-
-<!-- MODAL PRODUIT -->
 
 <div class="modal" id="productModal">
 
@@ -727,8 +569,6 @@
 </div>
 
 
-<!-- MODAL VENTE -->
-
 <div class="modal" id="sellModal">
 
     <div class="modal-card">
@@ -744,7 +584,7 @@
         <h2>Déposer une annonce</h2>
 
         <p class="modal-intro">
-            Présentez votre produit aux acheteurs partout en France.
+            Présentez votre produit aux acheteurs.
         </p>
 
         <form id="sellForm">
@@ -754,7 +594,7 @@
                 <input
                     type="text"
                     id="sellProduct"
-                    placeholder="Ex. Tomates anciennes"
+                    placeholder="Nom du produit"
                     required
                 >
             </label>
@@ -765,7 +605,7 @@
                     <option value="">Choisir</option>
                     <option>Fruits</option>
                     <option>Légumes</option>
-                    <option>Œufs</option>
+                    <option>Œuf</option>
                     <option>Miel</option>
                     <option>Plants</option>
                     <option>Autres</option>
@@ -788,7 +628,7 @@
                     Unité
                     <input
                         type="text"
-                        placeholder="kg, pot, lot..."
+                        placeholder="kg, unité, pot..."
                         required
                     >
                 </label>
@@ -813,7 +653,10 @@
                 ></textarea>
             </label>
 
-            <button class="btn btn-dark full" type="submit">
+            <button
+                class="btn btn-dark full"
+                type="submit"
+            >
                 Publier l'annonce
             </button>
 
@@ -829,26 +672,49 @@
     <div class="container footer-inner">
 
         <div>
+
             <div class="footer-logo">
                 AgriVoisin
             </div>
 
             <p>
-                Le marché local entre voisins.
+                Le marché entre voisins.
             </p>
+
         </div>
 
+
         <div class="footer-links">
-            <a href="#produits">Acheter</a>
-            <a href="#categories">Catégories</a>
-            <a href="#comment-ca-marche">Comment ça marche</a>
-            <button id="footerSell">Vendre</button>
+
+            <a href="#produits">
+                Acheter
+            </a>
+
+            <a href="#categories">
+                Catégories
+            </a>
+
+            <a href="#comment-ca-marche">
+                Comment ça marche
+            </a>
+
+            <button id="footerSell">
+                Vendre
+            </button>
+
         </div>
 
     </div>
 
+
     <div class="container copyright">
-        © 2026 AgriVoisin — Tous droits réservés.
+        © 2026 AgriVoisin
     </div>
 
 </footer>
+
+
+<script src="script.js"></script>
+
+</body>
+</html>

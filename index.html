@@ -8,139 +8,68 @@
 <style>
 body {
   margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: #f7f7f7;
+  font-family: Arial, sans-serif;
+  background: #ffffff;
 }
 
 /* HEADER */
 header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 40px;
-  background: white;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-
-.logo {
-  font-weight: bold;
-  font-size: 22px;
-  color: #2e7d32;
-}
-
-nav a {
-  margin: 0 15px;
-  text-decoration: none;
-  color: #333;
-}
-
-.auth button {
-  margin-left: 10px;
-  padding: 8px 15px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-}
-
-.signup {
-  background: #2e7d32;
+  background: #1b5e20;
   color: white;
+  padding: 20px;
+  text-align: center;
 }
 
 /* HERO */
 .hero {
   text-align: center;
-  padding: 80px 20px;
-  background: linear-gradient(#4caf50, #2e7d32);
-  color: white;
+  padding: 60px 20px;
 }
 
 .hero h1 {
-  font-size: 40px;
+  font-size: 32px;
 }
 
-.search-bar {
+.hero p {
+  color: #555;
+}
+
+.hero button {
   margin-top: 20px;
-}
-
-.search-bar input {
-  padding: 12px;
-  width: 250px;
-  border-radius: 6px;
-  border: none;
-}
-
-.search-bar button {
-  padding: 12px;
-  border: none;
+  padding: 12px 20px;
   background: #1b5e20;
   color: white;
+  border: none;
   border-radius: 6px;
 }
 
-/* CATEGORIES */
-.categories {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  padding: 30px;
-  flex-wrap: wrap;
-}
-
-.cat {
-  background: white;
-  padding: 15px;
-  border-radius: 10px;
-  width: 120px;
-  text-align: center;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-/* PRODUCTS */
-.products {
-  padding: 40px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+/* LISTE */
+.listings {
+  padding: 20px;
 }
 
 .card {
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.card img {
-  width: 100%;
-  height: 180px;
-  object-fit: cover;
-}
-
-.card-content {
+  background: #f5f5f5;
   padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 10px;
+}
+
+.card h3 {
+  margin: 0;
 }
 
 .price {
-  color: #2e7d32;
+  color: #1b5e20;
   font-weight: bold;
-}
-
-.card button {
-  width: 100%;
-  padding: 10px;
-  border: none;
-  background: #2e7d32;
-  color: white;
-  margin-top: 10px;
-  cursor: pointer;
 }
 
 /* FOOTER */
 footer {
   text-align: center;
-  padding: 30px;
-  background: #eee;
+  padding: 20px;
+  background: #1b5e20;
+  color: white;
 }
 </style>
 </head>
@@ -148,72 +77,34 @@ footer {
 <body>
 
 <header>
-  <div class="logo">🌱 AgriVoisin</div>
-  <nav>
-    <a href="#">Explorer</a>
-    <a href="#">Vendre</a>
-  </nav>
-  <div class="auth">
-    <button>Se connecter</button>
-    <button class="signup">S'inscrire</button>
-  </div>
+  <h1>🌱 AgriVoisin</h1>
 </header>
 
 <section class="hero">
-  <h1>Le frais, tout près de chez vous</h1>
-  <p>Achetez directement à vos voisins</p>
-  <div class="search-bar">
-    <input placeholder="Tomates, œufs, miel...">
-    <button>Rechercher</button>
-  </div>
+  <h1>Achète local autour de toi</h1>
+  <p>Fruits, légumes et produits maison sans intermédiaire</p>
+  <button>Voir les annonces</button>
 </section>
 
-<section class="categories">
-  <div class="cat">🍅 Fruits</div>
-  <div class="cat">🥚 Œufs</div>
-  <div class="cat">🌱 Plantes</div>
-  <div class="cat">🌸 Fleurs</div>
-  <div class="cat">🍯 Maison</div>
-</section>
-
-<section class="products">
+<section class="listings">
 
   <div class="card">
-    <img src="https://images.unsplash.com/photo-1567306226416-28f0efdc88ce">
-    <div class="card-content">
-      <h3>Tomates du jardin</h3>
-      <p class="price">4€ / panier</p>
-      <p>Lunéville · 2 km</p>
-      <button>Voir</button>
-    </div>
+    <h3>🍅 Tomates</h3>
+    <p class="price">4€/kg</p>
   </div>
 
   <div class="card">
-    <img src="https://images.unsplash.com/photo-1589927986089-35812388d1f4">
-    <div class="card-content">
-      <h3>Œufs frais</h3>
-      <p class="price">3€ / boîte</p>
-      <p>Lunéville · 1 km</p>
-      <button>Voir</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <img src="https://images.unsplash.com/photo-1587049352846-4a222e784d38">
-    <div class="card-content">
-      <h3>Miel maison</h3>
-      <p class="price">6€ / pot</p>
-      <p>Lunéville · 5 km</p>
-      <button>Voir</button>
-    </div>
+    <h3>🥚 Œufs frais</h3>
+    <p class="price">3€</p>
   </div>
 
 </section>
 
 <footer>
-  <p>© 2026 AgriVoisin</p>
+  © AgriVoisin
 </footer>
 
 </body>
 </html>
+
 

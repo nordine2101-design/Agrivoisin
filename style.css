@@ -310,11 +310,21 @@ h1, h2, h3, h4 {
 .hero-illustration {
   position: relative;
   z-index: 2;
-  max-width: 900px;
+  max-width: 780px;
   margin: 0 auto;
   padding: 0 32px;
 }
 
+.hero-photo {
+  width: 100%;
+  height: 320px;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(56, 92, 59, 0.28);
+  border: 5px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Ligne d'horizon organique en bas du hero */
 .hero-ground {
   position: relative;
   height: 90px;
@@ -328,7 +338,7 @@ h1, h2, h3, h4 {
 }
 
 /* ============================================
-   COMMENT ÇA MARCHE
+   COMMENT ÇA MARCHE (étapes réelles du processus)
    ============================================ */
 
 .how-it-works {
@@ -428,7 +438,7 @@ h1, h2, h3, h4 {
 }
 
 /* ============================================
-   POURQUOI AGRIVOISIN
+   POURQUOI AGRIVOISIN (bénéfices)
    ============================================ */
 
 .why-section {
@@ -516,16 +526,19 @@ h1, h2, h3, h4 {
 }
 
 .produce-card-image {
-  height: 150px;
-  background: linear-gradient(135deg, var(--sky) 0%, var(--prairie) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 170px;
+  overflow: hidden;
 }
 
-.produce-card-image svg {
-  width: 64px;
-  height: 64px;
+.produce-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s ease;
+}
+
+.produce-card:hover .produce-card-image img {
+  transform: scale(1.06);
 }
 
 .produce-card-body {
@@ -596,7 +609,7 @@ h1, h2, h3, h4 {
 }
 
 /* ============================================
-   BANDEAU CONFIANCE
+   BANDEAU CONFIANCE / SÉCURITÉ PAIEMENT
    ============================================ */
 
 .trust-banner {
@@ -631,7 +644,7 @@ h1, h2, h3, h4 {
 }
 
 /* ============================================
-   CTA FINALE
+   CTA FINALE — devenir jardinier vendeur
    ============================================ */
 
 .final-cta {
@@ -740,4 +753,9 @@ h1, h2, h3, h4 {
   .produce-grid { grid-template-columns: 1fr; }
   .footer-grid { grid-template-columns: 1fr; }
   .hero-cta { flex-direction: column; align-items: stretch; }
+}
+
+Colle ça dans style.css (remplace tout). Dis-moi quand c'est fait, et je t'envoie le nouveau index.html avec les vraies photos.
+
+
 

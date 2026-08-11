@@ -1,720 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agrivoisin — Les surplus du jardin, entre voisins</title>
+<meta name="description" content="Agrivoisin met en relation les jardiniers particuliers et leurs voisins pour vendre les surplus du potager. Paiement sécurisé en ligne.">
+<link rel="stylesheet" href="style.css">
+</head>
 <body>
 
-<header class="header">
-    <div class="container header-inner">
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+  <div class="container">
+    <a href="index.html" class="logo">
+      <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#4C7A50"/>
+        <path d="M16 12V26" stroke="#FBF7EF" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M16 16C16 16 13 15 12 12" stroke="#FBF7EF" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M16 20C16 20 19.5 19 20.5 15.5" stroke="#FBF7EF" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      Agrivoisin
+    </a>
 
-        <a href="#" class="logo" aria-label="AgriVoisin">
-            <span>A</span><span>g</span><span>r</span><span>i</span><span>V</span><span>o</span><span>i</span><span>s</span><span>i</span><span>n</span>
-        </a>
+    <nav class="main-nav">
+      <a href="index.html#comment-ca-marche">Comment ça marche</a>
+      <a href="annonces.html">Les annonces</a>
+      <a href="index.html#pourquoi">Pourquoi Agrivoisin</a>
+      <a href="vendre.html">Devenir vendeur</a>
+    </nav>
 
-        <nav class="nav">
-            <a href="#produits">Acheter</a>
-            <a href="#categories">Catégories</a>
-            <a href="#comment-ca-marche">Comment ça marche</a>
-        </nav>
-
-        <button class="btn btn-dark" id="openSell">
-            Vendre un produit
-        </button>
-
+    <div class="header-actions">
+      <a href="panier.html" class="cart-icon" aria-label="Panier">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"></circle>
+          <circle cx="20" cy="21" r="1"></circle>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span class="cart-count">0</span>
+      </a>
+      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
+      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
+  </div>
 </header>
 
-
-<main>
-
+<!-- ============ HERO — Présentation du concept ============ -->
 <section class="hero">
-
-    <div class="container hero-grid">
-
-        <div class="hero-content">
-
-            <span class="label">
-                LE MARCHÉ ENTRE VOISINS
-            </span>
-
-            <h1>
-                Le frais
-                <span>tout près.</span>
-            </h1>
-
-            <p>
-                Trouvez facilement des produits proposés
-                par des particuliers et producteurs partout en France.
-            </p>
-
-            <div class="search">
-
-                <div class="search-input">
-                    <span>⌕</span>
-                    <input
-                        id="searchInput"
-                        type="text"
-                        placeholder="Que recherchez-vous ?"
-                    >
-                </div>
-
-                <div class="search-input location">
-                    <span>⌖</span>
-                    <input
-                        id="locationInput"
-                        type="text"
-                        placeholder="Ville ou code postal"
-                    >
-                </div>
-
-                <button class="btn btn-dark" id="searchButton">
-                    Rechercher
-                </button>
-
-            </div>
-
-            <div class="quick-search">
-                <span>Recherches populaires :</span>
-                <button data-search="Tomates">Tomates</button>
-                <button data-search="Carottes">Carottes</button>
-                <button data-search="Œuf">Œuf</button>
-            </div>
-
-        </div>
-
-
-        <div class="hero-card">
-
-            <div class="hero-visual">
-                <img
-                    src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=1200&q=85"
-                    alt="Tomates"
-                >
-            </div>
-
-            <div class="hero-product">
-
-                <div>
-                    <strong>Tomates</strong>
-                    <span>Produit disponible</span>
-                </div>
-
-                <strong>4,50 € / kg</strong>
-
-            </div>
-
-        </div>
-
+  <div class="hero-content">
+    <span class="hero-eyebrow">🌱 La marketplace des jardins gourmands</span>
+    <h1>Le surplus de <em>votre</em> jardin devient le régal <em>d'un voisin</em></h1>
+    <p>Agrivoisin relie les jardiniers particuliers qui récoltent plus qu'ils ne consomment aux voisins qui rêvent de légumes fraîchement cueillis. Simple, local, et payé en toute sécurité avant même de connaître l'adresse du vendeur.</p>
+    <div class="hero-cta">
+      <a href="annonces.html" class="btn btn-primary">Découvrir les annonces</a>
+      <a href="vendre.html" class="btn btn-outline-light">Vendre mes récoltes</a>
     </div>
+  </div>
 
+  <div class="hero-illustration">
+    <svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg">
+      <!-- Carotte -->
+      <g transform="translate(140,60)">
+        <path d="M20 0 L35 0 L27.5 90 Z" fill="#E8935C"/>
+        <path d="M20 0 Q10 -18 2 -22 Q14 -14 20 -2 Z" fill="#4C7A50"/>
+        <path d="M27 0 Q27 -22 22 -28 Q30 -18 30 0 Z" fill="#4C7A50"/>
+        <path d="M35 0 Q45 -16 52 -18 Q42 -12 35 0 Z" fill="#4C7A50"/>
+      </g>
+      <!-- Tomate -->
+      <g transform="translate(360,70)">
+        <circle cx="0" cy="20" r="26" fill="#E8935C"/>
+        <circle cx="0" cy="20" r="26" fill="#D97D45" opacity="0.25"/>
+        <path d="M-10 -2 Q0 -14 10 -2 Q4 -6 0 -4 Q-4 -6 -10 -2Z" fill="#4C7A50"/>
+      </g>
+      <!-- Panier -->
+      <g transform="translate(560,50)">
+        <path d="M0 40 L90 40 L78 90 L12 90 Z" fill="#9FC49A"/>
+        <path d="M0 40 L90 40 L86 52 L4 52 Z" fill="#7FAE7A"/>
+        <path d="M20 40 Q45 0 70 40" stroke="#6B5842" stroke-width="4" fill="none" stroke-linecap="round"/>
+      </g>
+      <!-- Feuilles décoratives éparses -->
+      <g transform="translate(60,140)" opacity="0.6">
+        <path d="M0 0 Q10 -12 22 0 Q10 6 0 0Z" fill="#4C7A50"/>
+      </g>
+      <g transform="translate(720,120)" opacity="0.6">
+        <path d="M0 0 Q10 -12 22 0 Q10 6 0 0Z" fill="#4C7A50"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="hero-ground">
+    <svg viewBox="0 0 1440 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0,40 C240,90 480,0 720,30 C960,60 1200,10 1440,50 L1440,90 L0,90 Z" fill="#FBF7EF"/>
+    </svg>
+  </div>
 </section>
 
-
-<section class="section" id="categories">
-
-    <div class="container">
-
-        <div class="section-heading">
-
-            <div>
-                <span class="label">EXPLORER</span>
-                <h2>Que recherchez-vous ?</h2>
-            </div>
-
-            <button class="text-button" id="showAll">
-                Voir tous les produits →
-            </button>
-
-        </div>
-
-
-        <div class="categories">
-
-            <button class="category" data-category="Fruits">
-                <span class="category-icon">🍎</span>
-                <strong>Fruits</strong>
-            </button>
-
-            <button class="category" data-category="Légumes">
-                <span class="category-icon">🥕</span>
-                <strong>Légumes</strong>
-            </button>
-
-            <button class="category" data-category="Œuf">
-                <span class="category-icon">🥚</span>
-                <strong>Œuf</strong>
-            </button>
-
-            <button class="category" data-category="Miel">
-                <span class="category-icon">🍯</span>
-                <strong>Miel</strong>
-            </button>
-
-            <button class="category" data-category="Plants">
-                <span class="category-icon">🌱</span>
-                <strong>Plants</strong>
-            </button>
-
-            <button class="category" data-category="Autres">
-                <span class="category-icon">🧺</span>
-                <strong>Autres</strong>
-            </button>
-
-        </div>
-
+<!-- ============ COMMENT ÇA MARCHE ============ -->
+<section class="how-it-works" id="comment-ca-marche">
+  <div class="container">
+    <div class="section-heading">
+      <span class="eyebrow">Le principe</span>
+      <h2>Trois étapes, entre voisins</h2>
+      <p>Un circuit pensé pour protéger les deux côtés de l'échange, du premier clic jusqu'à la récolte dans votre panier.</p>
     </div>
 
+    <div class="steps">
+      <div class="step">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20M2 12h20"/>
+            <circle cx="12" cy="12" r="9"/>
+          </svg>
+        </div>
+        <span class="step-label">Étape 1</span>
+        <h3>Le jardinier publie</h3>
+        <p>Un voisin jardinier photographie ses surplus (légumes, fruits, aromates) et publie une annonce avec quantité et prix.</p>
+      </div>
+
+      <div class="step">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="1" y="4" width="22" height="16" rx="2"/>
+            <path d="M1 10h22"/>
+          </svg>
+        </div>
+        <span class="step-label">Étape 2</span>
+        <h3>L'acheteur commande et paie</h3>
+        <p>L'acheteur choisit une annonce et règle en ligne, de façon sécurisée, directement sur Agrivoisin.</p>
+      </div>
+
+      <div class="step">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0Z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <span class="step-label">Étape 3</span>
+        <h3>L'adresse est dévoilée</h3>
+        <p>Une fois le paiement confirmé, l'adresse du jardinier s'affiche pour organiser la remise des récoltes.</p>
+      </div>
+    </div>
+  </div>
 </section>
 
+<!-- ============ POURQUOI AGRIVOISIN ============ -->
+<section class="why-section" id="pourquoi">
+  <div class="container">
+    <div class="why-grid">
+      <div class="why-visual">
+        <svg viewBox="0 0 400 320" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="400" height="320" rx="20" fill="#FBF7EF"/>
+          <!-- rangs de potager -->
+          <g stroke="#9FC49A" stroke-width="14" stroke-linecap="round">
+            <line x1="40" y1="60" x2="360" y2="60"/>
+            <line x1="40" y1="120" x2="360" y2="120"/>
+            <line x1="40" y1="180" x2="360" y2="180"/>
+            <line x1="40" y1="240" x2="360" y2="240"/>
+          </g>
+          <!-- petites plantes -->
+          <g fill="#4C7A50">
+            <circle cx="90" cy="60" r="10"/>
+            <circle cx="170" cy="60" r="10"/>
+            <circle cx="250" cy="60" r="10"/>
+            <circle cx="330" cy="60" r="10"/>
+            <circle cx="120" cy="120" r="10"/>
+            <circle cx="200" cy="120" r="10"/>
+            <circle cx="280" cy="120" r="10"/>
+            <circle cx="90" cy="180" r="10"/>
+            <circle cx="170" cy="180" r="10"/>
+            <circle cx="250" cy="180" r="10"/>
+            <circle cx="330" cy="180" r="10"/>
+          </g>
+          <g fill="#E8935C">
+            <circle cx="150" cy="240" r="10"/>
+            <circle cx="230" cy="240" r="10"/>
+            <circle cx="310" cy="240" r="10"/>
+          </g>
+        </svg>
+      </div>
 
-<section class="section products-section" id="produits">
-
-    <div class="container">
-
-        <div class="section-heading">
-
-            <div>
-                <span class="label">ANNONCES</span>
-                <h2>Produits disponibles</h2>
-            </div>
-
-            <span class="result-count" id="resultCount"></span>
-
+      <div class="why-list">
+        <span class="hero-eyebrow" style="align-self:flex-start;background:var(--cream-soft);">Pourquoi Agrivoisin</span>
+        <div class="why-item">
+          <div class="why-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/>
+            </svg>
+          </div>
+          <div>
+            <h4>Paiement protégé</h4>
+            <p>Aucune adresse n'est communiquée avant confirmation du paiement en ligne. Vendeurs et acheteurs échangent en confiance.</p>
+          </div>
         </div>
 
-
-        <div class="products" id="productsGrid">
-
-
-            <!-- TOMATES -->
-
-            <article
-                class="product"
-                data-name="Tomates"
-                data-category="Légumes"
-                data-location="France"
-            >
-
-                <div class="product-image">
-
-                    <img
-                        src="https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&w=900&q=85"
-                        alt="Tomates"
-                    >
-
-                    <button
-                        class="favorite"
-                        aria-label="Ajouter aux favoris"
-                    >
-                        ♡
-                    </button>
-
-                </div>
-
-
-                <div class="product-body">
-
-                    <span class="product-category">
-                        LÉGUMES
-                    </span>
-
-                    <h3>Tomates</h3>
-
-                    <p>
-                        Tomates fraîches.
-                    </p>
-
-                    <div class="product-bottom">
-
-                        <strong>
-                            4,50 € <small>/ kg</small>
-                        </strong>
-
-                        <span>
-                            France
-                        </span>
-
-                    </div>
-
-                    <button class="product-button view-product">
-                        Voir le produit
-                    </button>
-
-                </div>
-
-            </article>
-
-
-            <!-- CAROTTES -->
-
-            <article
-                class="product"
-                data-name="Carottes"
-                data-category="Légumes"
-                data-location="France"
-            >
-
-                <div class="product-image">
-
-                    <img
-                        src="https://images.unsplash.com/photo-1445282768818-728615cc910a?auto=format&fit=crop&w=900&q=85"
-                        alt="Carottes"
-                    >
-
-                    <button
-                        class="favorite"
-                        aria-label="Ajouter aux favoris"
-                    >
-                        ♡
-                    </button>
-
-                </div>
-
-
-                <div class="product-body">
-
-                    <span class="product-category">
-                        LÉGUMES
-                    </span>
-
-                    <h3>Carottes</h3>
-
-                    <p>
-                        Carottes fraîches.
-                    </p>
-
-                    <div class="product-bottom">
-
-                        <strong>
-                            2,00 € <small>/ kg</small>
-                        </strong>
-
-                        <span>
-                            France
-                        </span>
-
-                    </div>
-
-                    <button class="product-button view-product">
-                        Voir le produit
-                    </button>
-
-                </div>
-
-            </article>
-
-
-            <!-- OEUF -->
-
-            <article
-                class="product"
-                data-name="Œuf"
-                data-category="Œuf"
-                data-location="France"
-            >
-
-                <div class="product-image">
-
-                    <img
-                        src="https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=900&q=85"
-                        alt="Œuf"
-                    >
-
-                    <button
-                        class="favorite"
-                        aria-label="Ajouter aux favoris"
-                    >
-                        ♡
-                    </button>
-
-                </div>
-
-
-                <div class="product-body">
-
-                    <span class="product-category">
-                        ŒUF
-                    </span>
-
-                    <h3>Œuf</h3>
-
-                    <p>
-                        Œuf frais.
-                    </p>
-
-                    <div class="product-bottom">
-
-                        <strong>
-                            3,50 € <small>/ unité</small>
-                        </strong>
-
-                        <span>
-                            France
-                        </span>
-
-                    </div>
-
-                    <button class="product-button view-product">
-                        Voir le produit
-                    </button>
-
-                </div>
-
-            </article>
-
-
-            <!-- MIEL -->
-
-            <article
-                class="product"
-                data-name="Miel"
-                data-category="Miel"
-                data-location="France"
-            >
-
-                <div class="product-image">
-
-                    <img
-                        src="https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=900&q=85"
-                        alt="Miel"
-                    >
-
-                    <button
-                        class="favorite"
-                        aria-label="Ajouter aux favoris"
-                    >
-                        ♡
-                    </button>
-
-                </div>
-
-
-                <div class="product-body">
-
-                    <span class="product-category">
-                        PRODUIT
-                    </span>
-
-                    <h3>Miel</h3>
-
-                    <p>
-                        Miel.
-                    </p>
-
-                    <div class="product-bottom">
-
-                        <strong>
-                            8,50 € <small>/ pot</small>
-                        </strong>
-
-                        <span>
-                            France
-                        </span>
-
-                    </div>
-
-                    <button class="product-button view-product">
-                        Voir le produit
-                    </button>
-
-                </div>
-
-            </article>
-
+        <div class="why-item">
+          <div class="why-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/>
+            </svg>
+          </div>
+          <div>
+            <h4>Circuit ultra-local</h4>
+            <p>Des récoltes qui viennent du quartier ou du village d'à côté, pas d'un entrepôt à des centaines de kilomètres.</p>
+          </div>
         </div>
 
-
-        <div class="empty-state" id="emptyState">
-
-            <strong>Aucun produit trouvé.</strong>
-
-            <p>
-                Essayez une autre recherche.
-            </p>
-
-            <button class="btn btn-dark" id="resetSearch">
-                Voir tous les produits
-            </button>
-
+        <div class="why-item">
+          <div class="why-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v18h18"/>
+              <path d="M18.7 8 12 14.7 8.5 11.2 3 16.7"/>
+            </svg>
+          </div>
+          <div>
+            <h4>Moins de gaspillage</h4>
+            <p>Les surplus du potager trouvent preneur au lieu de finir au compost, et les jardiniers arrondissent leurs fins de mois.</p>
+          </div>
         </div>
-
+      </div>
     </div>
-
+  </div>
 </section>
 
-
-<section class="how" id="comment-ca-marche">
-
-    <div class="container">
-
-        <div class="center-heading">
-
-            <span class="label">
-                COMMENT ÇA MARCHE ?
-            </span>
-
-            <h2>
-                Simple, local, entre voisins.
-            </h2>
-
-        </div>
-
-
-        <div class="steps">
-
-            <div class="step">
-
-                <span>01</span>
-
-                <div class="step-icon">
-                    ⌕
-                </div>
-
-                <h3>Je recherche</h3>
-
-                <p>
-                    Je recherche un produit.
-                </p>
-
-            </div>
-
-
-            <div class="step">
-
-                <span>02</span>
-
-                <div class="step-icon">
-                    ♡
-                </div>
-
-                <h3>Je choisis</h3>
-
-                <p>
-                    Je découvre les annonces.
-                </p>
-
-            </div>
-
-
-            <div class="step">
-
-                <span>03</span>
-
-                <div class="step-icon">
-                    🤝
-                </div>
-
-                <h3>Je contacte</h3>
-
-                <p>
-                    Je contacte le vendeur.
-                </p>
-
-            </div>
-
-        </div>
-
+<!-- ============ ANNONCES EN VEDETTE ============ -->
+<section class="featured-section">
+  <div class="container">
+    <div class="section-heading">
+      <span class="eyebrow">Fraîchement publié</span>
+      <h2>Quelques récoltes du moment</h2>
+      <p>Un aperçu des annonces déposées par les jardiniers de la communauté.</p>
     </div>
 
+    <div class="produce-grid">
+      <div class="produce-card">
+        <div class="produce-card-image">
+          <svg viewBox="0 0 60 60" fill="none">
+            <path d="M30 5 L38 5 L34 55 Z" fill="#E8935C"/>
+            <path d="M30 5 Q20 -8 12 -10 Q24 0 30 10 Z" fill="#4C7A50" transform="translate(0,10)"/>
+          </svg>
+        </div>
+        <div class="produce-card-body">
+          <span class="tag">Légume racine</span>
+          <h4>Carottes du potager</h4>
+          <p class="seller">Marie · à 1,2 km</p>
+          <div class="produce-card-footer">
+            <span class="price">3,50 €/kg</span>
+            <button class="icon-btn" aria-label="Ajouter au panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produce-card">
+        <div class="produce-card-image">
+          <svg viewBox="0 0 60 60" fill="none">
+            <circle cx="30" cy="34" r="20" fill="#D97D45"/>
+            <path d="M20 18 Q30 6 40 18 Q34 12 30 15 Q26 12 20 18Z" fill="#4C7A50"/>
+          </svg>
+        </div>
+        <div class="produce-card-body">
+          <span class="tag">Fruit-légume</span>
+          <h4>Tomates anciennes</h4>
+          <p class="seller">Julien · à 800 m</p>
+          <div class="produce-card-footer">
+            <span class="price">4,00 €/kg</span>
+            <button class="icon-btn" aria-label="Ajouter au panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produce-card">
+        <div class="produce-card-image">
+          <svg viewBox="0 0 60 60" fill="none">
+            <ellipse cx="30" cy="32" rx="14" ry="20" fill="#9FC49A"/>
+            <path d="M30 12 Q26 6 22 4" stroke="#4C7A50" stroke-width="3" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="produce-card-body">
+          <span class="tag">Courgette</span>
+          <h4>Courgettes vertes</h4>
+          <p class="seller">Sophie · à 2 km</p>
+          <div class="produce-card-footer">
+            <span class="price">2,80 €/kg</span>
+            <button class="icon-btn" aria-label="Ajouter au panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produce-card">
+        <div class="produce-card-image">
+          <svg viewBox="0 0 60 60" fill="none">
+            <path d="M30 10c-10 6-14 16-8 26 4 6 12 6 16 0 6-10 2-20-8-26Z" fill="#4C7A50"/>
+          </svg>
+        </div>
+        <div class="produce-card-body">
+          <span class="tag">Aromate</span>
+          <h4>Basilic frais</h4>
+          <p class="seller">Nadia · à 1,5 km</p>
+          <div class="produce-card-footer">
+            <span class="price">1,50 €/botte</span>
+            <button class="icon-btn" aria-label="Ajouter au panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="featured-cta">
+      <a href="annonces.html" class="btn btn-primary">Voir toutes les annonces</a>
+    </div>
+  </div>
 </section>
 
-
-<section class="sell">
-
-    <div class="container">
-
-        <div class="sell-box">
-
-            <div>
-
-                <span class="label">
-                    VOUS AVEZ UN PRODUIT À VENDRE ?
-                </span>
-
-                <h2>
-                    Publiez votre annonce sur AgriVoisin.
-                </h2>
-
-                <p>
-                    Présentez vos produits aux acheteurs.
-                </p>
-
-                <button class="btn btn-light" id="openSellBottom">
-                    Déposer une annonce
-                </button>
-
-            </div>
-
-            <div class="sell-mark">
-                AV
-            </div>
-
-        </div>
-
+<!-- ============ BANDEAU CONFIANCE ============ -->
+<section class="trust-banner">
+  <div class="container">
+    <div class="trust-grid">
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
+        <h4>Paiement sécurisé</h4>
+        <p>Transactions chiffrées, adresse révélée après paiement uniquement.</p>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <h4>Récolte du jour</h4>
+        <p>Des produits vendus dans les heures qui suivent la cueillette.</p>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <h4>Communauté de voisins</h4>
+        <p>Des vendeurs et acheteurs de votre quartier, pas d'inconnus lointains.</p>
+      </div>
     </div>
-
+  </div>
 </section>
 
-</main>
-
-
-<div class="modal" id="productModal">
-
-    <div class="modal-card">
-
-        <button class="modal-close" data-close="productModal">
-            ×
-        </button>
-
-        <div id="modalProductContent"></div>
-
+<!-- ============ CTA FINALE ============ -->
+<section class="final-cta">
+  <div class="container">
+    <div class="final-cta-box">
+      <h2>Votre jardin déborde de récoltes ?</h2>
+      <p>Publiez votre première annonce en quelques minutes et rencontrez les voisins gourmands de votre quartier.</p>
+      <a href="vendre.html" class="btn btn-outline-light">Devenir vendeur</a>
     </div>
+  </div>
+</section>
 
-</div>
-
-
-<div class="modal" id="sellModal">
-
-    <div class="modal-card">
-
-        <button class="modal-close" data-close="sellModal">
-            ×
-        </button>
-
-        <span class="label">
-            VENDRE SUR AGRIVOISIN
-        </span>
-
-        <h2>Déposer une annonce</h2>
-
-        <p class="modal-intro">
-            Présentez votre produit aux acheteurs.
-        </p>
-
-        <form id="sellForm">
-
-            <label>
-                Produit
-                <input
-                    type="text"
-                    id="sellProduct"
-                    placeholder="Nom du produit"
-                    required
-                >
-            </label>
-
-            <label>
-                Catégorie
-                <select id="sellCategory" required>
-                    <option value="">Choisir</option>
-                    <option>Fruits</option>
-                    <option>Légumes</option>
-                    <option>Œuf</option>
-                    <option>Miel</option>
-                    <option>Plants</option>
-                    <option>Autres</option>
-                </select>
-            </label>
-
-            <div class="form-row">
-
-                <label>
-                    Prix
-                    <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0,00"
-                        required
-                    >
-                </label>
-
-                <label>
-                    Unité
-                    <input
-                        type="text"
-                        placeholder="kg, unité, pot..."
-                        required
-                    >
-                </label>
-
-            </div>
-
-            <label>
-                Ville
-                <input
-                    type="text"
-                    placeholder="Votre ville"
-                    required
-                >
-            </label>
-
-            <label>
-                Description
-                <textarea
-                    rows="4"
-                    placeholder="Décrivez votre produit..."
-                    required
-                ></textarea>
-            </label>
-
-            <button
-                class="btn btn-dark full"
-                type="submit"
-            >
-                Publier l'annonce
-            </button>
-
-        </form>
-
-    </div>
-
-</div>
-
-
-<footer class="footer">
-
-    <div class="container footer-inner">
-
-        <div>
-
-            <div class="footer-logo">
-                AgriVoisin
-            </div>
-
-            <p>
-                Le marché entre voisins.
-            </p>
-
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
         </div>
-
-
-        <div class="footer-links">
-
-            <a href="#produits">
-                Acheter
-            </a>
-
-            <a href="#categories">
-                Catégories
-            </a>
-
-            <a href="#comment-ca-marche">
-                Comment ça marche
-            </a>
-
-            <button id="footerSell">
-                Vendre
-            </button>
-
-        </div>
-
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+          <li><a href="vendre.html">Devenir vendeur</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
     </div>
-
-
-    <div class="container copyright">
-        © 2026 AgriVoisin
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
     </div>
-
+  </div>
 </footer>
 
-
 <script src="script.js"></script>
-
 </body>
 </html>

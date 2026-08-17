@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone', // Empêche Vercel de boucler à l'infini sur le build
   swcMinify: false,
   typescript: {
-    ignoreBuildErrors: true, // Force le serveur à ignorer les blocages techniques
+    ignoreBuildErrors: true,
   },
   eslint: {
-    ignoreDuringBuilds: true, // Force le serveur à publier sans s'arrêter
+    ignoreDuringBuilds: true,
   },
 };
 

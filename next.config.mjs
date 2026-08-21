@@ -1,11 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: true, // Force Netlify à publier malgré les alertes TypeScript
+    ignoreBuildErrors: true,
   },
   eslint: {
-    ignoreDuringBuilds: true, // Empêche les blocages sur les règles de syntaxe
+    ignoreDuringBuilds: true,
   },
 };
-
-export default nextConfig;

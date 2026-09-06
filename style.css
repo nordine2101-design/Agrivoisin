@@ -96,11 +96,17 @@ h1, h2, h3, h4 {
   border-bottom: 1px solid rgba(107, 88, 66, 0.08);
 }
 
-.site-header .container {
+.logo-bar {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 0;
+}
+
+.nav-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 76px;
+  height: 64px;
 }
 
 .logo {

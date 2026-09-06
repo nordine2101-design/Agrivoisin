@@ -739,7 +739,92 @@ h1, h2, h3, h4 {
   flex-wrap: wrap;
   gap: 10px;
 }
+/* ============================================
+   PAGE ANNONCES — en-tête, filtres
+   ============================================ */
 
+.page-header {
+  padding: 50px 0 30px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--sky) 0%, var(--cream) 100%);
+}
+
+.page-header h1 {
+  font-size: clamp(1.8rem, 3.5vw, 2.4rem);
+  margin-bottom: 10px;
+}
+
+.page-header p {
+  color: var(--soil);
+  font-size: 1.05rem;
+}
+
+.filters-bar {
+  padding: 24px 0;
+  border-bottom: 1px solid rgba(107, 88, 66, 0.1);
+}
+
+.filters-bar .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.filter-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  background: var(--cream-soft);
+  color: var(--soil);
+  border: 1px solid rgba(107, 88, 66, 0.15);
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.chip:hover {
+  border-color: var(--leaf);
+  color: var(--leaf-deep);
+}
+
+.chip-active {
+  background: var(--leaf);
+  color: var(--white);
+  border-color: var(--leaf);
+}
+
+.sort-select {
+  background: var(--white);
+  border: 1px solid rgba(107, 88, 66, 0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.listings-section {
+  padding: 40px 0 90px;
+}
+
+.listings-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 900px) {
+  .listings-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .listings-grid { grid-template-columns: 1fr; }
+}
 /* ============================================
    RESPONSIVE
    ============================================ */

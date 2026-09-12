@@ -826,6 +826,127 @@ h1, h2, h3, h4 {
   .listings-grid { grid-template-columns: 1fr; }
 }
 /* ============================================
+   PAGES CONNEXION / INSCRIPTION
+   ============================================ */
+
+.auth-section {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: linear-gradient(180deg, var(--sky) 0%, var(--cream) 45%);
+}
+
+.auth-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  padding: 44px 40px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+}
+
+.auth-card-wide {
+  max-width: 480px;
+}
+
+.auth-card h1 {
+  font-size: 1.7rem;
+  margin-bottom: 10px;
+}
+
+.auth-subtitle {
+  color: var(--soil);
+  font-size: 0.95rem;
+  margin-bottom: 28px;
+}
+
+.account-type-toggle {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.account-type-btn {
+  flex: 1;
+  background: var(--cream-soft);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 16px 10px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--soil);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.account-type-emoji {
+  font-size: 1.4rem;
+}
+
+.account-type-active {
+  background: var(--cream);
+  border-color: var(--leaf);
+  color: var(--leaf-deep);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.auth-form label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--leaf-deep);
+  margin-top: 14px;
+}
+
+.auth-form input {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid rgba(107, 88, 66, 0.2);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: var(--leaf);
+}
+
+.auth-link-inline {
+  align-self: flex-end;
+  font-size: 0.85rem;
+  color: var(--leaf-deep);
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.auth-submit {
+  margin-top: 24px;
+  width: 100%;
+}
+
+.auth-switch {
+  margin-top: 24px;
+  font-size: 0.9rem;
+  color: var(--soil);
+}
+
+.auth-switch a {
+  color: var(--leaf-deep);
+  font-weight: 700;
+}/* ============================================
    RESPONSIVE
    ============================================ */
 
@@ -846,7 +967,7 @@ h1, h2, h3, h4 {
   .hero-cta { flex-direction: column; align-items: stretch; }
 }
 
-Colle ça dans style.css (remplace tout). Dis-moi quand c'est fait, et je t'envoie le nouveau index.html avec les vraies photos.
+
 
 
 

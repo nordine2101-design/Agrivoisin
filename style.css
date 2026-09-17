@@ -1098,7 +1098,84 @@ h1, h2, h3, h4 {
 
 @media (max-width: 800px) {
   .product-layout { grid-template-columns: 1fr; }
-}/* ============================================
+/* ============================================
+   PANIER
+   ============================================ */
+
+.cart-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(107, 88, 66, 0.08);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 30px;
+}
+
+.cart-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--white);
+  padding: 16px 20px;
+  gap: 16px;
+}
+
+.cart-item-name {
+  font-weight: 600;
+  color: var(--ink);
+  flex: 1;
+}
+
+.cart-item-price {
+  color: var(--carrot-deep);
+  font-weight: 700;
+}
+
+.cart-item-remove {
+  background: var(--cream-soft);
+  color: var(--soil);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 0.85rem;
+}
+
+.cart-item-remove:hover {
+  background: #f0d0d0;
+  color: #C8352F;
+}
+
+.cart-summary {
+  background: var(--cream-soft);
+  border-radius: var(--radius-lg);
+  padding: 30px;
+  max-width: 440px;
+  margin-left: auto;
+}
+
+.cart-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  color: var(--soil);
+}
+
+.cart-summary-total {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  border-top: 1px solid rgba(107, 88, 66, 0.2);
+  margin-top: 8px;
+  padding-top: 16px;
+}
+
+.cart-checkout-btn {
+  width: 100%;
+  padding: 16px;
+  font-size: 1.05rem;
+  margin-top: 20px;
+}}/* ============================================
    RESPONSIVE
    ============================================ */
 

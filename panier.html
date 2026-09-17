@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon panier — Agrivoisin</title>
+<meta name="description" content="Votre panier de récoltes sur Agrivoisin.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+  <div class="logo-bar">
+    <a href="index.html" class="logo">
+      <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:200px;width:auto;">
+    </a>
+  </div>
+
+  <div class="container nav-bar">
+    <nav class="main-nav">
+      <a href="index.html#comment-ca-marche">Comment ça marche</a>
+      <a href="annonces.html">Les annonces</a>
+      <a href="index.html#pourquoi">Pourquoi Agrivoisin</a>
+      <a href="vendre.html">Devenir vendeur</a>
+    </nav>
+
+    <div class="header-actions">
+      <a href="panier.html" class="cart-icon" aria-label="Panier">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"></circle>
+          <circle cx="20" cy="21" r="1"></circle>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span class="cart-count">0</span>
+      </a>
+      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
+      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ EN-TÊTE DE PAGE ============ -->
+<section class="page-header">
+  <div class="container">
+    <h1>Mon panier</h1>
+    <p>Vérifiez votre commande avant de passer au paiement sécurisé.</p>
+  </div>
+</section>
+
+<!-- ============ CONTENU PANIER ============ -->
+<section class="listings-section">
+  <div class="container">
+    <div id="cartEmpty" style="display:none;text-align:center;padding:60px 0;">
+      <p style="font-size:1.1rem;color:var(--soil);margin-bottom:24px;">Votre panier est vide pour l'instant.</p>
+      <a href="annonces.html" class="btn btn-primary">Découvrir les annonces</a>
+    </div>
+
+    <div id="cartContent" style="display:none;">
+      <div id="cartItems" class="cart-items-list"></div>
+
+      <div class="cart-summary">
+        <div class="cart-summary-row">
+          <span>Sous-total</span>
+          <span id="cartSubtotal">0,00 €</span>
+        </div>
+        <div class="cart-summary-row cart-summary-total">
+          <span>Total à payer</span>
+          <span id="cartTotal">0,00 €</span>
+        </div>
+
+        <button class="btn btn-primary cart-checkout-btn" id="checkoutBtn">Payer en toute sécurité</button>
+
+        <p class="product-trust-note" style="margin-top:20px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:20px;height:20px;flex-shrink:0;"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
+          <span>Les adresses des vendeurs seront communiquées automatiquement après confirmation du paiement.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+          <li><a href="vendre.html">Devenir vendeur</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  function getCart() {
+    return JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+  }
+
+  function parsePrice(priceText) {
+    const match = priceText.replace(',', '.').match(/[\d.]+/);
+    return match ? parseFloat(match[0]) : 0;
+  }
+
+  function renderCart() {
+    const cart = getCart();
+    const emptyEl = document.getElementById('cartEmpty');
+    const contentEl = document.getElementById('cartContent');
+    const itemsEl = document.getElementById('cartItems');
+
+    if (cart.length === 0) {
+      emptyEl.style.display = 'block';
+      contentEl.style.display = 'none';
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+    contentEl.style.display = 'block';
+
+    itemsEl.innerHTML = '';
+    let total = 0;
+
+    cart.forEach((item, index) => {
+      const price = parsePrice(item.price);
+      total += price;
+
+      const row = document.createElement('div');
+      row.className = 'cart-item-row';
+      row.innerHTML = `
+        <span class="cart-item-name">${item.name}</span>
+        <span class="cart-item-price">${item.price}</span>
+        <button class="cart-item-remove" data-index="${index}" aria-label="Retirer">✕</button>
+      `;
+      itemsEl.appendChild(row);
+    });
+
+    document.getElementById('cartSubtotal').textContent = total.toFixed(2).replace('.', ',') + ' €';
+    document.getElementById('cartTotal').textContent = total.toFixed(2).replace('.', ',') + ' €';
+
+    document.querySelectorAll('.cart-item-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cart = getCart();
+        cart.splice(parseInt(btn.dataset.index), 1);
+        localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
+        renderCart();
+        const cartCountEl = document.querySelector('.cart-count');
+        if (cartCountEl) cartCountEl.textContent = cart.length;
+      });
+    });
+  }
+
+  document.getElementById('checkoutBtn').addEventListener('click', async () => {
+    const cart = getCart();
+    const btn = document.getElementById('checkoutBtn');
+    btn.textContent = 'Redirection en cours...';
+    btn.disabled = true;
+
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cart }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Une erreur est survenue');
+      }
+
+      window.location.href = data.checkoutUrl;
+
+    } catch (err) {
+      alert('Erreur : ' + err.message);
+      btn.textContent = 'Payer en toute sécurité';
+      btn.disabled = false;
+    }
+  });
+
+  renderCart();
+</script>
+</body>
+</html>

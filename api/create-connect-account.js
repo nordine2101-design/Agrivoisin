@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -20,7 +22,16 @@ export default async function handler(req, res) {
       },
     });
 
-    // 2. Générer le lien d'inscription (onboarding) Stripe pour ce compte
+    // 2. Enregistrer ce vendeur dans notre base de données Supabase
+    const { error: dbError } = await supabase
+      .from('sellers')
+      .insert({ email: email, stripe_account_id: account.id });
+
+    if (dbError) {
+      console.error('Erreur Supabase :', dbError);
+    }
+
+    // 3. Générer le lien d'inscription (onboarding) Stripe pour ce compte
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
       refresh_url: `${req.headers.origin}/vendre.html`,

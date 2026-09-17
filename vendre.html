@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devenir vendeur — Agrivoisin</title>
+<meta name="description" content="Vendez vos récoltes sur Agrivoisin et recevez vos paiements en toute sécurité.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+  <div class="logo-bar">
+    <a href="index.html" class="logo">
+      <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:200px;width:auto;">
+    </a>
+  </div>
+
+  <div class="container nav-bar">
+    <nav class="main-nav">
+      <a href="index.html#comment-ca-marche">Comment ça marche</a>
+      <a href="annonces.html">Les annonces</a>
+      <a href="index.html#pourquoi">Pourquoi Agrivoisin</a>
+      <a href="vendre.html">Devenir vendeur</a>
+    </nav>
+
+    <div class="header-actions">
+      <a href="panier.html" class="cart-icon" aria-label="Panier">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"></circle>
+          <circle cx="20" cy="21" r="1"></circle>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span class="cart-count">0</span>
+      </a>
+      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
+      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ FORMULAIRE VENDEUR ============ -->
+<section class="auth-section">
+  <div class="auth-card auth-card-wide">
+    <h1>Vendez vos récoltes</h1>
+    <p class="auth-subtitle">Créez votre compte de paiement sécurisé pour recevoir directement l'argent de vos ventes sur Agrivoisin.</p>
+
+    <form class="auth-form" id="sellerForm">
+      <label for="sellerEmail">Votre adresse e-mail</label>
+      <input type="email" id="sellerEmail" placeholder="vous@exemple.com" required>
+
+      <button type="submit" class="btn btn-primary auth-submit" id="sellerSubmitBtn">Créer mon compte de paiement</button>
+    </form>
+
+    <p class="auth-switch" id="sellerError" style="color:#C8352F;display:none;"></p>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+          <li><a href="vendre.html">Devenir vendeur</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  document.getElementById('sellerForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const email = document.getElementById('sellerEmail').value;
+    const btn = document.getElementById('sellerSubmitBtn');
+    const errorEl = document.getElementById('sellerError');
+
+    btn.textContent = 'Création en cours...';
+    btn.disabled = true;
+    errorEl.style.display = 'none';
+
+    try {
+      const response = await fetch('/api/create-connect-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Une erreur est survenue');
+      }
+
+      // Redirection vers le formulaire Stripe (onboarding)
+      window.location.href = data.onboardingUrl;
+
+    } catch (err) {
+      errorEl.textContent = 'Erreur : ' + err.message;
+      errorEl.style.display = 'block';
+      btn.textContent = 'Créer mon compte de paiement';
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

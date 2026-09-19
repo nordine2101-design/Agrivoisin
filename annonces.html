@@ -261,50 +261,7 @@
     })
     .catch((err) => console.error('Erreur chargement annonces :', err));
 </script>
-<script>
-  fetch('/api/get-listings')
-    .then((res) => res.json())
-    .then((data) => {
-      const container = document.getElementById('realListingsContainer');
-      if (!data.listings || data.listings.length === 0) return;
 
-      data.listings.forEach((item) => {
-        const card = document.createElement('div');
-        card.className = 'produce-card';
-        card.innerHTML = `
-          <div class="produce-card-image">
-            <img src="${item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop'}" alt="${item.title}">
-          </div>
-          <div class="produce-card-body">
-            <span class="tag">${item.category || 'Récolte'}</span>
-            <h4>${item.title}</h4>
-            <p class="seller">${item.sellers ? item.sellers.email : 'Vendeur Agrivoisin'}</p>
-            <div class="produce-card-footer">
-              <span class="price">${Number(item.price).toFixed(2).replace('.', ',')} €/${item.unit || 'kg'}</span>
-              <button class="icon-btn" aria-label="Ajouter au panier">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              </button>
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-
-      container.querySelectorAll('.icon-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const card = btn.closest('.produce-card');
-          const name = card.querySelector('h4').textContent;
-          const price = card.querySelector('.price').textContent;
-          const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
-          cart.push({ name, price });
-          localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
-          const cartCountEl = document.querySelector('.cart-count');
-          if (cartCountEl) cartCountEl.textContent = cart.length;
-        });
-      });
-    })
-    .catch((err) => console.error('Erreur chargement annonces :', err));
-</script>
 <!-- ============ FOOTER ============ -->
 <footer class="site-footer">
   <div class="container">

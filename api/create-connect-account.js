@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email } = req.body;
+     const { email, address } = req.body;
 
     // 1. Créer un compte Stripe Connect Express pour ce jardinier
     const account = await stripe.accounts.create({
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     // 2. Enregistrer ce vendeur dans notre base de données Supabase
     const { error: dbError } = await supabase
       .from('sellers')
-      .insert({ email: email, stripe_account_id: account.id });
+      .insert({ email: email, stripe_account_id: account.id, address: address });
 
     if (dbError) {
       console.error('Erreur Supabase :', dbError);

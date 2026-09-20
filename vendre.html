@@ -53,6 +53,9 @@
       <label for="sellerEmail">Votre adresse e-mail</label>
       <input type="email" id="sellerEmail" placeholder="vous@exemple.com" required>
 
+      <label for="sellerAddress">Votre adresse (sera communiquée à l'acheteur après paiement)</label>
+      <input type="text" id="sellerAddress" placeholder="Ex : 12 rue des Jardins, 75000 Paris" required>
+
       <button type="submit" class="btn btn-primary auth-submit" id="sellerSubmitBtn">Créer mon compte de paiement</button>
     </form>
 
@@ -110,6 +113,7 @@
   document.getElementById('sellerForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const email = document.getElementById('sellerEmail').value;
+    const address = document.getElementById('sellerAddress').value;
     const btn = document.getElementById('sellerSubmitBtn');
     const errorEl = document.getElementById('sellerError');
 
@@ -121,7 +125,7 @@
       const response = await fetch('/api/create-connect-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, address }),
       });
 
       const data = await response.json();

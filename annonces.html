@@ -87,7 +87,7 @@
           <p class="seller">Marie · à 1,2 km</p>
           <div class="produce-card-footer">
             <span class="price">3,50 €/kg</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
+             <button class="icon-btn" aria-label="Ajouter au panier" data-stripe-account="${item.sellers ? item.sellers.stripe_account_id : ''}" data-listing-id="${item.id}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           </div>
@@ -251,8 +251,10 @@
           const card = btn.closest('.produce-card');
           const name = card.querySelector('h4').textContent;
           const price = card.querySelector('.price').textContent;
+          const stripeAccountId = btn.dataset.stripeAccount;
+          const listingId = btn.dataset.listingId;
           const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
-          cart.push({ name, price });
+          cart.push({ name, price, stripeAccountId, listingId });
           localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
           const cartCountEl = document.querySelector('.cart-count');
           if (cartCountEl) cartCountEl.textContent = cart.length;

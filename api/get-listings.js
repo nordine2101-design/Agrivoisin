@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     const { data: listings, error } = await supabase
       .from('listings')
-      .select('id, title, description, price, unit, category, image_url, created_at, sellers(email, city)')
+      .select('id, title, description, price, unit, category, image_url, created_at, sellers(email, city, stripe_account_id)')
       .order('created_at', { ascending: false });
 
     if (error) {

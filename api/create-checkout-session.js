@@ -25,16 +25,29 @@ export default async function handler(req, res) {
           product_data: {
             name: item.name,
           },
-          unit_amount: Math.round(priceInEuros * 100), // Stripe attend des centimes
+          unit_amount: Math.round(priceInEuros * 100),
         },
         quantity: 1,
       };
     });
 
+    // On garde la liste des vendeurs/montants concernés pour la répartition après paiement
+    const transferInfo = cart
+      .filter((item) => item.stripeAccountId)
+      .map((item) => {
+        const priceMatch = item.price.replace(',', '.').match(/[\d.]+/);
+        const priceInEuros = priceMatch ? parseFloat(priceMatch[0]) : 0;
+        return `${item.stripeAccountId}:${Math.round(priceInEuros * 100)}`;
+      })
+      .join(',');
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
       line_items: lineItems,
+      metadata: {
+        transfers: transferInfo,
+      },
       success_url: `${req.headers.origin}/paiement-succes.html`,
       cancel_url: `${req.headers.origin}/panier.html`,
     });

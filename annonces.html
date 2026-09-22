@@ -237,7 +237,7 @@
             <p class="seller">${item.sellers ? item.sellers.email : 'Vendeur Agrivoisin'}</p>
             <div class="produce-card-footer">
               <span class="price">${Number(item.price).toFixed(2).replace('.', ',')} €/${item.unit || 'kg'}</span>
-              <button class="icon-btn" aria-label="Ajouter au panier">
+              <button class="icon-btn" aria-label="Ajouter au panier" data-stripe-account="${item.sellers ? item.sellers.stripe_account_id : ''}" data-listing-id="${item.id}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
               </button>
             </div>

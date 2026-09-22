@@ -52,7 +52,12 @@
       </svg>
     </div>
     <h1>Paiement confirmé !</h1>
-    <p class="auth-subtitle">Merci pour votre commande. Les vendeurs concernés ont été notifiés et leur adresse vous sera communiquée pour organiser la remise des récoltes.</p>
+    <p class="auth-subtitle">Merci pour votre commande. Voici l'adresse pour récupérer votre récolte.</p>
+
+    <div id="sellerAddresses" style="text-align:left;background:var(--cream-soft);border-radius:var(--radius-md);padding:20px;margin-bottom:24px;display:none;">
+      <p style="font-weight:700;margin-bottom:10px;">Adresse(s) pour récupérer votre commande :</p>
+      <div id="sellerAddressList"></div>
+    </div>
 
     <a href="annonces.html" class="btn btn-primary auth-submit" style="display:inline-block;text-decoration:none;">Continuer mes achats</a>
   </div>
@@ -104,8 +109,31 @@
 </footer>
 
 <script>
-  // Vider le panier une fois le paiement confirmé
   localStorage.removeItem('agrivoisin_cart');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('session_id');
+
+  if (sessionId) {
+    fetch(`/api/get-order-details?session_id=${sessionId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.paid && data.sellers && data.sellers.length > 0) {
+          const container = document.getElementById('sellerAddresses');
+          const list = document.getElementById('sellerAddressList');
+
+          data.sellers.forEach((seller) => {
+            const p = document.createElement('p');
+            p.style.marginBottom = '8px';
+            p.innerHTML = `<strong>${seller.email}</strong><br>${seller.address || 'Adresse non renseignée'}`;
+            list.appendChild(p);
+          });
+
+          container.style.display = 'block';
+        }
+      })
+      .catch((err) => console.error('Erreur récupération adresse :', err));
+  }
 </script>
 <script src="script.js"></script>
 </body>

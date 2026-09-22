@@ -6,6 +6,7 @@
 <title>Créer un compte — Agrivoisin</title>
 <meta name="description" content="Créez votre compte Agrivoisin, jardinier ou acheteur.">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -60,7 +61,7 @@
       </button>
     </div>
 
-    <form class="auth-form">
+    <form class="auth-form" id="signupForm">
       <label for="name">Nom complet</label>
       <input type="text" id="name" placeholder="Votre nom" required>
 
@@ -68,13 +69,16 @@
       <input type="email" id="email" placeholder="vous@exemple.com" required>
 
       <label for="password">Mot de passe</label>
-      <input type="password" id="password" placeholder="8 caractères minimum" required>
+      <input type="password" id="password" placeholder="8 caractères minimum" minlength="8" required>
 
       <label for="city">Ville</label>
       <input type="text" id="city" placeholder="Votre ville" required>
 
-      <button type="submit" class="btn btn-primary auth-submit">Créer mon compte</button>
+      <button type="submit" class="btn btn-primary auth-submit" id="signupBtn">Créer mon compte</button>
     </form>
+
+    <p class="auth-switch" id="signupError" style="color:#C8352F;display:none;"></p>
+    <p class="auth-switch" id="signupSuccess" style="color:#4C7A50;display:none;"></p>
 
     <p class="auth-switch">Déjà un compte ? <a href="connexion.html">Se connecter</a></p>
   </div>
@@ -126,5 +130,63 @@
 </footer>
 
 <script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  let selectedType = 'acheteur';
+  document.querySelectorAll('.account-type-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.account-type-btn').forEach((b) => b.classList.remove('account-type-active'));
+      btn.classList.add('account-type-active');
+      selectedType = btn.dataset.type;
+    });
+  });
+
+  document.getElementById('signupForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('signupBtn');
+    const errorEl = document.getElementById('signupError');
+    const successEl = document.getElementById('signupSuccess');
+
+    btn.textContent = 'Création en cours...';
+    btn.disabled = true;
+    errorEl.style.display = 'none';
+    successEl.style.display = 'none';
+
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const city = document.getElementById('city').value;
+
+    const { data, error } = await supabaseClient.auth.signUp({
+      email: email,
+      password: password,
+      options: {
+        data: {
+          full_name: name,
+          role: selectedType,
+          city: city,
+        },
+      },
+    });
+
+    if (error) {
+      errorEl.textContent = 'Erreur : ' + error.message;
+      errorEl.style.display = 'block';
+      btn.textContent = 'Créer mon compte';
+      btn.disabled = false;
+      return;
+    }
+
+    successEl.textContent = 'Compte créé avec succès ! Vous pouvez maintenant vous connecter.';
+    successEl.style.display = 'block';
+    document.getElementById('signupForm').reset();
+    btn.textContent = 'Créer mon compte';
+    btn.disabled = false;
+  });
+</script>
 </body>
 </html>

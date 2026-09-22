@@ -6,6 +6,7 @@
 <title>Se connecter — Agrivoisin</title>
 <meta name="description" content="Connectez-vous à votre compte Agrivoisin.">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -49,7 +50,7 @@
     <h1>Content de vous revoir</h1>
     <p class="auth-subtitle">Connectez-vous pour retrouver vos annonces et vos commandes.</p>
 
-    <form class="auth-form">
+    <form class="auth-form" id="loginForm">
       <label for="email">Adresse e-mail</label>
       <input type="email" id="email" placeholder="vous@exemple.com" required>
 
@@ -58,8 +59,11 @@
 
       <a href="#" class="auth-link-inline">Mot de passe oublié ?</a>
 
-      <button type="submit" class="btn btn-primary auth-submit">Se connecter</button>
+      <button type="submit" class="btn btn-primary auth-submit" id="loginBtn">Se connecter</button>
     </form>
+
+    <p class="auth-switch" id="loginError" style="color:#C8352F;display:none;"></p>
+    <p class="auth-switch" id="loginSuccess" style="color:#4C7A50;display:none;"></p>
 
     <p class="auth-switch">Pas encore de compte ? <a href="inscription.html">Créer un compte</a></p>
   </div>
@@ -111,5 +115,46 @@
 </footer>
 
 <script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  document.getElementById('loginForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    const errorEl = document.getElementById('loginError');
+    const successEl = document.getElementById('loginSuccess');
+
+    btn.textContent = 'Connexion en cours...';
+    btn.disabled = true;
+    errorEl.style.display = 'none';
+    successEl.style.display = 'none';
+
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
+      errorEl.textContent = 'Erreur : ' + error.message;
+      errorEl.style.display = 'block';
+      btn.textContent = 'Se connecter';
+      btn.disabled = false;
+      return;
+    }
+
+    successEl.textContent = 'Connexion réussie ! Redirection...';
+    successEl.style.display = 'block';
+
+    setTimeout(() => {
+      window.location.href = 'annonces.html';
+    }, 1000);
+  });
+</script>
 </body>
 </html>

@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       metadata: {
         transfers: transferInfo,
       },
-      success_url: `${req.headers.origin}/paiement-succes.html`,
+      success_url: `${req.headers.origin}/paiement-succes.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.origin}/panier.html`,
     });
 

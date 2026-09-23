@@ -57,7 +57,14 @@
       <input type="text" id="title" placeholder="Ex : Carottes du potager" required>
 
       <label for="category">Catégorie</label>
-      <input type="text" id="category" placeholder="Ex : Légume racine">
+      <select id="category" required>
+        <option value="" disabled selected>Choisissez une catégorie</option>
+      </select>
+
+      <label for="subcategory" id="subcategoryLabel" style="display:none;">Sous-catégorie</label>
+      <select id="subcategory" style="display:none;">
+        <option value="" disabled selected>Choisissez une sous-catégorie</option>
+      </select>
 
       <label for="description">Description</label>
       <input type="text" id="description" placeholder="Décrivez votre récolte">
@@ -126,6 +133,57 @@
 
 <script src="script.js"></script>
 <script>
+  // Catégories et sous-catégories du site Agrivoisin
+  const CATEGORIES = {
+    "Fruits": ["Pommes", "Poires", "Prunes", "Pêches / Nectarines", "Abricots", "Cerises", "Fraises", "Framboises", "Groseilles / Cassis", "Melons / Pastèques", "Raisins de table", "Kiwis", "Rhubarbe", "Autres fruits"],
+    "Légumes": ["Tomates", "Courgettes / Courges", "Salades", "Carottes", "Pommes de terre", "Oignons / Échalotes / Ail", "Poivrons / Piments", "Aubergines", "Haricots / Petits pois", "Choux", "Concombres / Cornichons", "Betteraves", "Radis", "Potirons / Citrouilles", "Autres légumes"],
+    "Aromates": [],
+    "Produits de la ruche": ["Miel", "Cire", "Produits dérivés de la ruche"],
+    "Jus et boissons artisanales": ["Jus", "Sirop", "Autres boissons non alcoolisées"],
+    "Plants et graines": [],
+    "Fleurs du jardin": ["Bouquets", "Fleurs coupées", "Fleurs séchées", "Compositions florales"],
+    "Bocaux, confitures et préparations": ["Confitures", "Gelées", "Compotes", "Fruits au sirop", "Légumes en bocaux", "Sauces/coulis", "Conserves maison"],
+    "Confiseries et douceurs aux fruits": ["Pâtes de fruits", "Fruits confits", "Fruits enrobés", "Autres douceurs à base de fruits"],
+    "Fruits à coque": ["Noix", "Noisettes", "Amandes", "Châtaignes", "Pistaches", "Noix de cajou", "Autres fruits à coque"],
+    "Fruits séchés": ["Pommes séchées", "Poires séchées", "Abricots secs", "Figues séchées", "Pruneaux", "Raisins secs", "Dattes", "Autres fruits séchés"]
+  };
+
+  const categorySelect = document.getElementById('category');
+  const subcategorySelect = document.getElementById('subcategory');
+  const subcategoryLabel = document.getElementById('subcategoryLabel');
+
+  // Remplir le menu des catégories
+  Object.keys(CATEGORIES).forEach(function (cat) {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    categorySelect.appendChild(opt);
+  });
+
+  // Mettre à jour les sous-catégories selon la catégorie choisie
+  categorySelect.addEventListener('change', function () {
+    const subcats = CATEGORIES[categorySelect.value] || [];
+
+    subcategorySelect.innerHTML = '<option value="" disabled selected>Choisissez une sous-catégorie</option>';
+
+    if (subcats.length > 0) {
+      subcats.forEach(function (sub) {
+        const opt = document.createElement('option');
+        opt.value = sub;
+        opt.textContent = sub;
+        subcategorySelect.appendChild(opt);
+      });
+      subcategorySelect.style.display = '';
+      subcategoryLabel.style.display = '';
+      subcategorySelect.required = true;
+    } else {
+      subcategorySelect.style.display = 'none';
+      subcategoryLabel.style.display = 'none';
+      subcategorySelect.required = false;
+      subcategorySelect.value = '';
+    }
+  });
+
   document.getElementById('listingForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = document.getElementById('listingSubmitBtn');
@@ -141,6 +199,7 @@
       sellerEmail: document.getElementById('sellerEmail').value,
       title: document.getElementById('title').value,
       category: document.getElementById('category').value,
+      subcategory: document.getElementById('subcategory').value || null,
       description: document.getElementById('description').value,
       price: parseFloat(document.getElementById('price').value),
       unit: document.getElementById('unit').value,
@@ -163,6 +222,8 @@
       successEl.textContent = 'Annonce publiée avec succès !';
       successEl.style.display = 'block';
       document.getElementById('listingForm').reset();
+      subcategorySelect.style.display = 'none';
+      subcategoryLabel.style.display = 'none';
 
     } catch (err) {
       errorEl.textContent = 'Erreur : ' + err.message;

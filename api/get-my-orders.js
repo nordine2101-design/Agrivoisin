@@ -39,10 +39,23 @@ export default async function handler(req, res) {
 
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('id, order_id, seller_id, listing_id, listings(title, image_url), sellers(email)')
+      .select('id, order_id, seller_id, listing_id, listings(title, image_url)')
       .in('order_id', orderIds);
 
     if (itemsError) throw itemsError;
+
+    const sellerIds = [...new Set(items.map((it) => it.seller_id).filter(Boolean))];
+    let sellersById = {};
+    if (sellerIds.length > 0) {
+      const { data: sellersData, error: sellersError } = await supabase
+        .from('sellers')
+        .select('id, email')
+        .in('id', sellerIds);
+      if (sellersError) throw sellersError;
+      sellersData.forEach((s) => {
+        sellersById[s.id] = s.email;
+      });
+    }
 
     const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
@@ -60,7 +73,7 @@ export default async function handler(req, res) {
         if (!sellersMap[it.seller_id]) {
           sellersMap[it.seller_id] = {
             sellerId: it.seller_id,
-            sellerEmail: it.sellers ? it.sellers.email : 'Vendeur',
+            sellerEmail: sellersById[it.seller_id] || 'Vendeur',
             products: [],
           };
         }

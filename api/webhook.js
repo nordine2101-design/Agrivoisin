@@ -61,7 +61,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. Enregistrement de la commande dans Supabase (nouveau)
+    // 2. Enregistrement de la commande dans Supabase
     if (buyerId && itemsRaw) {
       try {
         const { data: order, error: orderError } = await supabase
@@ -82,6 +82,7 @@ export default async function handler(req, res) {
               order_id: order.id,
               listing_id: listingId || null,
               seller_id: sellerId || null,
+              price_at_purchase: amount ? parseInt(amount, 10) / 100 : 0,
             };
           });
 

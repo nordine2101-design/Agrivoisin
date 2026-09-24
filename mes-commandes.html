@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -35,6 +36,7 @@
         </svg>
         <span class="cart-count">0</span>
       </a>
+      <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
       <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
       <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
       <button class="nav-toggle" aria-label="Menu">
@@ -137,12 +139,12 @@
     return html;
   }
 
-  function renderExistingReview(review) {
+  function renderExistingReview(review, justSubmitted) {
     return `
       <div class="existing-review">
         <p>${'🍓'.repeat(review.rating)}</p>
         ${review.comment ? `<p>"${review.comment}"</p>` : ''}
-        <p style="font-size:0.9em;color:#888;">Avis envoyé</p>
+        <p style="font-size:0.9em;color:#888;">${justSubmitted ? 'Avis envoyé' : 'Avis déjà envoyé'}</p>
       </div>
     `;
   }
@@ -187,7 +189,7 @@
           return;
         }
 
-        form.outerHTML = renderExistingReview({ rating, comment });
+        form.outerHTML = renderExistingReview({ rating, comment }, true);
       });
     });
   }
@@ -224,7 +226,7 @@
           sellersHtml += `
             <div class="order-seller-block">
               <p><strong>${seller.sellerEmail}</strong> — ${seller.products.join(', ')}</p>
-              ${seller.review ? renderExistingReview(seller.review) : renderStrawberryPicker(order.orderId, seller.sellerId)}
+              ${seller.review ? renderExistingReview(seller.review, false) : renderStrawberryPicker(order.orderId, seller.sellerId)}
             </div>
           `;
         });

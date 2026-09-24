@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
 export const config = {
   api: {
@@ -36,7 +38,10 @@ export default async function handler(req, res) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const transfersRaw = session.metadata?.transfers || '';
+    const buyerId = session.metadata?.buyer_id || '';
+    const itemsRaw = session.metadata?.items || '';
 
+    // 1. Transferts d'argent aux vendeurs (déjà existant)
     if (transfersRaw) {
       const transfers = transfersRaw.split(',').filter(Boolean);
 
@@ -54,6 +59,45 @@ export default async function handler(req, res) {
           console.error(`Erreur de transfert vers ${accountId} :`, transferError.message);
         }
       }
+    }
+
+    // 2. Enregistrement de la commande dans Supabase (nouveau)
+    if (buyerId && itemsRaw) {
+      try {
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .insert({
+            buyer_id: buyerId,
+            total_amount: session.amount_total / 100,
+          })
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error('Erreur création commande :', orderError.message);
+        } else {
+          const items = itemsRaw.split(',').filter(Boolean).map((entry) => {
+            const [listingId, sellerId, amount] = entry.split(':');
+            return {
+              order_id: order.id,
+              listing_id: listingId || null,
+              seller_id: sellerId || null,
+            };
+          });
+
+          const { error: itemsError } = await supabase.from('order_items').insert(items);
+
+          if (itemsError) {
+            console.error('Erreur création articles de commande :', itemsError.message);
+          } else {
+            console.log('Commande enregistrée avec succès :', order.id);
+          }
+        }
+      } catch (dbError) {
+        console.error('Erreur base de données :', dbError.message);
+      }
+    } else {
+      console.log('Pas d\'acheteur connecté identifié, commande non enregistrée dans Supabase.');
     }
   }
 

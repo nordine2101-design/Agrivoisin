@@ -131,6 +131,11 @@
 
 <script src="script.js"></script>
 <script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
   function getCart() {
     return JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
   }
@@ -194,9 +199,15 @@
     btn.disabled = true;
 
     try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const headers = { 'Content-Type': 'application/json' };
+      if (session) {
+        headers['Authorization'] = 'Bearer ' + session.access_token;
+      }
+
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ cart }),
       });
 
@@ -217,5 +228,3 @@
 
   renderCart();
 </script>
-</body>
-</html>

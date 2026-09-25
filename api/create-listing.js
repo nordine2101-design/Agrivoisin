@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { sellerEmail, title, description, price, unit, category, subcategory, imageUrl } = req.body;
+    const { sellerEmail, title, description, price, unit, category, subcategory, harvestDate, imageUrl } = req.body;
 
     // 1. Retrouver le vendeur à partir de son e-mail
     const { data: seller, error: sellerError } = await supabase
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
         unit,
         category,
         subcategory,
+        harvest_date: harvestDate,
         image_url: imageUrl,
       })
       .select()

@@ -66,6 +66,10 @@
         <option value="" disabled selected>Choisissez une sous-catégorie</option>
       </select>
 
+      <label for="harvestDate" id="harvestDateLabel" style="display:none;">Date de récolte</label>
+      <input type="date" id="harvestDate" style="display:none;">
+      <p id="harvestDateHint" style="display:none;font-size:0.85em;color:#888;margin-top:-8px;">Cette date détermine le niveau de fraîcheur affiché sur votre annonce.</p>
+
       <label for="description">Description</label>
       <input type="text" id="description" placeholder="Décrivez votre récolte">
 
@@ -148,9 +152,15 @@
     "Fruits séchés": ["Pommes séchées", "Poires séchées", "Abricots secs", "Figues séchées", "Pruneaux", "Raisins secs", "Dattes", "Autres fruits séchés"]
   };
 
+  // Catégories pour lesquelles la date de récolte est obligatoire
+  const HARVEST_DATE_REQUIRED_CATEGORIES = ["Fruits", "Légumes"];
+
   const categorySelect = document.getElementById('category');
   const subcategorySelect = document.getElementById('subcategory');
   const subcategoryLabel = document.getElementById('subcategoryLabel');
+  const harvestDateInput = document.getElementById('harvestDate');
+  const harvestDateLabel = document.getElementById('harvestDateLabel');
+  const harvestDateHint = document.getElementById('harvestDateHint');
 
   // Remplir le menu des catégories
   Object.keys(CATEGORIES).forEach(function (cat) {
@@ -160,7 +170,7 @@
     categorySelect.appendChild(opt);
   });
 
-  // Mettre à jour les sous-catégories selon la catégorie choisie
+  // Mettre à jour les sous-catégories et le champ date de récolte selon la catégorie choisie
   categorySelect.addEventListener('change', function () {
     const subcats = CATEGORIES[categorySelect.value] || [];
 
@@ -182,6 +192,20 @@
       subcategorySelect.required = false;
       subcategorySelect.value = '';
     }
+
+    if (HARVEST_DATE_REQUIRED_CATEGORIES.includes(categorySelect.value)) {
+      harvestDateInput.style.display = '';
+      harvestDateLabel.style.display = '';
+      harvestDateHint.style.display = '';
+      harvestDateInput.required = true;
+      harvestDateInput.max = new Date().toISOString().split('T')[0];
+    } else {
+      harvestDateInput.style.display = 'none';
+      harvestDateLabel.style.display = 'none';
+      harvestDateHint.style.display = 'none';
+      harvestDateInput.required = false;
+      harvestDateInput.value = '';
+    }
   });
 
   document.getElementById('listingForm').addEventListener('submit', async function (e) {
@@ -200,6 +224,7 @@
       title: document.getElementById('title').value,
       category: document.getElementById('category').value,
       subcategory: document.getElementById('subcategory').value || null,
+      harvestDate: document.getElementById('harvestDate').value || null,
       description: document.getElementById('description').value,
       price: parseFloat(document.getElementById('price').value),
       unit: document.getElementById('unit').value,
@@ -224,6 +249,9 @@
       document.getElementById('listingForm').reset();
       subcategorySelect.style.display = 'none';
       subcategoryLabel.style.display = 'none';
+      harvestDateInput.style.display = 'none';
+      harvestDateLabel.style.display = 'none';
+      harvestDateHint.style.display = 'none';
 
     } catch (err) {
       errorEl.textContent = 'Erreur : ' + err.message;

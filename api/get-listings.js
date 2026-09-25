@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
+  realtime: {
+    params: {
+      eventsPerSecond: 0,
+    },
+  },
+});
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

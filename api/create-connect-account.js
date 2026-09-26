@@ -10,7 +10,23 @@ export default async function handler(req, res) {
   }
 
   try {
-     const { email, address } = req.body;
+    const { email, address } = req.body;
+
+    // 0. Vérifier que la personne est bien connectée
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({ error: 'Vous devez être connecté pour devenir vendeur.' });
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !userData.user) {
+      return res.status(401).json({ error: 'Session invalide, reconnectez-vous.' });
+    }
+
+    const userId = userData.user.id;
 
     // 1. Créer un compte Stripe Connect Express pour ce jardinier
     const account = await stripe.accounts.create({
@@ -22,10 +38,10 @@ export default async function handler(req, res) {
       },
     });
 
-    // 2. Enregistrer ce vendeur dans notre base de données Supabase
+    // 2. Enregistrer ce vendeur dans notre base de données Supabase, lié à son compte connecté
     const { error: dbError } = await supabase
       .from('sellers')
-      .insert({ email: email, stripe_account_id: account.id, address: address });
+      .insert({ email: email, stripe_account_id: account.id, address: address, user_id: userId });
 
     if (dbError) {
       console.error('Erreur Supabase :', dbError);

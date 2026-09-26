@@ -14,18 +14,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { listingId, sellerEmail } = req.body;
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace('Bearer ', '');
 
-    if (!listingId || !sellerEmail) {
+    if (!token) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !userData.user) {
+      return res.status(401).json({ error: 'Session invalide' });
+    }
+
+    const userId = userData.user.id;
+    const { listingId } = req.body;
+
+    if (!listingId) {
       return res.status(400).json({ error: 'Informations manquantes' });
     }
 
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
       .select('id')
-      .eq('email', sellerEmail)
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('user_id', userId)
       .single();
 
     if (sellerError || !seller) {

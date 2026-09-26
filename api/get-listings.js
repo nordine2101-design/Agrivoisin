@@ -14,14 +14,40 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data: listings, error } = await supabase
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !userData.user) {
+      return res.status(401).json({ error: 'Session invalide' });
+    }
+
+    const userId = userData.user.id;
+
+    const { data: seller, error: sellerError } = await supabase
+      .from('sellers')
+      .select('id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (sellerError || !seller) {
+      return res.status(400).json({ error: "Aucun compte vendeur trouvé pour ce compte. Devenez d'abord vendeur." });
+    }
+
+    const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, sellers(email, city, stripe_account_id)')
+      .select('id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at')
+      .eq('seller_id', seller.id)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      throw error;
-    }
+    if (listingsError) throw listingsError;
 
     res.status(200).json({ listings });
 
@@ -30,4 +56,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-

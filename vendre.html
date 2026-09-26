@@ -6,6 +6,7 @@
 <title>Devenir vendeur — Agrivoisin</title>
 <meta name="description" content="Vendez vos récoltes sur Agrivoisin et recevez vos paiements en toute sécurité.">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -49,7 +50,9 @@
     <h1>Vendez vos récoltes</h1>
     <p class="auth-subtitle">Créez votre compte de paiement sécurisé pour recevoir directement l'argent de vos ventes sur Agrivoisin.</p>
 
-    <form class="auth-form" id="sellerForm">
+    <p id="notLoggedMessage" style="display:none;text-align:center;">Vous devez être connecté pour devenir vendeur. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
+
+    <form class="auth-form" id="sellerForm" style="display:none;">
       <label for="sellerEmail">Votre adresse e-mail</label>
       <input type="email" id="sellerEmail" placeholder="vous@exemple.com" required>
 
@@ -110,7 +113,23 @@
 
 <script src="script.js"></script>
 <script>
-  document.getElementById('sellerForm').addEventListener('submit', async function (e) {
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const sellerForm = document.getElementById('sellerForm');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+
+  supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      sellerForm.style.display = 'flex';
+    } else {
+      notLoggedMessage.style.display = 'block';
+    }
+  });
+
+  sellerForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     const email = document.getElementById('sellerEmail').value;
     const address = document.getElementById('sellerAddress').value;
@@ -122,9 +141,17 @@
     errorEl.style.display = 'none';
 
     try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        throw new Error('Session expirée, reconnectez-vous.');
+      }
+
       const response = await fetch('/api/create-connect-account', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + session.access_token,
+        },
         body: JSON.stringify({ email, address }),
       });
 
@@ -134,7 +161,6 @@
         throw new Error(data.error || 'Une erreur est survenue');
       }
 
-      // Redirection vers le formulaire Stripe (onboarding)
       window.location.href = data.onboardingUrl;
 
     } catch (err) {

@@ -51,15 +51,12 @@
     <h1>Mes annonces</h1>
     <p class="auth-subtitle">Retrouvez et gérez les annonces que vous avez publiées.</p>
 
-    <div id="emailFormSection" style="padding-bottom:24px;">
+    <div id="emailFormSection" class="auth-form" style="padding-bottom:24px;">
       <label for="sellerEmailInput">Votre e-mail (compte vendeur)</label>
-      <input type="email" id="sellerEmailInput" placeholder="vous@exemple.com" class="auth-form" style="margin-bottom:12px;">
+      <input type="email" id="sellerEmailInput" placeholder="vous@exemple.com">
       <button type="button" class="btn btn-primary auth-submit" id="loadListingsBtn" onclick="window.agrivoisinLoadListings()">Voir mes annonces</button>
       <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
     </div>
-  </div>
-</section>
-
 <!-- ============ LISTE DES ANNONCES ============ -->
 <section class="listings-section">
   <div class="container">

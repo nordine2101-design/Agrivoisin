@@ -54,7 +54,7 @@
 </section>
 
 <!-- ============ RECHERCHE PAR EMAIL ============ -->
-<section class="auth-section">
+<section class="auth-section" id="emailFormSection">
   <div class="auth-card">
     <label for="sellerEmailInput">Votre e-mail (compte vendeur)</label>
     <input type="email" id="sellerEmailInput" placeholder="vous@exemple.com" class="auth-form" style="margin-bottom:12px;">
@@ -123,8 +123,9 @@ window.agrivoisinLoadListings = async function () {
   var container = document.getElementById('myListingsContainer');
   var email = emailInput.value;
 
-  errorEl.style.display = 'none';
+ errorEl.style.display = 'none';
   container.innerHTML = '';
+  document.getElementById('emailFormSection').style.display = 'none';
 
   if (!email) {
     errorEl.textContent = 'Merci de renseigner votre e-mail.';

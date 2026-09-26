@@ -45,21 +45,18 @@
   </div>
 </header>
 
-<!-- ============ EN-TÊTE DE PAGE ============ -->
-<section class="page-header" style="padding-bottom:0;">
-  <div class="container">
-    <h1>Mes annonces</h1>
-    <p>Retrouvez et gerez les annonces que vous avez publiees.</p>
-  </div>
-</section>
-
-<!-- ============ RECHERCHE PAR EMAIL ============ -->
-<section class="auth-section" id="emailFormSection" style="padding-top:10px;padding-bottom:10px;">
+<!-- ============ FORMULAIRE ============ -->
+<section class="auth-section">
   <div class="auth-card">
-    <label for="sellerEmailInput">Votre e-mail (compte vendeur)</label>
-    <input type="email" id="sellerEmailInput" placeholder="vous@exemple.com" class="auth-form" style="margin-bottom:12px;">
-    <button type="button" class="btn btn-primary auth-submit" id="loadListingsBtn" onclick="window.agrivoisinLoadListings()">Voir mes annonces</button>
-    <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
+    <h1>Mes annonces</h1>
+    <p class="auth-subtitle">Retrouvez et gérez les annonces que vous avez publiées.</p>
+
+    <div id="emailFormSection">
+      <label for="sellerEmailInput">Votre e-mail (compte vendeur)</label>
+      <input type="email" id="sellerEmailInput" placeholder="vous@exemple.com" class="auth-form" style="margin-bottom:12px;">
+      <button type="button" class="btn btn-primary auth-submit" id="loadListingsBtn" onclick="window.agrivoisinLoadListings()">Voir mes annonces</button>
+      <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
+    </div>
   </div>
 </section>
 
@@ -81,13 +78,13 @@
           </svg>
           Agrivoisin
         </div>
-        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, recolte apres recolte.</p>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
       </div>
       <div class="footer-col">
-        <h5>Decouvrir</h5>
+        <h5>Découvrir</h5>
         <ul>
           <li><a href="annonces.html">Les annonces</a></li>
-          <li><a href="index.html#comment-ca-marche">Comment ca marche</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
           <li><a href="vendre.html">Devenir vendeur</a></li>
         </ul>
       </div>
@@ -95,22 +92,22 @@
         <h5>Compte</h5>
         <ul>
           <li><a href="connexion.html">Se connecter</a></li>
-          <li><a href="inscription.html">Creer un compte</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
           <li><a href="panier.html">Mon panier</a></li>
         </ul>
       </div>
       <div class="footer-col">
         <h5>Informations</h5>
         <ul>
-          <li><a href="#">Conditions generales</a></li>
-          <li><a href="#">Confidentialite</a></li>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
           <li><a href="#">Contact</a></li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
-      <span>&copy; 2026 Agrivoisin. Tous droits reserves.</span>
-      <span>Fait avec entre voisins</span>
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
     </div>
   </div>
 </footer>
@@ -123,13 +120,14 @@ window.agrivoisinLoadListings = async function () {
   var container = document.getElementById('myListingsContainer');
   var email = emailInput.value;
 
- errorEl.style.display = 'none';
+  errorEl.style.display = 'none';
   container.innerHTML = '';
   document.getElementById('emailFormSection').style.display = 'none';
 
   if (!email) {
     errorEl.textContent = 'Merci de renseigner votre e-mail.';
     errorEl.style.display = 'block';
+    document.getElementById('emailFormSection').style.display = 'block';
     return;
   }
 
@@ -232,6 +230,7 @@ window.agrivoisinLoadListings = async function () {
   } catch (err) {
     errorEl.textContent = 'Erreur : ' + err.message;
     errorEl.style.display = 'block';
+    document.getElementById('emailFormSection').style.display = 'block';
   }
 };
 </script>

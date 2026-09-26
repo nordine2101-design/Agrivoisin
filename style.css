@@ -168,10 +168,11 @@ h1, h2, h3, h4 {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 6px 14px;
+  padding: 10px 20px;
   border-radius: 999px;
   font-weight: 600;
   font-size: 0.95rem;
+  white-space: nowrap;
   transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 

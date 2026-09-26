@@ -132,12 +132,12 @@ window.agrivoisinLoadListings = async function () {
 
   errorEl.style.display = 'none';
   container.innerHTML = '';
-  document.getElementById('emailFormSection').style.display = 'none';
+  document.querySelector('.auth-section').style.display = 'none';
 
   if (!email) {
     errorEl.textContent = 'Merci de renseigner votre e-mail.';
     errorEl.style.display = 'block';
-    document.getElementById('emailFormSection').style.display = 'block';
+document.getElementById('emailFormSection').style.display = 'block';
     return;
   }
 

@@ -189,13 +189,14 @@ h1, h2, h3, h4 {
 }
 
 .btn-ghost {
-  background: transparent;
-  color: var(--leaf-deep);
+  background: var(--leaf-deep);
+  color: var(--white);
   border: 1.5px solid var(--leaf-deep);
 }
 
 .btn-ghost:hover {
-  background: var(--leaf-deep);
+  background: var(--prairie);
+  border-color: var(--prairie);
   color: var(--white);
 }
 

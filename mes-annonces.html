@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -7,6 +6,7 @@
 <title>Mes annonces — Agrivoisin</title>
 <meta name="description" content="Gérez vos annonces publiées sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -50,14 +50,13 @@
 <section class="auth-section" style="min-height:auto;align-items:flex-start;padding-top:30px;">
   <div class="auth-card auth-card-wide" style="max-width:600px;margin:0 auto;">
     <h1>Mes annonces</h1>
-    <p class="auth-subtitle">Retrouvez et gérez les annonces que vous avez publiées.</p>
+    <p class="auth-subtitle" id="pageSubtitle">Retrouvez et gérez les annonces que vous avez publiées.</p>
 
-    <div id="emailFormSection" class="auth-form" style="padding-bottom:24px;">
-      <label for="sellerEmailInput">Votre e-mail (compte vendeur)</label>
-      <input type="email" id="sellerEmailInput" placeholder="vous@exemple.com">
-      <button type="button" class="btn btn-primary auth-submit" id="loadListingsBtn" onclick="window.agrivoisinLoadListings()">Voir mes annonces</button>
-      <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
+    <div id="notLoggedSection" style="display:none;">
+      <p style="text-align:center;">Vous devez être connecté pour voir vos annonces. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
     </div>
+
+    <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
   </div>
 </section>
 
@@ -124,125 +123,140 @@
 
 <script src="script.js"></script>
 <script>
-window.agrivoisinLoadListings = async function () {
-  var emailInput = document.getElementById('sellerEmailInput');
-  var errorEl = document.getElementById('listingsError');
-  var container = document.getElementById('myListingsContainer');
-  var email = emailInput.value;
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
 
-  errorEl.style.display = 'none';
-  container.innerHTML = '';
-  document.querySelector('.auth-section').style.display = 'none';
+  const errorEl = document.getElementById('listingsError');
+  const container = document.getElementById('myListingsContainer');
+  const notLoggedSection = document.getElementById('notLoggedSection');
+  const pageSubtitle = document.getElementById('pageSubtitle');
 
-  if (!email) {
-    errorEl.textContent = 'Merci de renseigner votre e-mail.';
-    errorEl.style.display = 'block';
-document.getElementById('emailFormSection').style.display = 'block';
-    return;
-  }
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
 
-  try {
-    var response = await fetch('/api/get-seller-listings?email=' + encodeURIComponent(email));
-    var data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Erreur');
-    }
-
-    if (!data.listings || data.listings.length === 0) {
-      container.innerHTML = '<p>Vous n avez pas encore publie d annonce.</p>';
+    if (!session) {
+      notLoggedSection.style.display = 'block';
+      pageSubtitle.style.display = 'none';
       return;
     }
 
-    data.listings.forEach(function (item) {
-      var div = document.createElement('div');
-      div.className = 'order-card';
-      div.innerHTML =
-        '<form class="edit-listing-form" data-id="' + item.id + '">' +
-        '<h3>' + item.title + '</h3>' +
-        '<label>Titre</label>' +
-        '<input type="text" name="title" value="' + item.title + '" required>' +
-        '<label>Description</label>' +
-        '<input type="text" name="description" value="' + (item.description || '') + '">' +
-        '<label>Prix (euros)</label>' +
-        '<input type="number" step="0.01" name="price" value="' + item.price + '" required>' +
-        '<label>Unite</label>' +
-        '<input type="text" name="unit" value="' + (item.unit || '') + '">' +
-        '<label>Lien photo</label>' +
-        '<input type="text" name="imageUrl" value="' + (item.image_url || '') + '">' +
-        '<div style="display:flex;gap:10px;margin-top:12px;">' +
-        '<button type="submit" class="btn btn-primary">Enregistrer</button>' +
-        '<button type="button" class="btn btn-ghost delete-btn" data-id="' + item.id + '">Supprimer</button>' +
-        '</div>' +
-        '<p class="edit-msg" style="margin-top:8px;display:none;"></p>' +
-        '</form>';
-      container.appendChild(div);
-    });
-
-    document.querySelectorAll('.edit-listing-form').forEach(function (form) {
-      form.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        var listingId = form.getAttribute('data-id');
-        var msgEl = form.querySelector('.edit-msg');
-
-        var payload = {
-          listingId: listingId,
-          sellerEmail: email,
-          title: form.title.value,
-          description: form.description.value,
-          price: parseFloat(form.price.value),
-          unit: form.unit.value,
-          imageUrl: form.imageUrl.value
-        };
-
-        try {
-          var r = await fetch('/api/update-listing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          var d = await r.json();
-          if (!r.ok) throw new Error(d.error || 'Erreur');
-
-          msgEl.textContent = 'Annonce mise a jour !';
-          msgEl.style.color = '#4C7A50';
-          msgEl.style.display = 'block';
-        } catch (err) {
-          msgEl.textContent = 'Erreur : ' + err.message;
-          msgEl.style.color = '#C8352F';
-          msgEl.style.display = 'block';
-        }
+    try {
+      const response = await fetch('/api/get-seller-listings', {
+        headers: { Authorization: 'Bearer ' + session.access_token },
       });
-    });
+      const data = await response.json();
 
-    document.querySelectorAll('.delete-btn').forEach(function (btn) {
-      btn.addEventListener('click', async function () {
-        if (!confirm('Supprimer definitivement cette annonce ?')) return;
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur');
+      }
 
-        var listingId = btn.getAttribute('data-id');
+      pageSubtitle.style.display = 'none';
 
-        try {
-          var r = await fetch('/api/delete-listing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ listingId: listingId, sellerEmail: email })
-          });
-          var d = await r.json();
-          if (!r.ok) throw new Error(d.error || 'Erreur');
+      if (!data.listings || data.listings.length === 0) {
+        container.innerHTML = '<p>Vous n avez pas encore publie d annonce.</p>';
+        return;
+      }
 
-          btn.closest('.order-card').remove();
-        } catch (err) {
-          alert('Erreur : ' + err.message);
-        }
+      data.listings.forEach((item) => {
+        const div = document.createElement('div');
+        div.className = 'order-card';
+        div.innerHTML =
+          '<form class="edit-listing-form" data-id="' + item.id + '">' +
+          '<h3>' + item.title + '</h3>' +
+          '<label>Titre</label>' +
+          '<input type="text" name="title" value="' + item.title + '" required>' +
+          '<label>Description</label>' +
+          '<input type="text" name="description" value="' + (item.description || '') + '">' +
+          '<label>Prix (euros)</label>' +
+          '<input type="number" step="0.01" name="price" value="' + item.price + '" required>' +
+          '<label>Unite</label>' +
+          '<input type="text" name="unit" value="' + (item.unit || '') + '">' +
+          '<label>Lien photo</label>' +
+          '<input type="text" name="imageUrl" value="' + (item.image_url || '') + '">' +
+          '<div style="display:flex;gap:10px;margin-top:12px;">' +
+          '<button type="submit" class="btn btn-primary">Enregistrer</button>' +
+          '<button type="button" class="btn btn-ghost delete-btn" data-id="' + item.id + '">Supprimer</button>' +
+          '</div>' +
+          '<p class="edit-msg" style="margin-top:8px;display:none;"></p>' +
+          '</form>';
+        container.appendChild(div);
       });
-    });
 
-  } catch (err) {
-    errorEl.textContent = 'Erreur : ' + err.message;
-    errorEl.style.display = 'block';
-    document.getElementById('emailFormSection').style.display = 'block';
+      document.querySelectorAll('.edit-listing-form').forEach((form) => {
+        form.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          const listingId = form.getAttribute('data-id');
+          const msgEl = form.querySelector('.edit-msg');
+
+          const { data: { session } } = await supabaseClient.auth.getSession();
+
+          const payload = {
+            listingId: listingId,
+            title: form.title.value,
+            description: form.description.value,
+            price: parseFloat(form.price.value),
+            unit: form.unit.value,
+            imageUrl: form.imageUrl.value,
+          };
+
+          try {
+            const r = await fetch('/api/update-listing', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + session.access_token,
+              },
+              body: JSON.stringify(payload),
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error || 'Erreur');
+
+            msgEl.textContent = 'Annonce mise a jour !';
+            msgEl.style.color = '#4C7A50';
+            msgEl.style.display = 'block';
+          } catch (err) {
+            msgEl.textContent = 'Erreur : ' + err.message;
+            msgEl.style.color = '#C8352F';
+            msgEl.style.display = 'block';
+          }
+        });
+      });
+
+      document.querySelectorAll('.delete-btn').forEach((btn) => {
+        btn.addEventListener('click', async function () {
+          if (!confirm('Supprimer definitivement cette annonce ?')) return;
+
+          const listingId = btn.getAttribute('data-id');
+          const { data: { session } } = await supabaseClient.auth.getSession();
+
+          try {
+            const r = await fetch('/api/delete-listing', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + session.access_token,
+              },
+              body: JSON.stringify({ listingId: listingId }),
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error || 'Erreur');
+
+            btn.closest('.order-card').remove();
+          } catch (err) {
+            alert('Erreur : ' + err.message);
+          }
+        });
+      });
+
+    } catch (err) {
+      errorEl.textContent = 'Erreur : ' + err.message;
+      errorEl.style.display = 'block';
+    }
   }
-};
+
+  init();
 </script>
 </body>
 </html>

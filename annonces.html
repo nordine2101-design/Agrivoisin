@@ -54,16 +54,26 @@
   </div>
 </section>
 
+<!-- ============ LOCALISATION ACHETEUR ============ -->
+<section class="filters-bar">
+  <div class="container" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <input type="text" id="buyerCityInput" placeholder="Entrez votre ville pour voir les distances" style="flex:1;min-width:220px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;">
+    <button class="btn btn-primary" id="buyerCityBtn" type="button">Valider</button>
+    <span id="buyerCityDisplay" style="display:none;font-size:0.9em;color:#4C7A50;"></span>
+  </div>
+</section>
+
 <!-- ============ FILTRES ============ -->
 <section class="filters-bar">
   <div class="container">
     <div class="filter-chips" id="categoryChips">
       <button class="chip chip-active" data-category="Tout">Tout</button>
     </div>
-    <select class="sort-select" aria-label="Trier par">
-      <option>Plus récent</option>
-      <option>Prix croissant</option>
-      <option>Prix décroissant</option>
+    <select class="sort-select" id="sortSelect" aria-label="Trier par">
+      <option value="recent">Plus récent</option>
+      <option value="price-asc">Prix croissant</option>
+      <option value="price-desc">Prix décroissant</option>
+      <option value="distance">Plus proche</option>
     </select>
   </div>
 </section>
@@ -93,10 +103,16 @@
 
   let allListings = [];
   let currentCategory = 'Tout';
+  let currentSort = 'recent';
+  let buyerLocation = null;
 
   const chipsContainer = document.getElementById('categoryChips');
   const container = document.getElementById('realListingsContainer');
   const noListingsMessage = document.getElementById('noListingsMessage');
+  const sortSelect = document.getElementById('sortSelect');
+  const buyerCityInput = document.getElementById('buyerCityInput');
+  const buyerCityBtn = document.getElementById('buyerCityBtn');
+  const buyerCityDisplay = document.getElementById('buyerCityDisplay');
 
   CATEGORIES.forEach((cat) => {
     const btn = document.createElement('button');
@@ -129,12 +145,89 @@
     return html;
   }
 
+  function haversineDistance(lat1, lon1, lat2, lon2) {
+    const toRad = (v) => (v * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function getDistanceForListing(item) {
+    if (!buyerLocation || !item.sellers || item.sellers.latitude == null || item.sellers.longitude == null) {
+      return null;
+    }
+    return haversineDistance(buyerLocation.lat, buyerLocation.lng, item.sellers.latitude, item.sellers.longitude);
+  }
+
+  function loadBuyerLocation() {
+    const saved = localStorage.getItem('agrivoisin_buyer_location');
+    if (saved) {
+      try {
+        buyerLocation = JSON.parse(saved);
+        buyerCityInput.value = buyerLocation.city;
+        buyerCityDisplay.textContent = 'Distances calculées depuis : ' + buyerLocation.city;
+        buyerCityDisplay.style.display = 'inline';
+      } catch (e) {
+        buyerLocation = null;
+      }
+    }
+  }
+
+  buyerCityBtn.addEventListener('click', async () => {
+    const city = buyerCityInput.value.trim();
+    if (!city) return;
+
+    buyerCityBtn.textContent = 'Recherche...';
+    buyerCityBtn.disabled = true;
+
+    try {
+      const response = await fetch('/api/geocode?city=' + encodeURIComponent(city));
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Ville introuvable');
+      }
+
+      buyerLocation = { city, lat: data.latitude, lng: data.longitude };
+      localStorage.setItem('agrivoisin_buyer_location', JSON.stringify(buyerLocation));
+      buyerCityDisplay.textContent = 'Distances calculées depuis : ' + city;
+      buyerCityDisplay.style.display = 'inline';
+      renderListings();
+    } catch (err) {
+      alert('Erreur : ' + err.message);
+    } finally {
+      buyerCityBtn.textContent = 'Valider';
+      buyerCityBtn.disabled = false;
+    }
+  });
+
   function renderListings() {
     container.innerHTML = '';
 
-    const filtered = currentCategory === 'Tout'
-      ? allListings
+    let filtered = currentCategory === 'Tout'
+      ? [...allListings]
       : allListings.filter((item) => item.category === currentCategory);
+
+    if (currentSort === 'price-asc') {
+      filtered.sort((a, b) => a.price - b.price);
+    } else if (currentSort === 'price-desc') {
+      filtered.sort((a, b) => b.price - a.price);
+    } else if (currentSort === 'distance' && buyerLocation) {
+      filtered.sort((a, b) => {
+        const dA = getDistanceForListing(a);
+        const dB = getDistanceForListing(b);
+        if (dA == null) return 1;
+        if (dB == null) return -1;
+        return dA - dB;
+      });
+    } else {
+      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
 
     if (filtered.length === 0) {
       noListingsMessage.style.display = 'block';
@@ -151,6 +244,12 @@
         ? `<p class="freshness-badge" title="${freshness.label}">${starsHtml(freshness.stars)} ${freshness.label}</p>`
         : '';
 
+      const distance = getDistanceForListing(item);
+      let locationText = item.sellers && item.sellers.city ? item.sellers.city : 'Vendeur Agrivoisin';
+      if (distance !== null) {
+        locationText += ' · à ' + (distance < 1 ? Math.round(distance * 1000) + ' m' : distance.toFixed(1).replace('.', ',') + ' km');
+      }
+
       card.innerHTML = `
         <div class="produce-card-image">
           <img src="${item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop'}" alt="${item.title}">
@@ -159,7 +258,7 @@
           <span class="tag">${item.subcategory || item.category || 'Récolte'}</span>
           <h4>${item.title}</h4>
           ${freshnessHtml}
-          <p class="seller">${item.sellers ? item.sellers.email : 'Vendeur Agrivoisin'}</p>
+          <p class="seller">${locationText}</p>
           <div class="produce-card-footer">
             <span class="price">${Number(item.price).toFixed(2).replace('.', ',')} €/${item.unit || 'kg'}</span>
             <button class="icon-btn" aria-label="Ajouter au panier" data-stripe-account="${item.sellers ? item.sellers.stripe_account_id : ''}" data-listing-id="${item.id}">
@@ -196,6 +295,13 @@
     currentCategory = btn.dataset.category;
     renderListings();
   });
+
+  sortSelect.addEventListener('change', () => {
+    currentSort = sortSelect.value;
+    renderListings();
+  });
+
+  loadBuyerLocation();
 
   fetch('/api/get-listings')
     .then((res) => res.json())

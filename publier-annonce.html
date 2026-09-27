@@ -34,6 +34,8 @@
         </svg>
         <span class="cart-count">0</span>
       </a>
+      <a href="mes-annonces.html" class="btn btn-ghost">Mes annonces</a>
+      <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
       <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
       <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
       <button class="nav-toggle" aria-label="Menu">
@@ -137,7 +139,6 @@
 
 <script src="script.js"></script>
 <script>
-  // Catégories et sous-catégories du site Agrivoisin
   const CATEGORIES = {
     "Fruits": ["Pommes", "Poires", "Prunes", "Pêches / Nectarines", "Abricots", "Cerises", "Fraises", "Framboises", "Groseilles / Cassis", "Melons / Pastèques", "Raisins de table", "Kiwis", "Rhubarbe", "Autres fruits"],
     "Légumes": ["Tomates", "Courgettes / Courges", "Salades", "Carottes", "Pommes de terre", "Oignons / Échalotes / Ail", "Poivrons / Piments", "Aubergines", "Haricots / Petits pois", "Choux", "Concombres / Cornichons", "Betteraves", "Radis", "Potirons / Citrouilles", "Autres légumes"],
@@ -152,7 +153,6 @@
     "Fruits séchés": ["Pommes séchées", "Poires séchées", "Abricots secs", "Figues séchées", "Pruneaux", "Raisins secs", "Dattes", "Autres fruits séchés"]
   };
 
-  // Catégories pour lesquelles la date de récolte est obligatoire
   const HARVEST_DATE_REQUIRED_CATEGORIES = ["Fruits", "Légumes"];
 
   const categorySelect = document.getElementById('category');
@@ -162,7 +162,6 @@
   const harvestDateLabel = document.getElementById('harvestDateLabel');
   const harvestDateHint = document.getElementById('harvestDateHint');
 
-  // Remplir le menu des catégories
   Object.keys(CATEGORIES).forEach(function (cat) {
     const opt = document.createElement('option');
     opt.value = cat;
@@ -170,7 +169,6 @@
     categorySelect.appendChild(opt);
   });
 
-  // Mettre à jour les sous-catégories et le champ date de récolte selon la catégorie choisie
   categorySelect.addEventListener('change', function () {
     const subcats = CATEGORIES[categorySelect.value] || [];
 

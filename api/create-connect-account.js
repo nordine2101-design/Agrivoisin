@@ -7,7 +7,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 async function geocodeCity(city) {
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&country=France&format=json&limit=1`,
+       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city + ', France')}&format=json&limit=1`,
       { headers: { 'User-Agent': 'Agrivoisin/1.0' } }
     );
     const results = await response.json();

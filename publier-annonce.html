@@ -6,6 +6,7 @@
 <title>Publier une annonce — Agrivoisin</title>
 <meta name="description" content="Publiez une annonce pour vendre vos récoltes sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
 </head>
 <body>
 
@@ -49,12 +50,11 @@
 <section class="auth-section">
   <div class="auth-card auth-card-wide">
     <h1>Publier une annonce</h1>
-    <p class="auth-subtitle">Renseignez l'e-mail utilisé lors de la création de votre compte de paiement, puis décrivez votre récolte.</p>
+    <p class="auth-subtitle" id="pageSubtitle">Décrivez votre récolte et ajoutez une photo.</p>
 
-    <form class="auth-form" id="listingForm">
-      <label for="sellerEmail">Votre e-mail (compte vendeur)</label>
-      <input type="email" id="sellerEmail" placeholder="vous@exemple.com" required>
+    <p id="notLoggedMessage" style="display:none;text-align:center;">Vous devez être connecté pour publier une annonce. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
 
+    <form class="auth-form" id="listingForm" style="display:none;">
       <label for="title">Titre de l'annonce</label>
       <input type="text" id="title" placeholder="Ex : Carottes du potager" required>
 
@@ -81,8 +81,11 @@
       <label for="unit">Unité</label>
       <input type="text" id="unit" placeholder="Ex : kg, botte, barquette" value="kg">
 
-      <label for="imageUrl">Lien d'une photo (optionnel)</label>
-      <input type="text" id="imageUrl" placeholder="https://...">
+      <label for="photoFile">Photo de votre récolte</label>
+      <input type="file" id="photoFile" accept="image/*">
+      <p id="photoPreviewWrap" style="display:none;margin-top:8px;">
+        <img id="photoPreview" style="max-width:160px;border-radius:12px;display:block;">
+      </p>
 
       <button type="submit" class="btn btn-primary auth-submit" id="listingSubmitBtn">Publier l'annonce</button>
     </form>
@@ -139,6 +142,11 @@
 
 <script src="script.js"></script>
 <script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
   const CATEGORIES = {
     "Fruits": ["Pommes", "Poires", "Prunes", "Pêches / Nectarines", "Abricots", "Cerises", "Fraises", "Framboises", "Groseilles / Cassis", "Melons / Pastèques", "Raisins de table", "Kiwis", "Rhubarbe", "Autres fruits"],
     "Légumes": ["Tomates", "Courgettes / Courges", "Salades", "Carottes", "Pommes de terre", "Oignons / Échalotes / Ail", "Poivrons / Piments", "Aubergines", "Haricots / Petits pois", "Choux", "Concombres / Cornichons", "Betteraves", "Radis", "Potirons / Citrouilles", "Autres légumes"],
@@ -155,12 +163,27 @@
 
   const HARVEST_DATE_REQUIRED_CATEGORIES = ["Fruits", "Légumes"];
 
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const pageSubtitle = document.getElementById('pageSubtitle');
+  const listingForm = document.getElementById('listingForm');
   const categorySelect = document.getElementById('category');
   const subcategorySelect = document.getElementById('subcategory');
   const subcategoryLabel = document.getElementById('subcategoryLabel');
   const harvestDateInput = document.getElementById('harvestDate');
   const harvestDateLabel = document.getElementById('harvestDateLabel');
   const harvestDateHint = document.getElementById('harvestDateHint');
+  const photoFileInput = document.getElementById('photoFile');
+  const photoPreview = document.getElementById('photoPreview');
+  const photoPreviewWrap = document.getElementById('photoPreviewWrap');
+
+  supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      listingForm.style.display = 'flex';
+    } else {
+      notLoggedMessage.style.display = 'block';
+      pageSubtitle.style.display = 'none';
+    }
+  });
 
   Object.keys(CATEGORIES).forEach(function (cat) {
     const opt = document.createElement('option');
@@ -206,7 +229,21 @@
     }
   });
 
-  document.getElementById('listingForm').addEventListener('submit', async function (e) {
+  photoFileInput.addEventListener('change', function () {
+    const file = photoFileInput.files[0];
+    if (!file) {
+      photoPreviewWrap.style.display = 'none';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      photoPreview.src = e.target.result;
+      photoPreviewWrap.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  listingForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = document.getElementById('listingSubmitBtn');
     const errorEl = document.getElementById('listingError');
@@ -217,22 +254,53 @@
     errorEl.style.display = 'none';
     successEl.style.display = 'none';
 
-    const payload = {
-      sellerEmail: document.getElementById('sellerEmail').value,
-      title: document.getElementById('title').value,
-      category: document.getElementById('category').value,
-      subcategory: document.getElementById('subcategory').value || null,
-      harvestDate: document.getElementById('harvestDate').value || null,
-      description: document.getElementById('description').value,
-      price: parseFloat(document.getElementById('price').value),
-      unit: document.getElementById('unit').value,
-      imageUrl: document.getElementById('imageUrl').value,
-    };
-
     try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        throw new Error('Session expirée, reconnectez-vous.');
+      }
+
+      let imageUrl = '';
+      const file = photoFileInput.files[0];
+
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = session.user.id + '/' + Date.now() + '.' + fileExt;
+
+        const { error: uploadError } = await supabaseClient
+          .storage
+          .from('listing-photos')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          throw new Error('Erreur lors de l\'envoi de la photo : ' + uploadError.message);
+        }
+
+        const { data: publicUrlData } = supabaseClient
+          .storage
+          .from('listing-photos')
+          .getPublicUrl(filePath);
+
+        imageUrl = publicUrlData.publicUrl;
+      }
+
+      const payload = {
+        title: document.getElementById('title').value,
+        category: document.getElementById('category').value,
+        subcategory: document.getElementById('subcategory').value || null,
+        harvestDate: document.getElementById('harvestDate').value || null,
+        description: document.getElementById('description').value,
+        price: parseFloat(document.getElementById('price').value),
+        unit: document.getElementById('unit').value,
+        imageUrl: imageUrl,
+      };
+
       const response = await fetch('/api/create-listing', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + session.access_token,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -244,12 +312,13 @@
 
       successEl.textContent = 'Annonce publiée avec succès !';
       successEl.style.display = 'block';
-      document.getElementById('listingForm').reset();
+      listingForm.reset();
       subcategorySelect.style.display = 'none';
       subcategoryLabel.style.display = 'none';
       harvestDateInput.style.display = 'none';
       harvestDateLabel.style.display = 'none';
       harvestDateHint.style.display = 'none';
+      photoPreviewWrap.style.display = 'none';
 
     } catch (err) {
       errorEl.textContent = 'Erreur : ' + err.message;

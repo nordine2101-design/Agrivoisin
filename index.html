@@ -372,8 +372,16 @@
     });
   });
 
+  window.addEventListener('hashchange', function () {
+    if (window.location.hash !== '#comment-ca-marche') {
+      document.querySelector('.site-header').style.display = '';
+    }
+  });
+
   window.addEventListener('pageshow', function () {
-    document.querySelector('.site-header').style.display = '';
+    if (window.location.hash !== '#comment-ca-marche') {
+      document.querySelector('.site-header').style.display = '';
+    }
   });
 </script>
 

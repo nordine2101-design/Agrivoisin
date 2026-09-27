@@ -371,6 +371,10 @@
       document.querySelector('.site-header').style.display = 'none';
     });
   });
+
+  window.addEventListener('pageshow', function () {
+    document.querySelector('.site-header').style.display = '';
+  });
 </script>
 
 

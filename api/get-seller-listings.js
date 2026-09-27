@@ -14,22 +14,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email } = req.query;
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace('Bearer ', '');
 
-    if (!email) {
-      return res.status(400).json({ error: 'E-mail manquant' });
+    if (!token) {
+      return res.status(401).json({ error: 'Non authentifié' });
     }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !userData.user) {
+      return res.status(401).json({ error: 'Session invalide' });
+    }
+
+    const userId = userData.user.id;
 
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
       .select('id')
-      .eq('email', email)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
     if (sellerError || !seller) {
-      return res.status(400).json({ error: "Aucun compte vendeur trouvé pour cet e-mail." });
+      return res.status(400).json({ error: "Aucun compte vendeur trouvé pour ce compte. Devenez d'abord vendeur." });
     }
 
     const { data: listings, error: listingsError } = await supabase
@@ -47,3 +56,7 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+    
+
+    

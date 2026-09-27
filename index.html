@@ -365,9 +365,13 @@
   </div>
 </footer>
 
-<script src="script.js"></script>
-</body>
-</html>
+<script>
+  document.querySelectorAll('.main-nav a[href="index.html#comment-ca-marche"]').forEach(function (link) {
+    link.addEventListener('click', function () {
+      document.querySelector('.site-header').style.display = 'none';
+    });
+  });
+</script>
 
 
 

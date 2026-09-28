@@ -1,5 +1,16 @@
-/* "Les annonces" en rouge cerise (menu du haut et pied de page) */
-.main-nav a[href="annonces.html"],
+/* "Les annonces" : gélule rouge cerise dans le menu du haut */
+.main-nav a[href="annonces.html"] {
+  background: #A02B19;
+  color: #fff;
+  padding: 6px 18px;
+  border-radius: 999px;
+}
+
+.main-nav a[href="annonces.html"]::after {
+  display: none;
+}
+
+/* "Les annonces" dans le pied de page : texte rouge */
 .footer-col a[href="annonces.html"] {
   color: #A02B19;
 }

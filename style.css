@@ -1,9 +1,29 @@
-/* "Les annonces" : gélule rouge cerise dans le menu du haut */
+/* "Les annonces" : même forme que les boutons du menu, en rouge cerise */
 .main-nav a[href="annonces.html"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
   background: #A02B19;
   color: #fff;
-  padding: 6px 18px;
-  border-radius: 999px;
+  border: 1.5px solid #A02B19;
+}
+
+.main-nav a[href="annonces.html"]:hover {
+  color: #fff;
+}
+
+.main-nav a[href="annonces.html"]::after {
+  display: none;
+}
+
+/* "Les annonces" dans le pied de page : texte rouge */
+.footer-col a[href="annonces.html"] {
+  color: #A02B19;
 }
 
 .main-nav a[href="annonces.html"]::after {

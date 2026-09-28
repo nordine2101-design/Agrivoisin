@@ -54,19 +54,15 @@
   </div>
 </section>
 
-<!-- ============ RECHERCHE ============ -->
+<!-- ============ RECHERCHE + VILLE (une seule ligne) ============ -->
 <section class="filters-bar">
   <div class="container">
-    <input type="search" id="searchInput" placeholder="Rechercher une récolte (ex : tomates, miel, fraises...)" aria-label="Rechercher une annonce" style="width:100%;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:1rem;">
-  </div>
-</section>
-
-<!-- ============ LOCALISATION ACHETEUR ============ -->
-<section class="filters-bar">
-  <div class="container" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-    <input type="text" id="buyerCityInput" placeholder="Entrez votre ville pour voir les distances" style="flex:1;min-width:220px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;">
-    <button class="btn btn-primary" id="buyerCityBtn" type="button">Valider</button>
-    <span id="buyerCityDisplay" style="display:none;font-size:0.9em;color:#4C7A50;"></span>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="search" id="searchInput" placeholder="Rechercher une récolte (tomates, miel...)" aria-label="Rechercher une annonce" style="flex:2;min-width:220px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:0.95rem;">
+      <input type="text" id="buyerCityInput" placeholder="📍 Votre ville" aria-label="Votre ville" style="flex:1;min-width:140px;padding:10px 14px;border-radius:8px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:0.95rem;">
+      <button class="btn btn-primary" id="buyerCityBtn" type="button">Valider</button>
+    </div>
+    <p id="buyerCityDisplay" style="display:none;font-size:0.8rem;color:#4C7A50;margin-top:6px;"></p>
   </div>
 </section>
 
@@ -199,7 +195,7 @@
         buyerLocation = JSON.parse(saved);
         buyerCityInput.value = buyerLocation.city;
         buyerCityDisplay.textContent = 'Distances calculées depuis : ' + buyerLocation.city;
-        buyerCityDisplay.style.display = 'inline';
+        buyerCityDisplay.style.display = 'block';
       } catch (e) {
         buyerLocation = null;
       }
@@ -224,7 +220,7 @@
       buyerLocation = { city, lat: data.latitude, lng: data.longitude };
       localStorage.setItem('agrivoisin_buyer_location', JSON.stringify(buyerLocation));
       buyerCityDisplay.textContent = 'Distances calculées depuis : ' + city;
-      buyerCityDisplay.style.display = 'inline';
+      buyerCityDisplay.style.display = 'block';
       renderListings();
     } catch (err) {
       alert('Erreur : ' + err.message);

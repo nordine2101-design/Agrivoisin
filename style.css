@@ -1197,12 +1197,12 @@ h1, h2, h3, h4 {
   .footer-grid { grid-template-columns: 1fr; }
   .hero-cta { flex-direction: column; align-items: stretch; }
 }
-
 /* "Les annonces" en rouge cerise (menu du haut et pied de page) */
 .main-nav a[href="annonces.html"],
 .footer-col a[href="annonces.html"] {
   color: #A02B19;
 }
+
 
 
 

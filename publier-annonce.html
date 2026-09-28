@@ -321,6 +321,10 @@
       harvestDateHint.style.display = 'none';
       photoPreviewWrap.style.display = 'none';
 
+      setTimeout(function () {
+        window.location.href = 'mes-annonces.html';
+      }, 1000);
+
     } catch (err) {
       errorEl.textContent = 'Erreur : ' + err.message;
       errorEl.style.display = 'block';

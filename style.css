@@ -1,3 +1,9 @@
+/* ============================================
+   AGRIVOISIN — Feuille de style principale
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap');
+
 /* "Les annonces" : même forme que les boutons du menu, en rouge cerise */
 .main-nav a[href="annonces.html"] {
   display: inline-flex;
@@ -25,20 +31,6 @@
 .footer-col a[href="annonces.html"] {
   color: #A02B19;
 }
-
-.main-nav a[href="annonces.html"]::after {
-  display: none;
-}
-
-/* "Les annonces" dans le pied de page : texte rouge */
-.footer-col a[href="annonces.html"] {
-  color: #A02B19;
-}
-/* ============================================
-   AGRIVOISIN — Feuille de style principale
-   ============================================ */
-
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap');
 
 :root {
   /* Palette */
@@ -983,6 +975,8 @@ h1, h2, h3, h4 {
 .auth-switch a {
   color: var(--leaf-deep);
   font-weight: 700;
+}
+
 /* ============================================
    FICHE PRODUIT
    ============================================ */
@@ -1135,6 +1129,8 @@ h1, h2, h3, h4 {
 
 @media (max-width: 800px) {
   .product-layout { grid-template-columns: 1fr; }
+}
+
 /* ============================================
    PANIER
    ============================================ */
@@ -1212,7 +1208,9 @@ h1, h2, h3, h4 {
   padding: 16px;
   font-size: 1.05rem;
   margin-top: 20px;
-}}/* ============================================
+}
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 
@@ -1232,37 +1230,6 @@ h1, h2, h3, h4 {
   .footer-grid { grid-template-columns: 1fr; }
   .hero-cta { flex-direction: column; align-items: stretch; }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
    
 

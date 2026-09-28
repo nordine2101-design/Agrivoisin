@@ -54,6 +54,13 @@
   </div>
 </section>
 
+<!-- ============ RECHERCHE ============ -->
+<section class="filters-bar">
+  <div class="container">
+    <input type="search" id="searchInput" placeholder="Rechercher une récolte (ex : tomates, miel, fraises...)" aria-label="Rechercher une annonce" style="width:100%;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:1rem;">
+  </div>
+</section>
+
 <!-- ============ LOCALISATION ACHETEUR ============ -->
 <section class="filters-bar">
   <div class="container" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -82,7 +89,7 @@
 <section class="listings-section">
   <div class="container">
     <div id="realListingsContainer" class="produce-grid listings-grid"></div>
-    <p id="noListingsMessage" style="display:none;text-align:center;margin-top:24px;">Aucune annonce dans cette catégorie pour le moment.</p>
+    <p id="noListingsMessage" style="display:none;text-align:center;margin-top:24px;">Aucune annonce ne correspond à votre recherche pour le moment.</p>
   </div>
 </section>
 
@@ -104,12 +111,14 @@
   let allListings = [];
   let currentCategory = 'Tout';
   let currentSort = 'recent';
+  let currentSearch = '';
   let buyerLocation = null;
 
   const chipsContainer = document.getElementById('categoryChips');
   const container = document.getElementById('realListingsContainer');
   const noListingsMessage = document.getElementById('noListingsMessage');
   const sortSelect = document.getElementById('sortSelect');
+  const searchInput = document.getElementById('searchInput');
   const buyerCityInput = document.getElementById('buyerCityInput');
   const buyerCityBtn = document.getElementById('buyerCityBtn');
   const buyerCityDisplay = document.getElementById('buyerCityDisplay');
@@ -121,6 +130,25 @@
     btn.textContent = cat;
     chipsContainer.appendChild(btn);
   });
+
+  function normalizeText(text) {
+    return (text || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function matchesSearch(item, query) {
+    if (!query) return true;
+    const haystack = normalizeText(
+      [item.title, item.description, item.category, item.subcategory].join(' ')
+    );
+    return query
+      .split(/\s+/)
+      .filter(Boolean)
+      .every((word) => haystack.includes(word));
+  }
 
   function freshnessInfo(harvestDate) {
     if (!harvestDate) return null;
@@ -213,6 +241,8 @@
       ? [...allListings]
       : allListings.filter((item) => item.category === currentCategory);
 
+    filtered = filtered.filter((item) => matchesSearch(item, currentSearch));
+
     if (currentSort === 'price-asc') {
       filtered.sort((a, b) => a.price - b.price);
     } else if (currentSort === 'price-desc') {
@@ -298,6 +328,11 @@
 
   sortSelect.addEventListener('change', () => {
     currentSort = sortSelect.value;
+    renderListings();
+  });
+
+  searchInput.addEventListener('input', () => {
+    currentSearch = normalizeText(searchInput.value.trim());
     renderListings();
   });
 

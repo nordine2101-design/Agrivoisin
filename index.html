@@ -372,18 +372,20 @@
     });
   });
 
-  function showHeaderIfNeeded() {
-    if (window.location.hash !== '#comment-ca-marche' && window.location.hash !== '#pourquoi') {
-      document.querySelector('.site-header').style.display = '';
+  function updateHeader() {
+    var hash = window.location.hash;
+    var header = document.querySelector('.site-header');
+    if (hash === '#comment-ca-marche' || hash === '#pourquoi') {
+      header.style.display = 'none';
+    } else {
+      header.style.display = '';
     }
   }
 
-  window.addEventListener('hashchange', showHeaderIfNeeded);
-  window.addEventListener('pageshow', showHeaderIfNeeded);
+  updateHeader();
+  window.addEventListener('hashchange', updateHeader);
+  window.addEventListener('pageshow', updateHeader);
 </script>
-
-
-
 
 
 

@@ -12,9 +12,17 @@
 <!-- ============ HEADER ============ -->
 
 <header class="site-header">
-  <div class="logo-bar">
+  <div class="logo-bar" style="position:relative;">
     <a href="index.html" class="logo">
       <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:350px;width:auto;">
+    </a>
+    <a href="panier.html" class="cart-icon" aria-label="Panier" style="position:absolute;top:12px;right:32px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="21" r="1"></circle>
+        <circle cx="20" cy="21" r="1"></circle>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      </svg>
+      <span class="cart-count">0</span>
     </a>
   </div>
 
@@ -28,14 +36,6 @@
     </nav>
 
     <div class="header-actions">
-      <a href="panier.html" class="cart-icon" aria-label="Panier">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="9" cy="21" r="1"></circle>
-          <circle cx="20" cy="21" r="1"></circle>
-          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-        </svg>
-        <span class="cart-count">0</span>
-      </a>
       <a href="mes-annonces.html" class="btn btn-ghost">Mes annonces</a>
       <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
       <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
@@ -389,3 +389,5 @@
 
 
 
+</body>
+</html>

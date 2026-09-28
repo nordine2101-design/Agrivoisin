@@ -195,8 +195,8 @@
       try {
         buyerLocation = JSON.parse(saved);
         buyerCityInput.value = buyerLocation.city;
-        buyerCityDisplay.textContent = 'Distances calculées depuis : ' + buyerLocation.city;
-        buyerCityDisplay.style.display = 'block';
+        buyerCityDisplay.textContent = 'Distances calculées depuis : ' + city;
+      buyerCityDisplay.style.display = 'block';
       } catch (e) {
         buyerLocation = null;
       }

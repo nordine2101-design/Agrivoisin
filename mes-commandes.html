@@ -18,6 +18,10 @@
     </div>
     <h1>Mes commandes</h1>
     <p>Retrouvez vos achats et laissez un avis aux vendeurs.</p>
+
+    <p id="loadingMessage" style="margin-top:16px;">Chargement de vos commandes...</p>
+    <p id="notLoggedMessage" style="display:none;margin-top:16px;">Vous devez être connecté pour voir vos commandes. <a href="connexion.html">Se connecter</a></p>
+    <p id="noOrdersMessage" style="display:none;margin-top:16px;">Vous n'avez pas encore passé de commande.</p>
   </div>
   <img src="mamie-voisin.png" alt="Mascotte Agrivoisin" style="width:440px;object-fit:cover;align-self:stretch;display:block;margin:0;border-radius:28px;">
 </section>
@@ -25,9 +29,6 @@
 <!-- ============ CONTENU ============ -->
 <section class="listings-section">
   <div class="container">
-    <p id="loadingMessage">Chargement de vos commandes...</p>
-    <p id="notLoggedMessage" style="display:none;">Vous devez être connecté pour voir vos commandes. <a href="connexion.html">Se connecter</a></p>
-    <p id="noOrdersMessage" style="display:none;">Vous n'avez pas encore passé de commande.</p>
     <div id="ordersContainer"></div>
   </div>
 </section>

@@ -6,6 +6,7 @@
 <title>Agrivoisin — Les surplus du jardin, entre voisins</title>
 <meta name="description" content="Agrivoisin met en relation les jardiniers particuliers et leurs voisins pour vendre les surplus du potager. Paiement sécurisé en ligne.">
 <link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
 </head>
 <body>
 
@@ -16,6 +17,7 @@
     <a href="index.html" class="logo">
       <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:350px;width:auto;">
     </a>
+    <span id="userEmailDisplay" style="display:none;position:absolute;top:16px;right:80px;font-size:0.85rem;color:var(--leaf-deep);font-weight:600;"></span>
     <a href="panier.html" class="cart-icon" aria-label="Panier" style="position:absolute;top:12px;right:32px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="9" cy="21" r="1"></circle>
@@ -385,9 +387,20 @@
   updateHeader();
   window.addEventListener('hashchange', updateHeader);
   window.addEventListener('pageshow', updateHeader);
+
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      const emailDisplay = document.getElementById('userEmailDisplay');
+      emailDisplay.textContent = session.user.email;
+      emailDisplay.style.display = 'inline';
+    }
+  });
 </script>
-
-
 
 </body>
 </html>

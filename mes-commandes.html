@@ -3,320 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agrivoisin — Les surplus du jardin, entre voisins</title>
-<meta name="description" content="Agrivoisin met en relation les jardiniers particuliers et leurs voisins pour vendre les surplus du potager. Paiement sécurisé en ligne.">
+<title>Mes commandes — Agrivoisin</title>
+<meta name="description" content="Retrouvez vos commandes et laissez un avis aux vendeurs sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
 <script src="supabase.js"></script>
 </head>
 <body>
 
-<!-- ============ HEADER ============ -->
-
-<header class="site-header">
-  <div class="logo-bar" style="position:relative;">
-    <a href="index.html" class="logo">
-      <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:350px;width:auto;">
-    </a>
-    <span id="userEmailDisplay" style="position:absolute;top:16px;right:80px;font-size:0.85rem;color:#D97D45;font-weight:600;">🍎 Non connecté</span>
-    <a href="panier.html" class="cart-icon" aria-label="Panier" style="position:absolute;top:12px;right:32px;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="9" cy="21" r="1"></circle>
-        <circle cx="20" cy="21" r="1"></circle>
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-      </svg>
-      <span class="cart-count">0</span>
-    </a>
-  </div>
-
-  <div class="container nav-bar">
-    <nav class="main-nav">
-      <a href="index.html#comment-ca-marche">Comment ça marche</a>
-      <a href="annonces.html">Les annonces</a>
-      <a href="index.html#pourquoi">Pourquoi Agrivoisin</a>
-      <a href="publier-annonce.html">Publier une annonce</a>
-    </nav>
-
-    <div class="header-actions">
-      <a href="mes-annonces.html" class="btn btn-ghost">Mes annonces</a>
-      <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
-      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
-      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
-      <button class="nav-toggle" aria-label="Menu">
-        <span></span><span></span><span></span>
-      </button>
+<!-- ============ EN-TÊTE DE PAGE ============ -->
+<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
+  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;text-align:center;">
+    <div style="text-align:left;margin:-24px 0 12px -20px;">
+      <a href="index.html" class="btn btn-ghost">Retour</a>
     </div>
+    <h1>Mes commandes</h1>
+    <p>Retrouvez vos achats et laissez un avis aux vendeurs.</p>
+
+    <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de vos commandes...</p>
+    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous devez être connecté pour voir vos commandes. <a href="connexion.html">Se connecter</a></p>
+    <p id="noOrdersMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous n'avez pas encore passé de commande.</p>
   </div>
-</header>
-
-
-
-
-<!-- ============ HERO — Présentation du concept ============ -->
-<section class="hero">
-  <div class="hero-content">
-    <span class="hero-eyebrow">🌱 La marketplace des jardins gourmands</span>
-    <h1>Le surplus de <em>votre</em> jardin devient le régal <em>d'un voisin</em></h1>
-    <p>Agrivoisin relie les jardiniers particuliers qui récoltent plus qu'ils ne consomment aux voisins qui rêvent de légumes fraîchement cueillis. Simple, local, et payé en toute sécurité avant même de connaître l'adresse du vendeur.</p>
-    <div class="hero-cta">
-      <a href="annonces.html" class="btn btn-primary">Découvrir les annonces</a>
-    </div>
-  </div>
-
-  <div class="hero-illustration">
-    <img src="https://images.unsplash.com/photo-1648090229186-6188eaefcc6a?w=1400&q=80&auto=format&fit=crop" alt="Panier rempli de légumes fraîchement récoltés du jardin" class="hero-photo">
-  </div>
-
-  <div class="hero-ground">
-    <svg viewBox="0 0 1440 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M0,40 C240,90 480,0 720,30 C960,60 1200,10 1440,50 L1440,90 L0,90 Z" fill="#FBF7EF"/>
-    </svg>
-  </div>
+  <img src="mamie-voisin.png" alt="Mascotte Agrivoisin" style="width:440px;object-fit:cover;align-self:stretch;display:block;margin:0;border-radius:28px;">
 </section>
 
-<!-- ============ COMMENT ÇA MARCHE ============ -->
-<section class="how-it-works" id="comment-ca-marche">
+<!-- ============ CONTENU ============ -->
+<section class="listings-section">
   <div class="container">
-    <div class="section-heading">
-      <span class="eyebrow">Le principe</span>
-      <h2>Trois étapes, entre voisins</h2>
-      <p>Un circuit pensé pour protéger les deux côtés de l'échange, du premier clic jusqu'à la récolte dans votre panier.</p>
-    </div>
-
-    <div class="steps">
-      <div class="step">
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2v20M2 12h20"/>
-            <circle cx="12" cy="12" r="9"/>
-          </svg>
-        </div>
-        <span class="step-label">Étape 1</span>
-        <h3>Le jardinier publie</h3>
-        <p>Un voisin jardinier photographie ses surplus (légumes, fruits, aromates) et publie une annonce avec quantité et prix.</p>
-      </div>
-
-      <div class="step">
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="1" y="4" width="22" height="16" rx="2"/>
-            <path d="M1 10h22"/>
-          </svg>
-        </div>
-        <span class="step-label">Étape 2</span>
-        <h3>L'acheteur commande et paie</h3>
-        <p>L'acheteur choisit une annonce et règle en ligne, de façon sécurisée, directement sur Agrivoisin.</p>
-      </div>
-
-      <div class="step">
-        <div class="step-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0Z"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
-        </div>
-        <span class="step-label">Étape 3</span>
-        <h3>L'adresse est dévoilée</h3>
-        <p>Une fois le paiement confirmé, l'adresse du jardinier s'affiche pour organiser la remise des récoltes.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ POURQUOI AGRIVOISIN ============ -->
-<section class="why-section" id="pourquoi">
-  <div class="container">
-    <div class="why-grid">
-      <div class="why-visual">
-        <svg viewBox="0 0 400 320" xmlns="http://www.w3.org/2000/svg">
-          <rect x="0" y="0" width="400" height="320" rx="20" fill="#FBF7EF"/>
-          <!-- rangs de potager -->
-          <g stroke="#9FC49A" stroke-width="14" stroke-linecap="round">
-            <line x1="40" y1="60" x2="360" y2="60"/>
-            <line x1="40" y1="120" x2="360" y2="120"/>
-            <line x1="40" y1="180" x2="360" y2="180"/>
-            <line x1="40" y1="240" x2="360" y2="240"/>
-          </g>
-          <!-- petites plantes -->
-          <g fill="#4C7A50">
-            <circle cx="90" cy="60" r="10"/>
-            <circle cx="170" cy="60" r="10"/>
-            <circle cx="250" cy="60" r="10"/>
-            <circle cx="330" cy="60" r="10"/>
-            <circle cx="120" cy="120" r="10"/>
-            <circle cx="200" cy="120" r="10"/>
-            <circle cx="280" cy="120" r="10"/>
-            <circle cx="90" cy="180" r="10"/>
-            <circle cx="170" cy="180" r="10"/>
-            <circle cx="250" cy="180" r="10"/>
-            <circle cx="330" cy="180" r="10"/>
-          </g>
-          <g fill="#E8935C">
-            <circle cx="150" cy="240" r="10"/>
-            <circle cx="230" cy="240" r="10"/>
-            <circle cx="310" cy="240" r="10"/>
-          </g>
-        </svg>
-      </div>
-
-      <div class="why-list">
-        <span class="hero-eyebrow" style="align-self:flex-start;background:var(--cream-soft);">Pourquoi Agrivoisin</span>
-        <div class="why-item">
-          <div class="why-item-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/>
-            </svg>
-          </div>
-          <div>
-            <h4>Paiement protégé</h4>
-            <p>Aucune adresse n'est communiquée avant confirmation du paiement en ligne. Vendeurs et acheteurs échangent en confiance.</p>
-          </div>
-        </div>
-
-        <div class="why-item">
-          <div class="why-item-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/>
-            </svg>
-          </div>
-          <div>
-            <h4>Circuit ultra-local</h4>
-            <p>Des récoltes qui viennent du quartier ou du village d'à côté, pas d'un entrepôt à des centaines de kilomètres.</p>
-          </div>
-        </div>
-
-        <div class="why-item">
-          <div class="why-item-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 3v18h18"/>
-              <path d="M18.7 8 12 14.7 8.5 11.2 3 16.7"/>
-            </svg>
-          </div>
-          <div>
-            <h4>Moins de gaspillage</h4>
-            <p>Les surplus du potager trouvent preneur au lieu de finir au compost, et les jardiniers arrondissent leurs fins de mois.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ ANNONCES EN VEDETTE ============ -->
-<section class="featured-section">
-  <div class="container">
-    <div class="section-heading">
-      <span class="eyebrow">Fraîchement publié</span>
-      <h2>Quelques récoltes du moment</h2>
-      <p>Un aperçu des annonces déposées par les jardiniers de la communauté.</p>
-    </div>
-
-    <div class="produce-grid">
-      <div class="produce-card">
-        <div class="produce-card-image">
-          <img src="https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop" alt="Carottes fraîchement récoltées du potager">
-        </div>
-        <div class="produce-card-body">
-          <span class="tag">Légume racine</span>
-          <h4>Carottes du potager</h4>
-          <p class="seller">Marie · à 1,2 km</p>
-          <div class="produce-card-footer">
-            <span class="price">3,50 €/kg</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="produce-card">
-        <div class="produce-card-image">
-          <img src="https://images.unsplash.com/photo-1502234977800-a244761625eb?w=600&q=80&auto=format&fit=crop" alt="Tomates anciennes fraîchement cueillies">
-        </div>
-        <div class="produce-card-body">
-          <span class="tag">Fruit-légume</span>
-          <h4>Tomates anciennes</h4>
-          <p class="seller">Julien · à 800 m</p>
-          <div class="produce-card-footer">
-            <span class="price">4,00 €/kg</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="produce-card">
-        <div class="produce-card-image">
-          <img src="https://images.unsplash.com/photo-1753445657076-5c3c710c42c4?w=600&q=80&auto=format&fit=crop" alt="Courgettes vertes fraîches empilées">
-        </div>
-        <div class="produce-card-body">
-          <span class="tag">Courgette</span>
-          <h4>Courgettes vertes</h4>
-          <p class="seller">Sophie · à 2 km</p>
-          <div class="produce-card-footer">
-            <span class="price">2,80 €/kg</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="produce-card">
-        <div class="produce-card-image">
-          <img src="https://images.unsplash.com/photo-1749655248287-d1e0acb5f8d1?w=600&q=80&auto=format&fit=crop" alt="Basilic frais aux feuilles vibrantes">
-        </div>
-        <div class="produce-card-body">
-          <span class="tag">Aromate</span>
-          <h4>Basilic frais</h4>
-          <p class="seller">Nadia · à 1,5 km</p>
-          <div class="produce-card-footer">
-            <span class="price">1,50 €/botte</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="featured-cta">
-      <a href="annonces.html" class="btn btn-primary">Voir toutes les annonces</a>
-    </div>
-  </div>
-</section>
-
-<!-- ============ BANDEAU CONFIANCE ============ -->
-<section class="trust-banner">
-  <div class="container">
-    <div class="trust-grid">
-      <div class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
-        <h4>Paiement sécurisé</h4>
-        <p>Transactions chiffrées, adresse révélée après paiement uniquement.</p>
-      </div>
-      <div class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        <h4>Récolte du jour</h4>
-        <p>Des produits vendus dans les heures qui suivent la cueillette.</p>
-      </div>
-      <div class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-        <h4>Communauté de voisins</h4>
-        <p>Des vendeurs et acheteurs de votre quartier, pas d'inconnus lointains.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ CTA FINALE ============ -->
-<section class="final-cta">
-  <div class="container">
-    <div class="final-cta-box">
-      <h2>Votre jardin déborde de récoltes ?</h2>
-      <p>Publiez votre première annonce en quelques minutes et rencontrez les voisins gourmands de votre quartier.</p>
-      <a href="inscription.html" class="btn btn-outline-light">Créer un compte</a>
-    </div>
+    <div id="ordersContainer"></div>
   </div>
 </section>
 
@@ -364,40 +77,165 @@
   </div>
 </footer>
 
+<script src="script.js"></script>
 <script>
-  document.querySelectorAll('.main-nav a[href="index.html#comment-ca-marche"], .main-nav a[href="index.html#pourquoi"]').forEach(function (link) {
-    link.addEventListener('click', function () {
-      document.querySelector('.site-header').style.display = 'none';
-    });
-  });
-
-  function updateHeader() {
-    var hash = window.location.hash;
-    var header = document.querySelector('.site-header');
-    if (hash === '#comment-ca-marche' || hash === '#pourquoi') {
-      header.style.display = 'none';
-    } else {
-      header.style.display = '';
-    }
-  }
-
-  updateHeader();
-  window.addEventListener('hashchange', updateHeader);
-  window.addEventListener('pageshow', updateHeader);
-
   const supabaseClient = window.supabase.createClient(
     'https://eipksfszadhratfvavvs.supabase.co',
     'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
   );
 
-  supabaseClient.auth.getSession().then(({ data: { session } }) => {
-    const emailDisplay = document.getElementById('userEmailDisplay');
-    if (session) {
-      emailDisplay.textContent = '🍏 Connecté';
-      emailDisplay.style.color = '#4C7A50';
+  const loadingMessage = document.getElementById('loadingMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const noOrdersMessage = document.getElementById('noOrdersMessage');
+  const ordersContainer = document.getElementById('ordersContainer');
+
+  function strawberryIcons(count) {
+    let icons = '';
+    for (let j = 0; j < count; j++) {
+      icons += '<span class="strawberry-icon-wrap"><img src="fraise-mascotte.png" alt="fraise" class="strawberry-icon"></span>';
     }
-  });
+    return icons;
+  }
+
+  function renderStrawberryPicker(orderId, sellerId) {
+    let html = `<form class="review-form" data-order-id="${orderId}" data-seller-id="${sellerId}">`;
+    html += `<div class="strawberry-picker">`;
+    for (let i = 1; i <= 4; i++) {
+      html += `
+        <label class="strawberry-option">
+          <input type="radio" name="rating-${orderId}-${sellerId}" value="${i}" required>
+          <span class="strawberry-row">${strawberryIcons(i)}</span>
+        </label>`;
+    }
+    html += `</div>`;
+    html += `<textarea placeholder="Votre avis sur ce vendeur (optionnel)" class="review-comment"></textarea>`;
+    html += `<button type="submit" class="btn btn-primary">Envoyer mon avis</button>`;
+    html += `<p class="review-error" style="color:#C8352F;display:none;"></p>`;
+    html += `</form>`;
+    return html;
+  }
+
+  function renderExistingReview(review, justSubmitted) {
+    return `
+      <div class="existing-review">
+        <span class="strawberry-row">${strawberryIcons(review.rating)}</span>
+        ${review.comment ? `<p>"${review.comment}"</p>` : ''}
+        <p style="font-size:0.9em;color:#888;">${justSubmitted ? 'Avis envoyé' : 'Avis déjà envoyé'}</p>
+      </div>
+    `;
+  }
+
+  function attachReviewFormHandlers() {
+    document.querySelectorAll('.review-form').forEach((form) => {
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const orderId = form.dataset.orderId;
+        const sellerId = form.dataset.sellerId;
+        const ratingInput = form.querySelector(`input[name="rating-${orderId}-${sellerId}"]:checked`);
+        const errorEl = form.querySelector('.review-error');
+        errorEl.style.display = 'none';
+
+        if (!ratingInput) {
+          errorEl.textContent = 'Merci de choisir une note.';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        const rating = parseInt(ratingInput.value, 10);
+        const comment = form.querySelector('.review-comment').value;
+
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) {
+          errorEl.textContent = 'Session expirée, reconnectez-vous.';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        const { error } = await supabaseClient.from('reviews').insert({
+          order_id: orderId,
+          seller_id: sellerId,
+          buyer_id: session.user.id,
+          rating: rating,
+          comment: comment || null,
+        });
+
+        if (error) {
+          errorEl.textContent = 'Erreur : ' + error.message;
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        form.outerHTML = renderExistingReview({ rating, comment }, true);
+      });
+    });
+  }
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    if (!session) {
+      loadingMessage.style.display = 'none';
+      notLoggedMessage.style.display = 'block';
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/get-my-orders', {
+        headers: { Authorization: 'Bearer ' + session.access_token },
+      });
+      const data = await response.json();
+
+      loadingMessage.style.display = 'none';
+
+      if (!data.orders || data.orders.length === 0) {
+        noOrdersMessage.style.display = 'block';
+        return;
+      }
+
+      data.orders.forEach((order) => {
+        const orderDiv = document.createElement('div');
+        orderDiv.className = 'order-card';
+        const date = new Date(order.createdAt).toLocaleDateString('fr-FR');
+
+        let sellersHtml = '';
+        order.sellers.forEach((seller) => {
+          sellersHtml += `
+            <div class="order-seller-block">
+              <p><strong>${seller.sellerEmail}</strong> — ${seller.products.join(', ')}</p>
+              ${seller.review ? renderExistingReview(seller.review, false) : renderStrawberryPicker(order.orderId, seller.sellerId)}
+            </div>
+          `;
+        });
+
+        orderDiv.innerHTML = `
+          <h3>Commande du ${date} — ${Number(order.totalAmount).toFixed(2).replace('.', ',')} €</h3>
+          ${sellersHtml}
+        `;
+        ordersContainer.appendChild(orderDiv);
+      });
+
+      attachReviewFormHandlers();
+
+    } catch (err) {
+      loadingMessage.textContent = 'Erreur de chargement de vos commandes.';
+      console.error(err);
+    }
+  }
+
+  init();
 </script>
+
+<style>
+  .order-card { background:#fff; border-radius:12px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .order-seller-block { border-top:1px solid #eee; padding-top:14px; margin-top:14px; }
+  .strawberry-picker { display:flex; flex-direction:row; flex-wrap:nowrap; gap:16px; margin:10px 0; }
+  .strawberry-option { cursor:pointer; display:inline-block; }
+  .strawberry-row { display:inline-flex; flex-direction:row; flex-wrap:nowrap; align-items:center; gap:4px; }
+  .strawberry-icon-wrap { width:46px; height:46px; display:inline-block; flex-shrink:0; }
+  .strawberry-icon { width:100%; height:100%; object-fit:contain; display:block; mix-blend-mode:multiply; }
+  .review-comment { width:100%; min-height:60px; margin:10px 0; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; }
+  .existing-review { background:#f6f9f5; border-radius:8px; padding:10px; margin-top:8px; }
+</style>
 
 </body>
 </html>

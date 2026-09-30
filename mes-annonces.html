@@ -10,10 +10,13 @@
 </head>
 <body>
 
-<!-- ============ FORMULAIRE ============ -->
-<section class="auth-section" style="min-height:auto;align-items:flex-start;padding-top:30px;">
-  <div class="auth-card auth-card-wide" style="max-width:600px;margin:0 auto;">
-    <h1>Mes annonces <img src="papy-jardinier2.png" alt="Papy jardinier Agrivoisin" style="height:250px;width:auto;vertical-align:middle;"></h1>
+<!-- ============ EN-TÊTE DE PAGE ============ -->
+<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
+  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;text-align:center;">
+    <div style="text-align:left;margin:-24px 0 12px -20px;">
+      <a href="index.html" class="btn btn-ghost">Retour</a>
+    </div>
+    <h1>Mes annonces</h1>
     <p class="auth-subtitle" id="pageSubtitle">Retrouvez et gérez les annonces que vous avez publiées.</p>
 
     <div id="notLoggedSection" style="display:none;">
@@ -21,15 +24,12 @@
     </div>
 
     <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
-
-    <div style="text-align:right;margin-top:16px;">
-      <a href="index.html" class="btn btn-ghost">Retour</a>
-    </div>
   </div>
+  <img src="papy-jardinier2.png" alt="Papy jardinier Agrivoisin" style="width:440px;object-fit:cover;align-self:stretch;display:block;margin:0;border-radius:28px;">
 </section>
 
 <!-- ============ LISTE DES ANNONCES ============ -->
-<section class="listings-section" style="padding-top:0;margin-top:-20px;">
+<section class="listings-section">
   <div class="container">
     <div id="myListingsContainer"></div>
   </div>

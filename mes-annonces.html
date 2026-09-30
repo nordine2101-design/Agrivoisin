@@ -12,7 +12,7 @@
 
 <!-- ============ EN-TÊTE DE PAGE ============ -->
 <section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;text-align:center;">
+  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;text-align:center;display:flex;flex-direction:column;">
     <div style="text-align:left;margin:-24px 0 12px -20px;">
       <a href="index.html" class="btn btn-ghost">Retour</a>
     </div>
@@ -25,7 +25,7 @@
 
     <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
 
-    <div id="listingsNavWrap" style="display:none;">
+    <div id="listingsNavWrap" style="display:none;overflow-y:auto;flex:1;min-height:0;">
       <button type="button" id="prevListingBtn" class="btn btn-ghost" aria-label="Annonce précédente" style="width:100%;margin-top:10px;">▲</button>
       <div id="myListingsContainer" style="text-align:left;"></div>
       <button type="button" id="nextListingBtn" class="btn btn-ghost" aria-label="Annonce suivante" style="width:100%;margin-top:10px;">▼</button>

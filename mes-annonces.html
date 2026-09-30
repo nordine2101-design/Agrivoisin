@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -22,6 +21,11 @@
 
     <div id="notLoggedSection" style="display:none;">
       <p style="text-align:center;">Vous devez être connecté pour voir vos annonces. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
+    </div>
+
+    <div id="notSellerSection" style="display:none;">
+      <p style="text-align:center;margin-bottom:14px;">Vous n'avez pas encore de compte vendeur.</p>
+      <a href="vendre.html" class="btn btn-primary">Devenir vendeur</a>
     </div>
 
     <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
@@ -57,6 +61,7 @@
   const errorEl = document.getElementById('listingsError');
   const container = document.getElementById('myListingsContainer');
   const notLoggedSection = document.getElementById('notLoggedSection');
+  const notSellerSection = document.getElementById('notSellerSection');
   const pageSubtitle = document.getElementById('pageSubtitle');
   const listingsNavWrap = document.getElementById('listingsNavWrap');
   const prevBtn = document.getElementById('prevListingBtn');
@@ -215,6 +220,11 @@
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.error && data.error.includes('vendeur')) {
+          pageSubtitle.style.display = 'none';
+          notSellerSection.style.display = 'block';
+          return;
+        }
         throw new Error(data.error || 'Erreur');
       }
 

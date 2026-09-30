@@ -43,6 +43,9 @@
       <label for="city">Ville</label>
       <input type="text" id="city" placeholder="Votre ville" required>
 
+      <label for="sellerAddress" id="sellerAddressLabel" style="display:none;">Adresse complète (sera communiquée à l'acheteur après paiement uniquement)</label>
+      <input type="text" id="sellerAddress" placeholder="Ex : 12 rue des Jardins, 75000 Paris" style="display:none;">
+
       <button type="submit" class="btn btn-primary auth-submit" id="signupBtn">Créer mon compte</button>
     </form>
 
@@ -56,8 +59,6 @@
   </div>
 </section>
 
-
-
 <script src="script.js"></script>
 <script>
   const supabaseClient = window.supabase.createClient(
@@ -66,11 +67,24 @@
   );
 
   let selectedType = 'acheteur';
+  const sellerAddressLabel = document.getElementById('sellerAddressLabel');
+  const sellerAddressInput = document.getElementById('sellerAddress');
+
   document.querySelectorAll('.account-type-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.account-type-btn').forEach((b) => b.classList.remove('account-type-active'));
       btn.classList.add('account-type-active');
       selectedType = btn.dataset.type;
+
+      if (selectedType === 'jardinier') {
+        sellerAddressLabel.style.display = '';
+        sellerAddressInput.style.display = '';
+        sellerAddressInput.required = true;
+      } else {
+        sellerAddressLabel.style.display = 'none';
+        sellerAddressInput.style.display = 'none';
+        sellerAddressInput.required = false;
+      }
     });
   });
 
@@ -89,6 +103,7 @@
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const city = document.getElementById('city').value;
+    const sellerAddress = sellerAddressInput.value;
 
     const { data, error } = await supabaseClient.auth.signUp({
       email: email,
@@ -110,11 +125,44 @@
       return;
     }
 
-    successEl.textContent = 'Compte créé avec succès ! Vous pouvez maintenant vous connecter.';
-    successEl.style.display = 'block';
-    document.getElementById('signupForm').reset();
-    btn.textContent = 'Créer mon compte';
-    btn.disabled = false;
+    if (selectedType !== 'jardinier') {
+      successEl.textContent = 'Compte créé avec succès ! Vous pouvez maintenant vous connecter.';
+      successEl.style.display = 'block';
+      document.getElementById('signupForm').reset();
+      btn.textContent = 'Créer mon compte';
+      btn.disabled = false;
+      return;
+    }
+
+    try {
+      btn.textContent = 'Création du compte de paiement...';
+
+      const { data: sessionData } = await supabaseClient.auth.signInWithPassword({ email, password });
+      const accessToken = sessionData.session.access_token;
+
+      const response = await fetch('/api/create-connect-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + accessToken,
+        },
+        body: JSON.stringify({ email, city, address: sellerAddress }),
+      });
+
+      const stripeData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(stripeData.error || 'Une erreur est survenue');
+      }
+
+      window.location.href = stripeData.onboardingUrl;
+
+    } catch (err) {
+      errorEl.textContent = 'Votre compte a été créé, mais la création du compte de paiement a échoué : ' + err.message + '. Connectez-vous puis réessayez depuis "Devenir vendeur".';
+      errorEl.style.display = 'block';
+      btn.textContent = 'Créer mon compte';
+      btn.disabled = false;
+    }
   });
 </script>
 </body>

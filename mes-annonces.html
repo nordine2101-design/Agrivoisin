@@ -12,7 +12,7 @@
 
 <!-- ============ EN-TÊTE DE PAGE ============ -->
 <section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;text-align:center;display:flex;flex-direction:column;height:620px;overflow:hidden;">
+  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;text-align:center;height:533px;box-sizing:border-box;display:flex;flex-direction:column;">
     <div style="text-align:left;margin:-24px 0 12px -20px;">
       <a href="index.html" class="btn btn-ghost">Retour</a>
     </div>
@@ -29,10 +29,9 @@
       <button type="button" id="prevListingBtn" class="btn btn-ghost" aria-label="Annonce précédente" style="width:100%;margin-top:10px;">▲</button>
       <div id="myListingsContainer" style="text-align:left;"></div>
       <button type="button" id="nextListingBtn" class="btn btn-ghost" aria-label="Annonce suivante" style="width:100%;margin-top:10px;">▼</button>
-      <p id="listingPositionLabel" style="font-size:0.85rem;color:var(--soil);margin-top:10px;"></p>
     </div>
   </div>
-  <img src="papy-jardinier2.png" alt="Papy jardinier Agrivoisin" style="width:440px;object-fit:cover;align-self:stretch;display:block;margin:0;border-radius:28px;">
+  <img src="papy-jardinier2.png" alt="Papy jardinier Agrivoisin" style="width:440px;height:533px;object-fit:cover;display:block;margin:0;border-radius:28px;">
 </section>
 
 <!-- ============ FOOTER ============ -->
@@ -81,11 +80,11 @@
 </footer>
 
 <style>
-  .order-card { background:#f9f7f2; border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
-  .order-card h3 { margin-bottom:14px; font-size:1.1rem; }
-  .edit-listing-form { display:flex; flex-direction:column; gap:4px; }
-  .edit-listing-form label { font-size:0.85rem; font-weight:600; color:#4C7A50; margin-top:10px; }
-  .edit-listing-form input { padding:10px 12px; border-radius:8px; border:1.5px solid rgba(107,88,66,0.2); font-family:inherit; font-size:0.95rem; }
+  .order-card { background:#f9f7f2; border-radius:12px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .order-card h3 { margin-bottom:10px; font-size:1rem; }
+  .edit-listing-form { display:flex; flex-direction:column; gap:2px; }
+  .edit-listing-form label { font-size:0.8rem; font-weight:600; color:#4C7A50; margin-top:6px; }
+  .edit-listing-form input { padding:8px 10px; border-radius:8px; border:1.5px solid rgba(107,88,66,0.2); font-family:inherit; font-size:0.9rem; }
   .edit-listing-form input:focus { outline:none; border-color:#4C7A50; }
 </style>
 
@@ -103,7 +102,6 @@
   const listingsNavWrap = document.getElementById('listingsNavWrap');
   const prevBtn = document.getElementById('prevListingBtn');
   const nextBtn = document.getElementById('nextListingBtn');
-  const positionLabel = document.getElementById('listingPositionLabel');
 
   let allListings = [];
   let currentIndex = 0;
@@ -223,7 +221,6 @@
 
   function renderCurrentListing() {
     container.innerHTML = buildListingCardHtml(allListings[currentIndex]);
-    positionLabel.textContent = 'Annonce ' + (currentIndex + 1) + ' sur ' + allListings.length;
     prevBtn.disabled = currentIndex === 0;
     nextBtn.disabled = currentIndex === allListings.length - 1;
     attachHandlersToCurrentForm();

@@ -32,6 +32,29 @@
   color: #A02B19;
 }
 
+/* "Publier une annonce" : gélule verte Granny Smith dans le menu du haut */
+.main-nav a[href="publier-annonce.html"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  background: #83C13D;
+  color: #fff;
+  border: 1.5px solid #83C13D;
+}
+
+.main-nav a[href="publier-annonce.html"]:hover {
+  color: #fff;
+}
+
+.main-nav a[href="publier-annonce.html"]::after {
+  display: none;
+}
+
 :root {
   /* Palette */
   --cream: #FBF7EF;
@@ -1230,7 +1253,6 @@ h1, h2, h3, h4 {
   .footer-grid { grid-template-columns: 1fr; }
   .hero-cta { flex-direction: column; align-items: stretch; }
 }
-
    
 
    

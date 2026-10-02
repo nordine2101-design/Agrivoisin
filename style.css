@@ -45,6 +45,7 @@
   background: #83C13D;
   color: #fff;
   border: 1.5px solid #83C13D;
+  margin-right: 20px;
 }
 
 .main-nav a[href="publier-annonce.html"]:hover {
@@ -1254,9 +1255,6 @@ h1, h2, h3, h4 {
   .footer-grid { grid-template-columns: 1fr; }
   .hero-cta { flex-direction: column; align-items: stretch; }
 }
-
-   
-
 
 
 

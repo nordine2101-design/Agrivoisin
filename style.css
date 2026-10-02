@@ -56,6 +56,32 @@
   display: none;
 }
 
+/* "Pourquoi Agrivoisin" : disque rond jaune */
+.main-nav a[href="index.html#pourquoi"] {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #F2C94C;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+}
+
+.main-nav a[href="index.html#pourquoi"]:hover {
+  color: #fff;
+}
+
+.main-nav a[href="index.html#pourquoi"]::after {
+  display: none;
+}
+
 :root {
   /* Palette */
   --cream: #FBF7EF;
@@ -1255,6 +1281,5 @@ h1, h2, h3, h4 {
   .footer-grid { grid-template-columns: 1fr; }
   .hero-cta { flex-direction: column; align-items: stretch; }
 }
-
 
 

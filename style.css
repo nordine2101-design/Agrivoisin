@@ -83,6 +83,33 @@
   display: none;
 }
 
+/* "Comment ça marche" : disque rond jaune */
+.main-nav a[href="index.html#comment-ca-marche"] {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 90px;
+  height: 90px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #F2C94C;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+}
+
+.main-nav a[href="index.html#comment-ca-marche"]:hover {
+  color: #fff;
+}
+
+.main-nav a[href="index.html#comment-ca-marche"]::after {
+  display: none;
+}
+
 :root {
   /* Palette */
   --cream: #FBF7EF;
@@ -1282,3 +1309,406 @@ h1, h2, h3, h4 {
   .footer-grid { grid-template-columns: 1fr; }
   .hero-cta { flex-direction: column; align-items: stretch; }
 }
+
+2. index.html
+
+html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agrivoisin — Les surplus du jardin, entre voisins</title>
+<meta name="description" content="Agrivoisin met en relation les jardiniers particuliers et leurs voisins pour vendre les surplus du potager. Paiement sécurisé en ligne.">
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+
+<header class="site-header">
+  <div class="logo-bar" style="position:relative;">
+    <a href="index.html" class="logo">
+      <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:320px;width:auto;">
+    </a>
+    <span id="userEmailDisplay" style="position:absolute;top:16px;right:80px;font-size:0.85rem;color:#D97D45;font-weight:600;">🍎 Non connecté</span>
+    <a href="panier.html" class="cart-icon" aria-label="Panier" style="position:absolute;top:12px;right:32px;">
+      <img src="panier-agrivoisin.png" alt="Panier" style="width:100%;height:100%;object-fit:contain;">
+      <span class="cart-count">0</span>
+    </a>
+  </div>
+
+  <div class="container nav-bar">
+    <nav class="main-nav">
+      <a href="index.html#comment-ca-marche">Comment ça<br>marche</a>
+      <a href="index.html#pourquoi">Pourquoi<br>Agrivoisin</a>
+      <a href="annonces.html">Les annonces</a>
+      <a href="publier-annonce.html">Publier une annonce</a>
+    </nav>
+
+    <div class="header-actions">
+      <a href="mes-annonces.html" class="btn btn-ghost">Mes annonces</a>
+      <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
+      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
+      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+
+
+
+<!-- ============ HERO — Présentation du concept ============ -->
+<section class="hero" style="padding-top:0;">
+  <div class="hero-content" style="padding-top:20px;">
+    <h1>Le surplus de <em>votre</em> jardin devient le régal <em>d'un voisin</em></h1>
+    <p>Agrivoisin relie les jardiniers particuliers qui récoltent plus qu'ils ne consomment aux voisins qui rêvent de légumes fraîchement cueillis. Simple, local, et payé en toute sécurité avant même de connaître l'adresse du vendeur.</p>
+    <div class="hero-cta">
+      <a href="annonces.html" class="btn btn-primary">Découvrir les annonces</a>
+      <a href="inscription.html" class="btn btn-outline-light">Créer un compte</a>
+    </div>
+  </div>
+
+  <div class="hero-illustration">
+    <img src="https://images.unsplash.com/photo-1648090229186-6188eaefcc6a?w=1400&q=80&auto=format&fit=crop" alt="Panier rempli de légumes fraîchement récoltés du jardin" class="hero-photo">
+  </div>
+
+  <div class="hero-ground">
+    <svg viewBox="0 0 1440 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0,40 C240,90 480,0 720,30 C960,60 1200,10 1440,50 L1440,90 L0,90 Z" fill="#FBF7EF"/>
+    </svg>
+  </div>
+</section>
+
+<!-- ============ COMMENT ÇA MARCHE ============ -->
+<section class="how-it-works" id="comment-ca-marche">
+  <div class="container">
+    <div class="section-heading">
+      <span class="eyebrow">Le principe</span>
+      <h2>Trois étapes, entre voisins</h2>
+      <p>Un circuit pensé pour protéger les deux côtés de l'échange, du premier clic jusqu'à la récolte dans votre panier.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20M2 12h20"/>
+            <circle cx="12" cy="12" r="9"/>
+          </svg>
+        </div>
+        <span class="step-label">Étape 1</span>
+        <h3>Le jardinier publie</h3>
+        <p>Un voisin jardinier photographie ses surplus (légumes, fruits, aromates) et publie une annonce avec quantité et prix.</p>
+      </div>
+
+      <div class="step">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="1" y="4" width="22" height="16" rx="2"/>
+            <path d="M1 10h22"/>
+          </svg>
+        </div>
+        <span class="step-label">Étape 2</span>
+        <h3>L'acheteur commande et paie</h3>
+        <p>L'acheteur choisit une annonce et règle en ligne, de façon sécurisée, directement sur Agrivoisin.</p>
+      </div>
+
+      <div class="step">
+        <div class="step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0Z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <span class="step-label">Étape 3</span>
+        <h3>L'adresse est dévoilée</h3>
+        <p>Une fois le paiement confirmé, l'adresse du jardinier s'affiche pour organiser la remise des récoltes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ POURQUOI AGRIVOISIN ============ -->
+<section class="why-section" id="pourquoi">
+  <div class="container">
+    <div class="why-grid">
+      <div class="why-visual">
+        <svg viewBox="0 0 400 320" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="400" height="320" rx="20" fill="#FBF7EF"/>
+          <!-- rangs de potager -->
+          <g stroke="#9FC49A" stroke-width="14" stroke-linecap="round">
+            <line x1="40" y1="60" x2="360" y2="60"/>
+            <line x1="40" y1="120" x2="360" y2="120"/>
+            <line x1="40" y1="180" x2="360" y2="180"/>
+            <line x1="40" y1="240" x2="360" y2="240"/>
+          </g>
+          <!-- petites plantes -->
+          <g fill="#4C7A50">
+            <circle cx="90" cy="60" r="10"/>
+            <circle cx="170" cy="60" r="10"/>
+            <circle cx="250" cy="60" r="10"/>
+            <circle cx="330" cy="60" r="10"/>
+            <circle cx="120" cy="120" r="10"/>
+            <circle cx="200" cy="120" r="10"/>
+            <circle cx="280" cy="120" r="10"/>
+            <circle cx="90" cy="180" r="10"/>
+            <circle cx="170" cy="180" r="10"/>
+            <circle cx="250" cy="180" r="10"/>
+            <circle cx="330" cy="180" r="10"/>
+          </g>
+          <g fill="#E8935C">
+            <circle cx="150" cy="240" r="10"/>
+            <circle cx="230" cy="240" r="10"/>
+            <circle cx="310" cy="240" r="10"/>
+          </g>
+        </svg>
+      </div>
+
+      <div class="why-list">
+        <span class="hero-eyebrow" style="align-self:flex-start;background:var(--cream-soft);">Pourquoi Agrivoisin</span>
+        <div class="why-item">
+          <div class="why-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/>
+            </svg>
+          </div>
+          <div>
+            <h4>Paiement protégé</h4>
+            <p>Aucune adresse n'est communiquée avant confirmation du paiement en ligne. Vendeurs et acheteurs échangent en confiance.</p>
+          </div>
+        </div>
+
+        <div class="why-item">
+          <div class="why-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/>
+            </svg>
+          </div>
+          <div>
+            <h4>Circuit ultra-local</h4>
+            <p>Des récoltes qui viennent du quartier ou du village d'à côté, pas d'un entrepôt à des centaines de kilomètres.</p>
+          </div>
+        </div>
+
+        <div class="why-item">
+          <div class="why-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v18h18"/>
+              <path d="M18.7 8 12 14.7 8.5 11.2 3 16.7"/>
+            </svg>
+          </div>
+          <div>
+            <h4>Moins de gaspillage</h4>
+            <p>Les surplus du potager trouvent preneur au lieu de finir au compost, et les jardiniers arrondissent leurs fins de mois.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ANNONCES EN VEDETTE ============ -->
+<section class="featured-section">
+  <div class="container">
+    <div class="section-heading">
+      <span class="eyebrow">Fraîchement publié</span>
+      <h2>Quelques récoltes du moment</h2>
+      <p>Un aperçu des annonces déposées par les jardiniers de la communauté.</p>
+    </div>
+
+    <div class="produce-grid">
+      <div class="produce-card">
+        <div class="produce-card-image">
+          <img src="https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop" alt="Carottes fraîchement récoltées du potager">
+        </div>
+        <div class="produce-card-body">
+          <span class="tag">Légume racine</span>
+          <h4>Carottes du potager</h4>
+          <p class="seller">Marie · à 1,2 km</p>
+          <div class="produce-card-footer">
+            <span class="price">3,50 €/kg</span>
+            <button class="icon-btn" aria-label="Ajouter au panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produce-card">
+        <div class="produce-card-image">
+          <img src="https://images.unsplash.com/photo-1502234977800-a244761625eb?w=600&q=80&auto=format&fit=crop" alt="Tomates anciennes fraîchement cueillies">
+        </div>
+        <div class="produce-card-body">
+          <span class="tag">Fruit-légume</span>
+          <h4>Tomates anciennes</h4>
+          <p class="seller">Julien · à 800 m</p>
+          <div class="produce-card-footer">
+            <span class="price">4,00 €/kg</span>
+            <button class="icon-btn" aria-label="Ajouter au panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produce-card">
+        <div class="produce-card-image">
+          <img src="https://images.unsplash.com/photo-1753445657076-5c3c710c42c4?w=600&q=80&auto=format&fit=crop" alt="Courgettes vertes fraîches empilées">
+        </div>
+        <div class="produce-card-body">
+          <span class="tag">Courgette</span>
+          <h4>Courgettes vertes</h4>
+          <p class="seller">Sophie · à 2 km</p>
+          <div class="produce-card-footer">
+            <span class="price">2,80 €/kg</span>
+            <button class="icon-btn" aria-label="Ajouter au panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produce-card">
+        <div class="produce-card-image">
+          <img src="https://images.unsplash.com/photo-1749655248287-d1e0acb5f8d1?w=600&q=80&auto=format&fit=crop" alt="Basilic frais aux feuilles vibrantes">
+        </div>
+        <div class="produce-card-body">
+          <span class="tag">Aromate</span>
+          <h4>Basilic frais</h4>
+          <p class="seller">Nadia · à 1,5 km</p>
+          <div class="produce-card-footer">
+            <span class="price">1,50 €/botte</span>
+            <button class="icon-btn" aria-label="Ajouter au panier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="featured-cta">
+      <a href="annonces.html" class="btn btn-primary">Voir toutes les annonces</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BANDEAU CONFIANCE ============ -->
+<section class="trust-banner">
+  <div class="container">
+    <div class="trust-grid">
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
+        <h4>Paiement sécurisé</h4>
+        <p>Transactions chiffrées, adresse révélée après paiement uniquement.</p>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <h4>Récolte du jour</h4>
+        <p>Des produits vendus dans les heures qui suivent la cueillette.</p>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <h4>Communauté de voisins</h4>
+        <p>Des vendeurs et acheteurs de votre quartier, pas d'inconnus lointains.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA FINALE ============ -->
+<section class="final-cta">
+  <div class="container">
+    <div class="final-cta-box">
+      <h2>Votre jardin déborde de récoltes ?</h2>
+      <p>Publiez votre première annonce en quelques minutes et rencontrez les voisins gourmands de votre quartier.</p>
+      <a href="inscription.html" class="btn btn-outline-light">Créer un compte</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('.main-nav a[href="index.html#comment-ca-marche"], .main-nav a[href="index.html#pourquoi"]').forEach(function (link) {
+    link.addEventListener('click', function () {
+      document.querySelector('.site-header').style.display = 'none';
+    });
+  });
+
+  function updateHeader() {
+    var hash = window.location.hash;
+    var header = document.querySelector('.site-header');
+    if (hash === '#comment-ca-marche' || hash === '#pourquoi') {
+      header.style.display = 'none';
+    } else {
+      header.style.display = '';
+    }
+  }
+
+  updateHeader();
+  window.addEventListener('hashchange', updateHeader);
+  window.addEventListener('pageshow', updateHeader);
+
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    const emailDisplay = document.getElementById('userEmailDisplay');
+    if (session) {
+      emailDisplay.textContent = '🍏 Connecté';
+      emailDisplay.style.color = '#4C7A50';
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -58,8 +58,11 @@
       <label for="sellerEmail">Votre adresse e-mail</label>
       <input type="email" id="sellerEmail" placeholder="vous@exemple.com" required>
 
-      <label for="sellerCity">Votre ville (utilisée pour calculer la distance avec les acheteurs, sans jamais révéler votre adresse)</label>
+      <label for="sellerCity">Votre ville ou village (utilisé pour calculer la distance avec les acheteurs, sans jamais révéler votre adresse)</label>
       <input type="text" id="sellerCity" placeholder="Ex : Strasbourg" required>
+
+      <label for="sellerPostalCode">Votre code postal</label>
+      <input type="text" id="sellerPostalCode" placeholder="Ex : 67000" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" title="Le code postal comporte 5 chiffres" required>
 
       <label for="sellerAddress">Votre adresse complète (sera communiquée à l'acheteur après paiement uniquement)</label>
       <input type="text" id="sellerAddress" placeholder="Ex : 12 rue des Jardins, 75000 Paris" required>
@@ -138,6 +141,7 @@
     e.preventDefault();
     const email = document.getElementById('sellerEmail').value;
     const city = document.getElementById('sellerCity').value;
+    const postalCode = document.getElementById('sellerPostalCode').value.trim();
     const address = document.getElementById('sellerAddress').value;
     const btn = document.getElementById('sellerSubmitBtn');
     const errorEl = document.getElementById('sellerError');
@@ -158,7 +162,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ email, city, address }),
+        body: JSON.stringify({ email, city, postalCode, address }),
       });
 
       const data = await response.json();

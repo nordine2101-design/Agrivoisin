@@ -381,6 +381,23 @@
   window.addEventListener('hashchange', updateHeader);
   window.addEventListener('pageshow', updateHeader);
 
+  // Compteur du panier : affiche le vrai nombre d'articles ajoutés
+  function updateCartCount() {
+    let count = 0;
+    try {
+      const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+      count = Array.isArray(cart) ? cart.length : 0;
+    } catch (e) {
+      count = 0;
+    }
+    document.querySelectorAll('.cart-count').forEach(function (el) {
+      el.textContent = count;
+    });
+  }
+
+  updateCartCount();
+  window.addEventListener('pageshow', updateCartCount);
+
   const supabaseClient = window.supabase.createClient(
     'https://eipksfszadhratfvavvs.supabase.co',
     'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'

@@ -23,7 +23,17 @@ export default async function handler(req, res) {
       throw error;
     }
 
-    res.status(200).json({ listings });
+    // Une annonce n'apparaît sur le site que si la ville de son vendeur est connue
+    // et reconnue sur la carte (la distance doit toujours pouvoir être calculée)
+    const visibleListings = (listings || []).filter(
+      (item) =>
+        item.sellers &&
+        item.sellers.city &&
+        item.sellers.latitude != null &&
+        item.sellers.longitude != null
+    );
+
+    res.status(200).json({ listings: visibleListings });
 
   } catch (error) {
     console.error(error);

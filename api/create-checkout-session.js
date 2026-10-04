@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   try {
     const { cart } = req.body;
 
-    if (!cart || cart.length === 0) {
+    if (!Array.isArray(cart) || cart.length === 0) {
       return res.status(400).json({ error: 'Le panier est vide' });
     }
 
@@ -27,56 +27,85 @@ export default async function handler(req, res) {
       }
     }
 
-    // Transformer chaque article du panier en ligne de paiement Stripe
-    const lineItems = cart.map((item) => {
-      const priceMatch = item.price.replace(',', '.').match(/[\d.]+/);
-      const priceInEuros = priceMatch ? parseFloat(priceMatch[0]) : 0;
+    // Le navigateur ne nous donne que l'identifiant des annonces choisies.
+    // Le prix, le titre et le vendeur sont relus dans notre base : on ne les croit jamais sur parole.
+    const listingIds = [...new Set(cart.map((item) => item && item.listingId).filter(Boolean))];
 
-      return {
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: item.name,
-          },
-          unit_amount: Math.round(priceInEuros * 100),
-        },
-        quantity: 1,
-      };
-    });
-
-    // Répartition des paiements par vendeur (déjà existant)
-    const transferInfo = cart
-      .filter((item) => item.stripeAccountId)
-      .map((item) => {
-        const priceMatch = item.price.replace(',', '.').match(/[\d.]+/);
-        const priceInEuros = priceMatch ? parseFloat(priceMatch[0]) : 0;
-        return `${item.stripeAccountId}:${Math.round(priceInEuros * 100)}`;
-      })
-      .join(',');
-
-    // Retrouver le seller_id (Supabase) correspondant à chaque stripeAccountId
-    const stripeAccountIds = [...new Set(cart.map((i) => i.stripeAccountId).filter(Boolean))];
-    let sellersByStripeId = {};
-    if (stripeAccountIds.length > 0) {
-      const { data: sellersData } = await supabase
-        .from('sellers')
-        .select('id, stripe_account_id')
-        .in('stripe_account_id', stripeAccountIds);
-      if (sellersData) {
-        sellersData.forEach((s) => {
-          sellersByStripeId[s.stripe_account_id] = s.id;
-        });
-      }
+    if (listingIds.length === 0 || cart.some((item) => !item || !item.listingId)) {
+      return res.status(400).json({
+        error: "Un article de votre panier n'est pas valide. Retirez-le puis ajoutez-le de nouveau.",
+      });
     }
 
+    const { data: listings, error: listingsError } = await supabase
+      .from('listings')
+      .select('id, title, price, sellers(id, city, latitude, longitude, stripe_account_id)')
+      .in('id', listingIds);
+
+    if (listingsError) {
+      console.error('Erreur Supabase (lecture des annonces du panier) :', listingsError);
+      return res.status(500).json({
+        error: 'Impossible de vérifier votre panier pour le moment. Réessayez dans quelques instants.',
+      });
+    }
+
+    const listingsById = {};
+    (listings || []).forEach((listing) => {
+      listingsById[String(listing.id)] = listing;
+    });
+
+    // Une ligne de paiement par article du panier, avec le vrai prix et le vrai vendeur
+    const lines = [];
+    for (const item of cart) {
+      const listing = listingsById[String(item.listingId)];
+      const seller = listing ? (Array.isArray(listing.sellers) ? listing.sellers[0] : listing.sellers) : null;
+      const label = String(item.name || 'cette annonce').slice(0, 60);
+
+      // Une annonce n'est achetable que si elle existe encore et si son vendeur est complet
+      // (compte de paiement + ville reconnue), comme pour son affichage sur le site.
+      const sellerIsValid =
+        seller &&
+        seller.stripe_account_id &&
+        seller.city &&
+        seller.latitude != null &&
+        seller.longitude != null;
+
+      if (!listing || !sellerIsValid) {
+        return res.status(400).json({
+          error: `L'annonce « ${label} » n'est plus disponible. Retirez-la de votre panier.`,
+        });
+      }
+
+      const cents = Math.round(Number(listing.price) * 100);
+      if (!Number.isFinite(cents) || cents <= 0) {
+        return res.status(400).json({
+          error: `Le prix de l'annonce « ${label} » est invalide. Retirez-la de votre panier.`,
+        });
+      }
+
+      lines.push({ listing, seller, cents });
+    }
+
+    // Transformer chaque article en ligne de paiement Stripe
+    const lineItems = lines.map(({ listing, cents }) => ({
+      price_data: {
+        currency: 'eur',
+        product_data: {
+          name: listing.title || 'Récolte Agrivoisin',
+        },
+        unit_amount: cents,
+      },
+      quantity: 1,
+    }));
+
+    // Répartition des paiements par vendeur (calculée par le serveur, jamais par le navigateur)
+    const transferInfo = lines
+      .map(({ seller, cents }) => `${seller.stripe_account_id}:${cents}`)
+      .join(',');
+
     // Détail des articles pour créer order_items après paiement
-    const itemsInfo = cart
-      .map((item) => {
-        const priceMatch = item.price.replace(',', '.').match(/[\d.]+/);
-        const priceInEuros = priceMatch ? parseFloat(priceMatch[0]) : 0;
-        const sellerId = sellersByStripeId[item.stripeAccountId] || '';
-        return `${item.listingId || ''}:${sellerId}:${Math.round(priceInEuros * 100)}`;
-      })
+    const itemsInfo = lines
+      .map(({ listing, seller, cents }) => `${listing.id}:${seller.id}:${cents}`)
       .join(',');
 
     const session = await stripe.checkout.sessions.create({

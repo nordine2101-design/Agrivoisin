@@ -39,8 +39,11 @@
       <label for="password">Mot de passe</label>
       <input type="password" id="password" placeholder="8 caractères minimum" minlength="8" required>
 
-      <label for="city">Ville</label>
+      <label for="city">Ville ou village</label>
       <input type="text" id="city" placeholder="Votre ville" required>
+
+      <label for="postalCode" id="postalCodeLabel" style="display:none;">Code postal</label>
+      <input type="text" id="postalCode" placeholder="Ex : 57200" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" title="Le code postal comporte 5 chiffres" style="display:none;">
 
       <label for="sellerAddress" id="sellerAddressLabel" style="display:none;">Adresse complète (sera communiquée à l'acheteur après paiement uniquement)</label>
       <input type="text" id="sellerAddress" placeholder="Ex : 12 rue des Jardins, 75000 Paris" style="display:none;">
@@ -68,6 +71,8 @@
   let selectedType = 'acheteur';
   const sellerAddressLabel = document.getElementById('sellerAddressLabel');
   const sellerAddressInput = document.getElementById('sellerAddress');
+  const postalCodeLabel = document.getElementById('postalCodeLabel');
+  const postalCodeInput = document.getElementById('postalCode');
 
   document.querySelectorAll('.account-type-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -79,10 +84,17 @@
         sellerAddressLabel.style.display = '';
         sellerAddressInput.style.display = '';
         sellerAddressInput.required = true;
+        postalCodeLabel.style.display = '';
+        postalCodeInput.style.display = '';
+        postalCodeInput.required = true;
       } else {
         sellerAddressLabel.style.display = 'none';
         sellerAddressInput.style.display = 'none';
         sellerAddressInput.required = false;
+        postalCodeLabel.style.display = 'none';
+        postalCodeInput.style.display = 'none';
+        postalCodeInput.required = false;
+        postalCodeInput.value = '';
       }
     });
   });
@@ -101,8 +113,33 @@
     const name = document.getElementById('name').value;
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-    const city = document.getElementById('city').value;
+    let city = document.getElementById('city').value;
+    const postalCode = postalCodeInput.value.trim();
     const sellerAddress = sellerAddressInput.value;
+
+    if (selectedType === 'jardinier') {
+      btn.textContent = 'Vérification de la ville...';
+
+      let verification;
+      try {
+        const r = await fetch('/api/check-commune?city=' + encodeURIComponent(city) + '&postalCode=' + encodeURIComponent(postalCode));
+        const d = await r.json();
+        verification = r.ok ? { ok: true, city: d.city } : { ok: false, error: d.error };
+      } catch (err) {
+        verification = { ok: false, error: 'Impossible de vérifier la ville pour le moment. Réessayez dans quelques instants.' };
+      }
+
+      if (!verification.ok) {
+        errorEl.textContent = verification.error || 'Ville introuvable. Vérifiez-la.';
+        errorEl.style.display = 'block';
+        btn.textContent = 'Créer mon compte';
+        btn.disabled = false;
+        return;
+      }
+
+      city = verification.city;
+      btn.textContent = 'Création en cours...';
+    }
 
     const { data, error } = await supabaseClient.auth.signUp({
       email: email,
@@ -145,7 +182,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + accessToken,
         },
-        body: JSON.stringify({ email, city, address: sellerAddress }),
+        body: JSON.stringify({ email, city, postalCode, address: sellerAddress }),
       });
 
       const stripeData = await response.json();

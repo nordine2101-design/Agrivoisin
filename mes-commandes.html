@@ -12,7 +12,7 @@
 
 <!-- ============ EN-TÊTE DE PAGE ============ -->
 <section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;text-align:center;">
+  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;height:533px;box-sizing:border-box;text-align:center;display:flex;flex-direction:column;">
     <div style="text-align:left;margin:-24px 0 12px -20px;">
       <a href="index.html" class="btn btn-ghost">Retour</a>
     </div>
@@ -22,15 +22,10 @@
     <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de vos commandes...</p>
     <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous devez être connecté pour voir vos commandes. <a href="connexion.html">Se connecter</a></p>
     <p id="noOrdersMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous n'avez pas encore passé de commande.</p>
+
+    <div id="ordersContainer" style="flex:1;min-height:0;overflow-y:auto;text-align:left;margin-top:16px;"></div>
   </div>
    <video src="mamie-video3.mp4" autoplay muted playsinline style="width:440px;object-fit:cover;align-self:stretch;display:block;margin:0;border-radius:28px;"></video>
-</section>
-
-<!-- ============ CONTENU ============ -->
-<section class="listings-section">
-  <div class="container">
-    <div id="ordersContainer"></div>
-  </div>
 </section>
 
 <!-- ============ FOOTER ============ -->
@@ -226,12 +221,13 @@
 </script>
 
 <style>
-  .order-card { background:#fff; border-radius:12px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .order-card { background:#f9f7f2; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .order-card h3 { font-size:0.95rem; margin-bottom:8px; }
   .order-seller-block { border-top:1px solid #eee; padding-top:14px; margin-top:14px; }
-  .strawberry-picker { display:flex; flex-direction:row; flex-wrap:nowrap; gap:16px; margin:10px 0; }
+  .strawberry-picker { display:flex; flex-direction:row; flex-wrap:nowrap; gap:8px; margin:10px 0; }
   .strawberry-option { cursor:pointer; display:inline-block; }
-  .strawberry-row { display:inline-flex; flex-direction:row; flex-wrap:nowrap; align-items:center; gap:4px; }
-  .strawberry-icon-wrap { width:46px; height:46px; display:inline-block; flex-shrink:0; }
+  .strawberry-row { display:inline-flex; flex-direction:row; flex-wrap:nowrap; align-items:center; gap:2px; }
+  .strawberry-icon-wrap { width:26px; height:26px; display:inline-block; flex-shrink:0; }
   .strawberry-icon { width:100%; height:100%; object-fit:contain; display:block; mix-blend-mode:multiply; }
   .review-comment { width:100%; min-height:60px; margin:10px 0; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; }
   .existing-review { background:#f6f9f5; border-radius:8px; padding:10px; margin-top:8px; }

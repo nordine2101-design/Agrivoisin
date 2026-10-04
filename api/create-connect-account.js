@@ -120,43 +120,95 @@ export default async function handler(req, res) {
     }
     const { latitude, longitude } = commune;
 
-    // 2. Créer un compte Stripe Connect Express pour ce jardinier
-    const account = await stripe.accounts.create({
-      type: 'express',
-      email: email,
-      capabilities: {
-        transfers: { requested: true },
-        card_payments: { requested: true },
-      },
-    });
-
-    // 3. Enregistrer ce vendeur dans notre base de données Supabase, lié à son compte connecté
-    const { error: dbError } = await supabase
+    // 2. Cette personne est-elle déjà vendeuse ? (évite de créer des comptes en double)
+    const { data: existingSeller, error: lookupError } = await supabase
       .from('sellers')
-      .insert({
+      .select('id, stripe_account_id')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error('Erreur Supabase (recherche du vendeur) :', lookupError);
+      return res.status(500).json({
+        error: 'Impossible de vérifier votre compte vendeur pour le moment. Réessayez dans quelques instants.',
+      });
+    }
+
+    // 3. Compte Stripe Connect Express : on réutilise celui qui existe, sinon on en crée un
+    let stripeAccountId = existingSeller ? existingSeller.stripe_account_id : null;
+    let createdStripeAccount = false;
+
+    if (!stripeAccountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
         email: email,
-        stripe_account_id: account.id,
+        capabilities: {
+          transfers: { requested: true },
+          card_payments: { requested: true },
+        },
+      });
+      stripeAccountId = account.id;
+      createdStripeAccount = true;
+    }
+
+    // 4. Enregistrer (ou mettre à jour) ce vendeur dans notre base de données Supabase
+    let dbError = null;
+
+    if (existingSeller) {
+      const changes = {
         city: commune.city,
         address: address,
         latitude: latitude,
         longitude: longitude,
-        user_id: userId,
-      });
-
-    if (dbError) {
-      console.error('Erreur Supabase :', dbError);
+      };
+      if (createdStripeAccount) {
+        changes.stripe_account_id = stripeAccountId;
+      }
+      const result = await supabase.from('sellers').update(changes).eq('id', existingSeller.id);
+      dbError = result.error;
+    } else {
+      const result = await supabase
+        .from('sellers')
+        .insert({
+          email: email,
+          stripe_account_id: stripeAccountId,
+          city: commune.city,
+          address: address,
+          latitude: latitude,
+          longitude: longitude,
+          user_id: userId,
+        });
+      dbError = result.error;
     }
 
-    // 4. Générer le lien d'inscription (onboarding) Stripe pour ce compte
+    if (dbError) {
+      console.error('Erreur Supabase (enregistrement du vendeur) :', dbError);
+
+      // On ne laisse pas traîner un compte Stripe que l'on vient de créer pour rien
+      if (createdStripeAccount) {
+        try {
+          await stripe.accounts.del(stripeAccountId);
+        } catch (deleteError) {
+          console.error('Impossible de supprimer le compte Stripe créé :', deleteError);
+        }
+      }
+
+      return res.status(500).json({
+        error: "Impossible d'enregistrer votre compte vendeur pour le moment. Réessayez dans quelques instants.",
+      });
+    }
+
+    // 5. Générer le lien d'inscription (onboarding) Stripe pour ce compte
     const accountLink = await stripe.accountLinks.create({
-      account: account.id,
+      account: stripeAccountId,
       refresh_url: `${req.headers.origin}/vendre.html`,
       return_url: `${req.headers.origin}/vendre-confirmation.html`,
       type: 'account_onboarding',
     });
 
     res.status(200).json({
-      accountId: account.id,
+      accountId: stripeAccountId,
       onboardingUrl: accountLink.url,
     });
   } catch (error) {

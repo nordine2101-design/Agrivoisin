@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     // 1. Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
-      .select('id')
+      .select('id, city, latitude, longitude')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -43,7 +43,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Aucun compte vendeur trouvé pour ce compte. Devenez d'abord vendeur." });
     }
 
-    // 2. Créer l'annonce liée à ce vendeur
+    // 2. Une annonce n'est publiée que si la ville du vendeur est connue et reconnue sur la carte
+    //    (c'est ce qui permet de calculer la distance avec les acheteurs)
+    if (!seller.city || seller.latitude == null || seller.longitude == null) {
+      return res.status(400).json({
+        error: "Votre ville n'est pas encore reconnue sur la carte, votre annonce ne peut donc pas être publiée. Renseignez votre ville et votre code postal sur la page « Devenir vendeur » (vendre.html).",
+      });
+    }
+
+    // 3. Créer l'annonce liée à ce vendeur
     const { data: listing, error: listingError } = await supabase
       .from('listings')
       .insert({

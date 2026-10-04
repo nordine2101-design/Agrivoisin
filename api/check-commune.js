@@ -1,0 +1,105 @@
+// Vérifie qu'une ville / un village correspond bien à un code postal,
+// grâce à l'annuaire officiel des communes (geo.api.gouv.fr).
+// Renvoie le nom officiel de la commune et sa position (latitude / longitude).
+
+function normalizeName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\bsaint\b/g, 'st')
+    .replace(/\bsainte\b/g, 'ste');
+}
+
+function nameMatches(typed, official) {
+  if (typed.length < 3) return false;
+  return (
+    official === typed ||
+    official.startsWith(typed + ' ') ||
+    typed.startsWith(official + ' ')
+  );
+}
+
+async function lookupCommune(city, postalCode) {
+  const typed = normalizeName(city);
+  const cp = String(postalCode || '').trim();
+
+  if (!typed) {
+    return { ok: false, status: 400, error: 'Indiquez le nom de votre ville ou village.' };
+  }
+  if (!/^\d{5}$/.test(cp)) {
+    return { ok: false, status: 400, error: 'Le code postal doit comporter 5 chiffres.' };
+  }
+
+  let communes;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(
+      `https://geo.api.gouv.fr/communes?codePostal=${cp}&fields=nom,centre&format=json`,
+      { signal: controller.signal, headers: { Accept: 'application/json' } }
+    );
+    if (!response.ok) {
+      throw new Error('Réponse ' + response.status);
+    }
+    communes = await response.json();
+  } catch (err) {
+    console.error('Erreur annuaire des communes :', err);
+    return {
+      ok: false,
+      status: 503,
+      error: 'Le service de vérification des communes est momentanément indisponible. Réessayez dans quelques instants.',
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!Array.isArray(communes) || communes.length === 0) {
+    return { ok: false, status: 400, error: 'Ce code postal est introuvable. Vérifiez-le.' };
+  }
+
+  const match = communes.find((c) => nameMatches(typed, normalizeName(c.nom)));
+
+  if (!match) {
+    const names = communes.map((c) => c.nom).join(', ');
+    return {
+      ok: false,
+      status: 400,
+      error: `Ce code postal correspond à : ${names}. Vérifiez le nom de votre ville ou village.`,
+    };
+  }
+
+  const coords = match.centre && match.centre.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'Position de la commune indisponible pour le moment. Réessayez dans quelques instants.',
+    };
+  }
+
+  return { ok: true, city: match.nom, latitude: coords[1], longitude: coords[0] };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Méthode non autorisée' });
+  }
+
+  const { city, postalCode } = req.query;
+  const result = await lookupCommune(city, postalCode);
+
+  if (!result.ok) {
+    return res.status(result.status).json({ error: result.error });
+  }
+
+  return res.status(200).json({
+    city: result.city,
+    latitude: result.latitude,
+    longitude: result.longitude,
+  });
+}

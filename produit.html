@@ -3,93 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carottes du potager — Agrivoisin</title>
-<meta name="description" content="Carottes fraîchement récoltées, vendues par Marie, à 1,2 km. Paiement sécurisé sur Agrivoisin.">
+<title>Annonce — Agrivoisin</title>
+<meta name="description" content="Détail d'une annonce de récolte sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ============ HEADER ============ -->
-<header class="site-header">
-  <div class="logo-bar">
-    <a href="index.html" class="logo">
-      <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:200px;width:auto;">
-    </a>
-  </div>
+<!-- ============ FICHE ANNONCE ============ -->
+<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
+  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;min-height:533px;box-sizing:border-box;text-align:center;">
+    <div style="text-align:left;margin:-24px 0 12px -20px;">
+      <a href="annonces.html" class="btn btn-ghost">Retour</a>
+    </div>
 
-  <div class="container nav-bar">
-    <nav class="main-nav">
-      <a href="index.html#comment-ca-marche">Comment ça marche</a>
-      <a href="annonces.html">Les annonces</a>
-      <a href="index.html#pourquoi">Pourquoi Agrivoisin</a>
-      <a href="vendre.html">Devenir vendeur</a>
-      <a href="publier-annonce.html">Publier une annonce</a>
-    </nav>
+    <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de l'annonce...</p>
+    <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;"></p>
 
-    <div class="header-actions">
-      <a href="panier.html" class="cart-icon" aria-label="Panier">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="9" cy="21" r="1"></circle>
-          <circle cx="20" cy="21" r="1"></circle>
-          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-        </svg>
-        <span class="cart-count">0</span>
-      </a>
-      <a href="mes-annonces.html" class="btn btn-ghost">Mes annonces</a>
-      <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
-      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
-      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
-      <button class="nav-toggle" aria-label="Menu">
-        <span></span><span></span><span></span>
-      </button>
+    <div id="listingDetail" style="display:none;">
+      <span id="listingTag" class="tag" style="font-size:0.72rem;font-weight:700;color:var(--leaf);text-transform:uppercase;letter-spacing:0.05em;"></span>
+      <h1 id="listingTitle" style="margin:6px 0 10px;font-size:1.7rem;"></h1>
+      <p id="listingFreshness" style="display:none;font-weight:600;color:var(--leaf-deep);margin-bottom:8px;"></p>
+      <p id="listingSeller" style="font-size:0.95rem;margin-bottom:16px;"></p>
+      <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
+      <p style="margin-bottom:22px;"><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span></p>
+
+      <button type="button" id="addToCartBtn" class="btn btn-primary" style="width:100%;">Ajouter au panier</button>
+      <a id="viewCartLink" href="panier.html" style="display:none;margin-top:14px;font-weight:700;color:var(--leaf-deep);">Voir mon panier</a>
+
+      <p class="product-trust-note" style="margin-top:20px;text-align:left;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:20px;height:20px;flex-shrink:0;"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
+        <span>L'adresse du vendeur vous sera communiquée automatiquement après confirmation du paiement.</span>
+      </p>
     </div>
   </div>
-</header>
-
-<!-- ============ FIL D'ARIANE ============ -->
-<div class="container breadcrumb">
-  <a href="index.html">Accueil</a> <span>›</span> <a href="annonces.html">Les annonces</a> <span>›</span> <span>Carottes du potager</span>
-</div>
-
-<!-- ============ FICHE PRODUIT ============ -->
-<section class="product-section">
-  <div class="container product-layout">
-
-    <div class="product-image-block">
-      <img src="https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=900&q=80&auto=format&fit=crop" alt="Carottes fraîchement récoltées du potager">
-    </div>
-
-    <div class="product-info-block">
-      <span class="tag">Légume racine</span>
-      <h1>Carottes du potager</h1>
-
-      <div class="product-seller">
-        <div class="product-seller-avatar">M</div>
-        <div>
-          <p class="product-seller-name">Marie</p>
-          <p class="product-seller-distance">📍 à 1,2 km de vous</p>
-        </div>
-      </div>
-
-      <p class="product-description">Carottes croquantes cultivées sans pesticides, récoltées ce matin dans mon jardin. Idéales pour des soupes, des jus ou à croquer telles quelles. Quantité limitée selon la récolte de la semaine.</p>
-
-      <div class="product-price-row">
-        <span class="product-price">3,50 €<span class="product-price-unit">/kg</span></span>
-        <div class="quantity-selector">
-          <button type="button" class="qty-btn" aria-label="Diminuer">−</button>
-          <span class="qty-value">1</span>
-          <button type="button" class="qty-btn" aria-label="Augmenter">+</button>
-        </div>
-      </div>
-
-      <button class="btn btn-primary product-add-cart">Ajouter au panier</button>
-
-      <div class="product-trust-note">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
-        <p>L'adresse exacte de Marie sera communiquée automatiquement après confirmation du paiement.</p>
-      </div>
-    </div>
-
+  <div style="width:440px;min-height:533px;align-self:stretch;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+    <img id="listingImage" src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="max-width:80%;max-height:80%;width:auto;height:auto;object-fit:contain;">
   </div>
 </section>
 
@@ -111,7 +59,6 @@
         <ul>
           <li><a href="annonces.html">Les annonces</a></li>
           <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
-          <li><a href="vendre.html">Devenir vendeur</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -139,5 +86,122 @@
 </footer>
 
 <script src="script.js"></script>
+<script>
+  const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=900&q=80&auto=format&fit=crop';
+
+  const loadingMessage = document.getElementById('loadingMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const detailEl = document.getElementById('listingDetail');
+  const imageEl = document.getElementById('listingImage');
+  const addBtn = document.getElementById('addToCartBtn');
+  const viewCartLink = document.getElementById('viewCartLink');
+
+  const listingId = new URLSearchParams(window.location.search).get('id');
+
+  let buyerLocation = null;
+  try {
+    buyerLocation = JSON.parse(localStorage.getItem('agrivoisin_buyer_location'));
+  } catch (e) {
+    buyerLocation = null;
+  }
+
+  function showError(text) {
+    loadingMessage.style.display = 'none';
+    errorMessage.innerHTML = text;
+    errorMessage.style.display = 'block';
+  }
+
+  function freshnessInfo(harvestDate) {
+    if (!harvestDate) return null;
+    const harvest = new Date(harvestDate + 'T00:00:00');
+    const hoursSince = (new Date() - harvest) / (1000 * 60 * 60);
+    if (hoursSince < 24) return { stars: 3, label: 'Très frais' };
+    if (hoursSince < 48) return { stars: 2, label: 'Frais' };
+    return { stars: 1, label: 'Fraîcheur minimale' };
+  }
+
+  function haversineDistance(lat1, lon1, lat2, lon2) {
+    const toRad = (v) => (v * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function renderListing(item) {
+    document.title = item.title + ' — Agrivoisin';
+
+    document.getElementById('listingTag').textContent = item.subcategory || item.category || 'Récolte';
+    document.getElementById('listingTitle').textContent = item.title;
+
+    const freshness = freshnessInfo(item.harvest_date);
+    if (freshness) {
+      const el = document.getElementById('listingFreshness');
+      el.textContent = '⭐'.repeat(freshness.stars) + ' ' + freshness.label;
+      el.style.display = 'block';
+    }
+
+    let sellerText = item.sellers && item.sellers.city ? item.sellers.city : 'Vendeur Agrivoisin';
+    if (buyerLocation && item.sellers && item.sellers.latitude != null && item.sellers.longitude != null) {
+      const d = haversineDistance(buyerLocation.lat, buyerLocation.lng, item.sellers.latitude, item.sellers.longitude);
+      sellerText += ' · à ' + (d < 1 ? Math.round(d * 1000) + ' m' : d.toFixed(1).replace('.', ',') + ' km');
+    }
+    document.getElementById('listingSeller').textContent = sellerText;
+
+    const descEl = document.getElementById('listingDescription');
+    if (item.description) {
+      descEl.textContent = item.description;
+    } else {
+      descEl.style.display = 'none';
+    }
+
+    const priceText = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + (item.unit || 'kg');
+    document.getElementById('listingPrice').textContent = priceText;
+
+    imageEl.src = item.image_url || FALLBACK_IMAGE;
+    imageEl.alt = item.title;
+    imageEl.style.maxWidth = '100%';
+    imageEl.style.maxHeight = '533px';
+    imageEl.style.borderRadius = '28px';
+
+    addBtn.addEventListener('click', () => {
+      const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+      cart.push({
+        name: item.title,
+        price: priceText,
+        stripeAccountId: item.sellers ? item.sellers.stripe_account_id : '',
+        listingId: item.id,
+      });
+      localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
+      addBtn.textContent = 'Ajouté au panier';
+      viewCartLink.style.display = 'inline-block';
+      setTimeout(() => { addBtn.textContent = 'Ajouter au panier'; }, 2000);
+    });
+
+    loadingMessage.style.display = 'none';
+    detailEl.style.display = 'block';
+  }
+
+  if (!listingId) {
+    showError('Cette annonce est introuvable. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>');
+  } else {
+    fetch('/api/get-listings')
+      .then((res) => res.json())
+      .then((data) => {
+        const item = (data.listings || []).find((l) => String(l.id) === String(listingId));
+        if (!item) {
+          showError('Cette annonce n\'existe plus. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>');
+          return;
+        }
+        renderListing(item);
+      })
+      .catch((err) => {
+        console.error('Erreur chargement annonce :', err);
+        showError('Impossible de charger cette annonce pour le moment.');
+      });
+  }
+</script>
 </body>
 </html>

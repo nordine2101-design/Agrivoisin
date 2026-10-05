@@ -122,7 +122,7 @@
 
       let verification;
       try {
-        const r = await fetch('/api/check-commune?city=' + encodeURIComponent(city) + '&postalCode=' + encodeURIComponent(postalCode));
+        const r = await fetch('/api/create-connect-account?city=' + encodeURIComponent(city) + '&postalCode=' + encodeURIComponent(postalCode));
         const d = await r.json();
         verification = r.ok ? { ok: true, city: d.city } : { ok: false, error: d.error };
       } catch (err) {

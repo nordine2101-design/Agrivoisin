@@ -84,6 +84,104 @@
   const noOrdersMessage = document.getElementById('noOrdersMessage');
   const ordersContainer = document.getElementById('ordersContainer');
 
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString('fr-FR');
+  }
+
+  function payoutDoneHtml() {
+    return '<div class="payout-box payout-done"><p>Paiement versé au vendeur.</p></div>';
+  }
+
+  function payoutProblemHtml() {
+    return '<div class="payout-box payout-problem"><p>Problème signalé : le paiement est suspendu. Agrivoisin examine la situation.</p></div>';
+  }
+
+  function renderPayoutSection(orderId, seller) {
+    const payout = seller.payout;
+    // Anciennes commandes (avant l'argent retenu) : rien à afficher
+    if (!payout) return '';
+
+    if (payout.status === 'verse') return payoutDoneHtml();
+    if (payout.status === 'probleme') return payoutProblemHtml();
+    if (payout.status === 'en_cours') {
+      return '<div class="payout-box"><p>Versement au vendeur en cours de traitement...</p></div>';
+    }
+
+    // En attente : l'argent est gardé par Agrivoisin
+    const releaseDate = payout.autoReleaseAt ? new Date(payout.autoReleaseAt) : null;
+    const when = releaseDate && releaseDate.getTime() > Date.now()
+      ? 'le ' + formatDate(payout.autoReleaseAt)
+      : 'très prochainement';
+
+    return `
+      <div class="payout-box" data-order-id="${orderId}" data-seller-id="${seller.sellerId}">
+        <p>Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ${when}, ou dès que vous confirmez la réception.</p>
+        <div class="payout-actions">
+          <button type="button" class="btn btn-primary payout-confirm-btn">J'ai bien reçu ma commande</button>
+          <button type="button" class="btn btn-ghost payout-report-btn">Signaler un problème</button>
+        </div>
+        <p class="payout-error" style="color:#C8352F;display:none;"></p>
+      </div>
+    `;
+  }
+
+  async function sendPayoutAction(box, action) {
+    const orderId = box.dataset.orderId;
+    const sellerId = box.dataset.sellerId;
+    const errorEl = box.querySelector('.payout-error');
+    const buttons = box.querySelectorAll('button');
+
+    errorEl.style.display = 'none';
+    buttons.forEach((b) => { b.disabled = true; });
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        throw new Error('Session expirée, reconnectez-vous.');
+      }
+
+      const response = await fetch('/api/payouts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + session.access_token,
+        },
+        body: JSON.stringify({ action, orderId, sellerId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Une erreur est survenue');
+      }
+
+      box.outerHTML = data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+      buttons.forEach((b) => { b.disabled = false; });
+    }
+  }
+
+  function attachPayoutHandlers() {
+    document.querySelectorAll('.payout-box[data-order-id]').forEach((box) => {
+      const confirmBtn = box.querySelector('.payout-confirm-btn');
+      const reportBtn = box.querySelector('.payout-report-btn');
+
+      confirmBtn.addEventListener('click', () => {
+        if (window.confirm("Confirmez-vous avoir bien reçu votre commande ? Le vendeur sera payé tout de suite, et cette action ne peut pas être annulée.")) {
+          sendPayoutAction(box, 'confirm');
+        }
+      });
+
+      reportBtn.addEventListener('click', () => {
+        if (window.confirm("Signaler un problème avec cette commande ? Le paiement au vendeur sera suspendu le temps qu'Agrivoisin examine la situation.")) {
+          sendPayoutAction(box, 'report');
+        }
+      });
+    });
+  }
+
   function strawberryIcons(count) {
     let icons = '';
     for (let j = 0; j < count; j++) {
@@ -197,6 +295,7 @@
           sellersHtml += `
             <div class="order-seller-block">
               <p><strong>${seller.sellerEmail}</strong> — ${seller.products.join(', ')}</p>
+              ${renderPayoutSection(order.orderId, seller)}
               ${seller.review ? renderExistingReview(seller.review, false) : renderStrawberryPicker(order.orderId, seller.sellerId)}
             </div>
           `;
@@ -210,6 +309,7 @@
       });
 
       attachReviewFormHandlers();
+      attachPayoutHandlers();
 
     } catch (err) {
       loadingMessage.textContent = 'Erreur de chargement de vos commandes.';
@@ -231,6 +331,13 @@
   .strawberry-icon { width:100%; height:100%; object-fit:contain; display:block; mix-blend-mode:multiply; }
   .review-comment { width:100%; min-height:60px; margin:10px 0; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; }
   .existing-review { background:#f6f9f5; border-radius:8px; padding:10px; margin-top:8px; }
+  .payout-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin:8px 0; }
+  .payout-box p { margin:0 0 8px; font-size:0.85rem; }
+  .payout-box p:last-child { margin-bottom:0; }
+  .payout-actions { display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
+  .payout-actions .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
+  .payout-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
+  .payout-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
 </style>
 
 </body>

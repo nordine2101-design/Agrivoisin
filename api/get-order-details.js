@@ -23,22 +23,49 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Paiement non confirmé' });
     }
 
-    const transfersRaw = session.metadata?.transfers || '';
-    const accountIds = transfersRaw
-      .split(',')
-      .filter(Boolean)
-      .map((entry) => entry.split(':')[0]);
-
+    // Retrouver les vendeurs concernés par ce paiement
     let sellersInfo = [];
+    const cartId = session.metadata?.cart_id;
 
-    if (accountIds.length > 0) {
-      const { data: sellers, error } = await supabase
-        .from('sellers')
-        .select('email, address, city, stripe_account_id')
-        .in('stripe_account_id', accountIds);
+    if (cartId) {
+      // Nouveaux paiements : le détail du panier est rangé dans notre base
+      const { data: cart } = await supabase
+        .from('checkout_carts')
+        .select('lines')
+        .eq('id', cartId)
+        .single();
 
-      if (!error && sellers) {
-        sellersInfo = sellers;
+      const sellerIds = cart && Array.isArray(cart.lines)
+        ? [...new Set(cart.lines.map((line) => line.seller_id).filter(Boolean))]
+        : [];
+
+      if (sellerIds.length > 0) {
+        const { data: sellers, error } = await supabase
+          .from('sellers')
+          .select('email, address, city, stripe_account_id')
+          .in('id', sellerIds);
+
+        if (!error && sellers) {
+          sellersInfo = sellers;
+        }
+      }
+    } else {
+      // Anciens paiements : la liste des vendeurs était dans le message de Stripe
+      const transfersRaw = session.metadata?.transfers || '';
+      const accountIds = transfersRaw
+        .split(',')
+        .filter(Boolean)
+        .map((entry) => entry.split(':')[0]);
+
+      if (accountIds.length > 0) {
+        const { data: sellers, error } = await supabase
+          .from('sellers')
+          .select('email, address, city, stripe_account_id')
+          .in('stripe_account_id', accountIds);
+
+        if (!error && sellers) {
+          sellersInfo = sellers;
+        }
       }
     }
 

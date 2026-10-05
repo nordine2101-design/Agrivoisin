@@ -65,6 +65,20 @@ export default async function handler(req, res) {
 
     if (reviewsError) throw reviewsError;
 
+    // État du versement de chaque vendeur (l'argent est retenu jusqu'à la confirmation de réception)
+    let payouts = [];
+    const { data: payoutsData, error: payoutsError } = await supabase
+      .from('payouts')
+      .select('order_id, seller_id, status, auto_release_at, released_at')
+      .in('order_id', orderIds);
+
+    if (payoutsError) {
+      // Pas bloquant : la page s'affiche, sans les boutons de versement
+      console.error('Erreur Supabase (versements) :', payoutsError);
+    } else {
+      payouts = payoutsData || [];
+    }
+
     const result = orders.map((order) => {
       const orderItems = items.filter((it) => it.order_id === order.id);
 
@@ -82,7 +96,15 @@ export default async function handler(req, res) {
 
       const sellersList = Object.values(sellersMap).map((s) => {
         const existingReview = reviews.find((r) => r.order_id === order.id && r.seller_id === s.sellerId);
-        return { ...s, review: existingReview || null };
+        const payoutRow = payouts.find((p) => p.order_id === order.id && p.seller_id === s.sellerId);
+        return {
+          ...s,
+          review: existingReview || null,
+          // null pour les anciennes commandes (payées avant l'argent retenu)
+          payout: payoutRow
+            ? { status: payoutRow.status, autoReleaseAt: payoutRow.auto_release_at, releasedAt: payoutRow.released_at }
+            : null,
+        };
       });
 
       return {

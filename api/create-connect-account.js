@@ -89,6 +89,23 @@ async function lookupCommune(city, postalCode) {
 }
 
 export default async function handler(req, res) {
+  // Simple vérification "cette ville va-t-elle avec ce code postal ?"
+  // (utilisée par le formulaire d'inscription, avant de créer le compte)
+  if (req.method === 'GET') {
+    const { city, postalCode } = req.query;
+    const result = await lookupCommune(city, postalCode);
+
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error });
+    }
+
+    return res.status(200).json({
+      city: result.city,
+      latitude: result.latitude,
+      longitude: result.longitude,
+    });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }

@@ -164,24 +164,44 @@
     });
   }
 
-  document.getElementById('checkoutBtn').addEventListener('click', async () => {
+  // Le paiement est réservé aux personnes connectées
+  const checkoutBtn = document.getElementById('checkoutBtn');
+  const PAY_LABEL = 'Payer en toute sécurité';
+  const LOGIN_LABEL = 'Se connecter pour payer';
+  const LOGIN_PAGE = 'connexion.html?retour=panier.html';
+
+  supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    checkoutBtn.textContent = session ? PAY_LABEL : LOGIN_LABEL;
+  });
+
+  checkoutBtn.addEventListener('click', async () => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    // Pas connecté : on envoie vers la connexion, le panier est conservé et on revient ici ensuite
+    if (!session) {
+      window.location.href = LOGIN_PAGE;
+      return;
+    }
+
     const cart = getCart();
-    const btn = document.getElementById('checkoutBtn');
-    btn.textContent = 'Redirection en cours...';
-    btn.disabled = true;
+    checkoutBtn.textContent = 'Redirection en cours...';
+    checkoutBtn.disabled = true;
 
     try {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      const headers = { 'Content-Type': 'application/json' };
-      if (session) {
-        headers['Authorization'] = 'Bearer ' + session.access_token;
-      }
-
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + session.access_token,
+        },
         body: JSON.stringify({ cart }),
       });
+
+      // Session expirée : retour par la connexion
+      if (response.status === 401) {
+        window.location.href = LOGIN_PAGE;
+        return;
+      }
 
       const data = await response.json();
 
@@ -193,8 +213,8 @@
 
     } catch (err) {
       alert('Erreur : ' + err.message);
-      btn.textContent = 'Payer en toute sécurité';
-      btn.disabled = false;
+      checkoutBtn.textContent = PAY_LABEL;
+      checkoutBtn.disabled = false;
     }
   });
 

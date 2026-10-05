@@ -93,6 +93,11 @@
     'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
   );
 
+  // Page à rejoindre après la connexion (par exemple le panier).
+  // Seul un nom de page du site est accepté, jamais une adresse extérieure.
+  const returnParam = new URLSearchParams(window.location.search).get('retour');
+  const returnPage = returnParam && /^[a-zA-Z0-9-]+\.html$/.test(returnParam) ? returnParam : 'annonces.html';
+
   document.getElementById('loginForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = document.getElementById('loginBtn');
@@ -124,7 +129,7 @@
     successEl.style.display = 'block';
 
     setTimeout(() => {
-      window.location.href = 'annonces.html';
+      window.location.href = returnPage;
     }, 1000);
   });
 </script>

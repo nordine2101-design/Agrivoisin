@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
+const MAX_ITEMS = 50; // nombre maximum d'articles par paiement
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -30,6 +32,12 @@ export default async function handler(req, res) {
 
     if (!Array.isArray(cart) || cart.length === 0) {
       return res.status(400).json({ error: 'Le panier est vide' });
+    }
+
+    if (cart.length > MAX_ITEMS) {
+      return res.status(400).json({
+        error: `Votre panier contient trop d'articles (maximum ${MAX_ITEMS} par paiement). Réglez-en une partie, puis revenez pour le reste.`,
+      });
     }
 
     // Le navigateur ne nous donne que l'identifiant des annonces choisies.
@@ -103,28 +111,45 @@ export default async function handler(req, res) {
       quantity: 1,
     }));
 
-    // Répartition des paiements par vendeur (calculée par le serveur, jamais par le navigateur)
-    const transferInfo = lines
-      .map(({ seller, cents }) => `${seller.stripe_account_id}:${cents}`)
-      .join(',');
+    // Le détail du panier est rangé dans notre base (calculé par le serveur, jamais par le navigateur).
+    // Stripe ne reçoit que le numéro de ce panier : plus de limite due à la taille du message.
+    const cartLines = lines.map(({ listing, seller, cents }) => ({
+      listing_id: listing.id,
+      seller_id: seller.id,
+      cents,
+    }));
 
-    // Détail des articles pour créer order_items après paiement
-    const itemsInfo = lines
-      .map(({ listing, seller, cents }) => `${listing.id}:${seller.id}:${cents}`)
-      .join(',');
+    const { data: savedCart, error: cartError } = await supabase
+      .from('checkout_carts')
+      .insert({ buyer_id: buyerId, lines: cartLines })
+      .select('id')
+      .single();
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      metadata: {
-        transfers: transferInfo,
-        buyer_id: buyerId,
-        items: itemsInfo,
-      },
-      success_url: `${req.headers.origin}/paiement-succes.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.origin}/panier.html`,
-    });
+    if (cartError || !savedCart) {
+      console.error('Erreur Supabase (enregistrement du panier) :', cartError);
+      return res.status(500).json({
+        error: "Impossible d'enregistrer votre panier pour le moment. Réessayez dans quelques instants.",
+      });
+    }
+
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: lineItems,
+        metadata: {
+          cart_id: savedCart.id,
+          buyer_id: buyerId,
+        },
+        success_url: `${req.headers.origin}/paiement-succes.html?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.headers.origin}/panier.html`,
+      });
+    } catch (stripeError) {
+      // Le paiement n'a pas pu être créé : on retire le panier rangé pour rien
+      await supabase.from('checkout_carts').delete().eq('id', savedCart.id);
+      throw stripeError;
+    }
 
     res.status(200).json({ checkoutUrl: session.url });
 

@@ -4,6 +4,10 @@ import { createClient } from '@supabase/supabase-js';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
+// --- Réglages de l'argent retenu ---
+const COMMISSION_RATE = 0.10; // commission d'Agrivoisin : 10 % du prix, par vendeur et par commande
+const AUTO_RELEASE_DAYS = 3;  // délai avant le versement automatique au vendeur
+
 export const config = {
   api: {
     bodyParser: false,
@@ -16,6 +20,31 @@ function buffer(readable) {
     readable.on('data', (chunk) => chunks.push(chunk));
     readable.on('end', () => resolve(Buffer.concat(chunks)));
     readable.on('error', reject);
+  });
+}
+
+// Retrouve les articles d'un paiement : [{ listing_id, seller_id, cents }]
+async function loadLines(session) {
+  const cartId = session.metadata?.cart_id;
+
+  if (cartId) {
+    const { data, error } = await supabase
+      .from('checkout_carts')
+      .select('lines')
+      .eq('id', cartId)
+      .single();
+
+    if (error || !data) {
+      throw new Error('Panier introuvable (' + cartId + ') : ' + (error ? error.message : 'aucune ligne'));
+    }
+    return Array.isArray(data.lines) ? data.lines : [];
+  }
+
+  // Anciens paiements (faits avant ce changement) : le détail était dans le message de Stripe
+  const itemsRaw = session.metadata?.items || '';
+  return itemsRaw.split(',').filter(Boolean).map((entry) => {
+    const [listing_id, seller_id, amount] = entry.split(':');
+    return { listing_id, seller_id, cents: parseInt(amount, 10) };
   });
 }
 
@@ -37,95 +66,121 @@ export default async function handler(req, res) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    const transfersRaw = session.metadata?.transfers || '';
     const buyerId = session.metadata?.buyer_id || '';
-    const itemsRaw = session.metadata?.items || '';
 
-    // 1. Anti-doublon : on réserve la commande avec l'identifiant du paiement Stripe.
+    if (!buyerId) {
+      console.error(`Paiement ${session.id} sans acheteur identifié : commande non enregistrée.`);
+      return res.status(200).json({ received: true });
+    }
+
+    // 1. Retrouver les articles de ce paiement
+    let lines;
+    try {
+      lines = await loadLines(session);
+    } catch (err) {
+      console.error('Erreur lecture du panier :', err.message);
+      // Stripe réessaiera plus tard
+      return res.status(500).json({ error: 'Panier illisible, nouvel essai attendu.' });
+    }
+
+    const linesAreValid =
+      lines.length > 0 &&
+      lines.every((l) => l && l.listing_id && l.seller_id && Number.isInteger(l.cents) && l.cents > 0);
+
+    if (!linesAreValid) {
+      console.error(`Paiement ${session.id} : articles absents ou invalides, rien à enregistrer.`);
+      return res.status(200).json({ received: true });
+    }
+
+    // 2. Anti-doublon : on réserve la commande avec l'identifiant du paiement Stripe.
     //    Si ce paiement a déjà été traité, la base refuse (identifiant déjà présent) et on s'arrête là.
-    //    Stripe peut envoyer le même message plusieurs fois (nouveaux essais, renvois).
-    let order = null;
-    if (buyerId && itemsRaw) {
-      const { data: newOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          buyer_id: buyerId,
-          total_amount: session.amount_total / 100,
-          stripe_session_id: session.id,
-        })
-        .select()
-        .single();
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        buyer_id: buyerId,
+        total_amount: session.amount_total / 100,
+        stripe_session_id: session.id,
+      })
+      .select()
+      .single();
 
-      if (orderError) {
-        if (orderError.code === '23505') {
-          console.log(`Paiement ${session.id} déjà traité, message ignoré.`);
-          return res.status(200).json({ received: true, duplicate: true });
-        }
-        console.error('Erreur création commande :', orderError.message);
-        // Stripe réessaiera plus tard : rien n'a encore été versé aux vendeurs
-        return res.status(500).json({ error: "Commande non enregistrée, nouvel essai attendu." });
+    if (orderError) {
+      if (orderError.code === '23505') {
+        console.log(`Paiement ${session.id} déjà traité, message ignoré.`);
+        return res.status(200).json({ received: true, duplicate: true });
       }
-
-      order = newOrder;
+      console.error('Erreur création commande :', orderError.message);
+      return res.status(500).json({ error: 'Commande non enregistrée, nouvel essai attendu.' });
     }
 
-    // 2. Transferts d'argent aux vendeurs
-    //    La clé d'idempotence empêche Stripe de verser deux fois pour le même paiement.
-    if (transfersRaw) {
-      const transfers = transfersRaw.split(',').filter(Boolean);
-
-      for (let index = 0; index < transfers.length; index++) {
-        const [accountId, amount] = transfers[index].split(':');
-
-        try {
-          await stripe.transfers.create(
-            {
-              amount: parseInt(amount, 10),
-              currency: 'eur',
-              destination: accountId,
-            },
-            { idempotencyKey: `transfer_${session.id}_${index}` }
-          );
-          console.log(`Transfert de ${amount} centimes envoyé à ${accountId}`);
-        } catch (transferError) {
-          console.error(`Erreur de transfert vers ${accountId} :`, transferError.message);
-        }
-      }
+    // Petite vérification de cohérence (informative)
+    const linesTotal = lines.reduce((sum, l) => sum + l.cents, 0);
+    if (linesTotal !== session.amount_total) {
+      console.warn(`Paiement ${session.id} : total des articles (${linesTotal}) différent du montant payé (${session.amount_total}).`);
     }
 
-    // 3. Détail des articles de la commande
-    if (order) {
-      try {
-        const items = itemsRaw.split(',').filter(Boolean).map((entry) => {
-          const [listingId, sellerId, amount] = entry.split(':');
-          return {
-            order_id: order.id,
-            listing_id: listingId || null,
-            seller_id: sellerId || null,
-            price_at_purchase: amount ? parseInt(amount, 10) / 100 : 0,
-          };
-        });
-
-        const { error: itemsError } = await supabase.from('order_items').insert(items);
-
-        if (itemsError) {
-          throw new Error(itemsError.message);
-        }
-
-        console.log('Commande enregistrée avec succès :', order.id);
-      } catch (itemsFailure) {
-        console.error('Erreur création articles de commande :', itemsFailure.message);
-
-        // On retire la commande réservée, pour que le prochain essai de Stripe puisse la refaire proprement
-        const { error: rollbackError } = await supabase.from('orders').delete().eq('id', order.id);
-        if (rollbackError) {
-          console.error('Impossible de retirer la commande incomplète :', rollbackError.message);
-        }
-
-        return res.status(500).json({ error: "Articles non enregistrés, nouvel essai attendu." });
+    // 3. Retrouver le paiement (charge) chez Stripe : il servira au versement plus tard
+    let chargeId = null;
+    try {
+      if (session.payment_intent) {
+        const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+        const latest = paymentIntent.latest_charge;
+        chargeId = typeof latest === 'string' ? latest : (latest && latest.id) || null;
       }
-    } else {
-      console.log('Pas d\'acheteur connecté identifié, commande non enregistrée dans Supabase.');
+    } catch (err) {
+      // Pas bloquant : il sera retrouvé au moment du versement
+      console.error('Impossible de lire la charge Stripe :', err.message);
+    }
+
+    try {
+      // 4. Un versement en attente par vendeur : l'argent reste chez Agrivoisin
+      const amountBySeller = {};
+      lines.forEach((l) => {
+        amountBySeller[l.seller_id] = (amountBySeller[l.seller_id] || 0) + l.cents;
+      });
+
+      const releaseAt = new Date(Date.now() + AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+      const payouts = Object.entries(amountBySeller).map(([sellerId, amount]) => ({
+        order_id: order.id,
+        seller_id: sellerId,
+        amount_cents: amount,
+        commission_cents: Math.round(amount * COMMISSION_RATE),
+        stripe_charge_id: chargeId,
+        status: 'en_attente',
+        auto_release_at: releaseAt,
+      }));
+
+      const { error: payoutsError } = await supabase.from('payouts').insert(payouts);
+      if (payoutsError) {
+        throw new Error('versements : ' + payoutsError.message);
+      }
+
+      // 5. Détail des articles de la commande
+      const items = lines.map((l) => ({
+        order_id: order.id,
+        listing_id: l.listing_id,
+        seller_id: l.seller_id,
+        price_at_purchase: l.cents / 100,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(items);
+      if (itemsError) {
+        throw new Error('articles : ' + itemsError.message);
+      }
+
+      console.log(`Commande ${order.id} enregistrée, ${payouts.length} versement(s) en attente.`);
+    } catch (failure) {
+      console.error('Erreur enregistrement de la commande :', failure.message);
+
+      // On retire la commande réservée (ses versements partent avec elle),
+      // pour que le prochain essai de Stripe puisse la refaire proprement
+      const { error: rollbackError } = await supabase.from('orders').delete().eq('id', order.id);
+      if (rollbackError) {
+        console.error('Impossible de retirer la commande incomplète :', rollbackError.message);
+      }
+
+      return res.status(500).json({ error: 'Commande non enregistrée, nouvel essai attendu.' });
     }
   }
 

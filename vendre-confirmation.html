@@ -9,55 +9,24 @@
 </head>
 <body>
 
-<!-- ============ HEADER ============ -->
-<header class="site-header">
-  <div class="logo-bar">
-    <a href="index.html" class="logo">
-      <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:200px;width:auto;">
-    </a>
-  </div>
-
-  <div class="container nav-bar">
-    <nav class="main-nav">
-      <a href="index.html#comment-ca-marche">Comment ça marche</a>
-      <a href="annonces.html">Les annonces</a>
-      <a href="index.html#pourquoi">Pourquoi Agrivoisin</a>
-      <a href="vendre.html">Devenir vendeur</a>
-      <a href="publier-annonce.html">Publier une annonce</a>
-    </nav>
-
-    <div class="header-actions">
-      <a href="panier.html" class="cart-icon" aria-label="Panier">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="9" cy="21" r="1"></circle>
-          <circle cx="20" cy="21" r="1"></circle>
-          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-        </svg>
-        <span class="cart-count">0</span>
-      </a>
-      <a href="mes-annonces.html" class="btn btn-ghost">Mes annonces</a>
-      <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
-      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
-      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
-      <button class="nav-toggle" aria-label="Menu">
-        <span></span><span></span><span></span>
-      </button>
-    </div>
-  </div>
-</header>
-
 <!-- ============ CONFIRMATION ============ -->
-<section class="auth-section">
-  <div class="auth-card" style="text-align:center;">
+<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
+  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;min-height:533px;box-sizing:border-box;text-align:center;">
+    <div style="text-align:left;margin:-24px 0 12px -20px;">
+      <a href="index.html" class="btn btn-ghost">Retour</a>
+    </div>
     <div style="width:64px;height:64px;border-radius:50%;background:var(--leaf);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:32px;height:32px;">
         <polyline points="20 6 9 17 4 12"></polyline>
       </svg>
     </div>
-    <h1>Votre compte est prêt !</h1>
+    <h1 style="font-size:1.7rem;">Votre compte est prêt !</h1>
     <p class="auth-subtitle">Votre compte de paiement Agrivoisin a bien été créé. Vous pouvez dès maintenant publier vos premières annonces et recevoir vos paiements directement.</p>
 
     <a href="annonces.html" class="btn btn-primary auth-submit" style="display:inline-block;text-decoration:none;">Voir les annonces</a>
+  </div>
+  <div style="width:440px;min-height:533px;align-self:stretch;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;">
+    <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="width:auto;height:auto;max-width:80%;max-height:80%;">
   </div>
 </section>
 
@@ -79,7 +48,6 @@
         <ul>
           <li><a href="annonces.html">Les annonces</a></li>
           <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
-          <li><a href="vendre.html">Devenir vendeur</a></li>
         </ul>
       </div>
       <div class="footer-col">

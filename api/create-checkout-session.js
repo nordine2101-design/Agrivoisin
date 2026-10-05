@@ -12,19 +12,24 @@ export default async function handler(req, res) {
   try {
     const { cart } = req.body;
 
-    if (!Array.isArray(cart) || cart.length === 0) {
-      return res.status(400).json({ error: 'Le panier est vide' });
-    }
-
-    // Retrouver l'acheteur connecté (si présent)
-    let buyerId = '';
+    // Le paiement est réservé aux personnes connectées
     const authHeader = req.headers.authorization || '';
     const token = authHeader.replace('Bearer ', '');
-    if (token) {
-      const { data: userData } = await supabase.auth.getUser(token);
-      if (userData && userData.user) {
-        buyerId = userData.user.id;
-      }
+
+    if (!token) {
+      return res.status(401).json({ error: 'Vous devez être connecté pour payer.' });
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !userData || !userData.user) {
+      return res.status(401).json({ error: 'Session invalide, reconnectez-vous.' });
+    }
+
+    const buyerId = userData.user.id;
+
+    if (!Array.isArray(cart) || cart.length === 0) {
+      return res.status(400).json({ error: 'Le panier est vide' });
     }
 
     // Le navigateur ne nous donne que l'identifiant des annonces choisies.

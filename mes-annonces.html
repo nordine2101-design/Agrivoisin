@@ -51,6 +51,7 @@
   .edit-listing-form input { padding:6px 8px; border-radius:8px; border:1.5px solid rgba(107,88,66,0.2); font-family:inherit; font-size:0.8rem; }
   .edit-listing-form input:focus { outline:none; border-color:#4C7A50; }
   .edit-listing-form .btn { font-size:0.75rem; padding:6px 14px; }
+  #pickupHoursLink.pickup-hours-ok { background:#83C13D; color:#1F3D1F; }
 </style>
 
 <script src="script.js"></script>
@@ -185,6 +186,30 @@
     });
   }
 
+  // Le bouton des horaires devient vert et "validé" quand le vendeur a déjà réglé ses horaires
+  async function markPickupHoursStatus(link) {
+    try {
+      const { data: sellerId, error: idError } = await supabaseClient.rpc('get_my_seller_id');
+      if (idError || !sellerId) return;
+
+      const { data: rows, error: rowsError } = await supabaseClient
+        .from('pickup_hours')
+        .select('slot')
+        .eq('seller_id', sellerId)
+        .limit(1);
+
+      if (rowsError) return;
+
+      if (rows && rows.length > 0) {
+        link.textContent = '✓ Mes horaires sont validés';
+        link.classList.add('pickup-hours-ok');
+        link.title = 'Cliquez pour modifier vos horaires de retrait';
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   function renderCurrentListing() {
     container.innerHTML = buildListingCardHtml(allListings[currentIndex]);
     prevBtn.disabled = currentIndex === 0;
@@ -231,7 +256,9 @@
       }
 
       pageSubtitle.style.display = 'none';
-      document.getElementById('pickupHoursLink').style.display = 'inline-block';
+      const pickupLink = document.getElementById('pickupHoursLink');
+      pickupLink.style.display = 'inline-block';
+      markPickupHoursStatus(pickupLink);
       allListings = data.listings || [];
 
       if (allListings.length === 0) {

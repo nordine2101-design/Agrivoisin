@@ -19,6 +19,8 @@
     <h1 style="font-size:1.2rem;">Mes annonces</h1>
     <p class="auth-subtitle" id="pageSubtitle" style="font-size:0.85rem;">Retrouvez et gérez les annonces que vous avez publiées.</p>
 
+    <a href="horaires.html" id="pickupHoursLink" class="btn btn-ghost" style="display:none;align-self:center;margin:10px 0 4px;font-size:0.8rem;padding:6px 16px;">Mes horaires de retrait</a>
+
     <div id="notLoggedSection" style="display:none;">
       <p style="text-align:center;">Vous devez être connecté pour voir vos annonces. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
     </div>
@@ -229,6 +231,7 @@
       }
 
       pageSubtitle.style.display = 'none';
+      document.getElementById('pickupHoursLink').style.display = 'inline-block';
       allListings = data.listings || [];
 
       if (allListings.length === 0) {

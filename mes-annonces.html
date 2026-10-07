@@ -19,8 +19,6 @@
     <h1 style="font-size:1.2rem;">Mes annonces</h1>
     <p class="auth-subtitle" id="pageSubtitle" style="font-size:0.85rem;">Retrouvez et gérez les annonces que vous avez publiées.</p>
 
-    <a href="horaires.html" id="pickupHoursLink" class="btn btn-ghost" style="display:none;align-self:center;margin:10px 0 4px;font-size:0.8rem;padding:6px 16px;">Mes horaires de retrait</a>
-
     <div id="notLoggedSection" style="display:none;">
       <p style="text-align:center;">Vous devez être connecté pour voir vos annonces. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
     </div>
@@ -45,13 +43,11 @@
 
 <style>
   .order-card { background:#f9f7f2; border-radius:12px; padding:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
-  .order-card h3 { margin-bottom:8px; font-size:0.9rem; }
-  .edit-listing-form { display:flex; flex-direction:column; gap:2px; }
-  .edit-listing-form label { font-size:0.7rem; font-weight:600; color:#4C7A50; margin-top:5px; }
-  .edit-listing-form input { padding:6px 8px; border-radius:8px; border:1.5px solid rgba(107,88,66,0.2); font-family:inherit; font-size:0.8rem; }
-  .edit-listing-form input:focus { outline:none; border-color:#4C7A50; }
-  .edit-listing-form .btn { font-size:0.75rem; padding:6px 14px; }
-  #pickupHoursLink.pickup-hours-ok { background:#83C13D; color:#1F3D1F; }
+  .order-card h3 { margin-bottom:6px; font-size:1rem; }
+  .listing-photo { display:block; max-width:160px; max-height:120px; border-radius:10px; margin-bottom:10px; object-fit:cover; }
+  .order-card p.listing-desc { font-size:0.85rem; color:#6B5842; margin:0 0 6px; }
+  .order-card p.listing-price { font-size:0.9rem; font-weight:700; color:#4C7A50; margin:0; }
+  .order-card .btn { font-size:0.75rem; padding:6px 14px; }
 </style>
 
 <script src="script.js"></script>
@@ -73,83 +69,33 @@
   let allListings = [];
   let currentIndex = 0;
 
+  // Protège l'affichage : un titre ou une description n'est jamais interprété comme du code
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
   function buildListingCardHtml(item) {
+    const price = Number(item.price).toFixed(2).replace('.', ',');
+    const unit = item.unit ? '/' + escapeHtml(item.unit) : '';
     return (
       '<div class="order-card">' +
-      '<form class="edit-listing-form" data-id="' + item.id + '">' +
-      '<h3>' + item.title + '</h3>' +
-      '<label>Titre</label>' +
-      '<input type="text" name="title" value="' + item.title + '" required>' +
-      '<label>Description</label>' +
-      '<input type="text" name="description" value="' + (item.description || '') + '">' +
-      '<label>Prix (euros)</label>' +
-      '<input type="number" step="0.01" name="price" value="' + item.price + '" required>' +
-      '<label>Unite</label>' +
-      '<input type="text" name="unit" value="' + (item.unit || '') + '">' +
-      '<label>Lien photo</label>' +
-      '<input type="text" name="imageUrl" value="' + (item.image_url || '') + '">' +
-      '<div style="display:flex;gap:10px;margin-top:12px;">' +
-      '<button type="submit" class="btn btn-primary">Enregistrer</button>' +
-      '<button type="button" class="btn btn-ghost delete-btn" data-id="' + item.id + '">Supprimer</button>' +
+      (item.image_url ? '<img class="listing-photo" src="' + escapeHtml(item.image_url) + '" alt="">' : '') +
+      '<h3>' + escapeHtml(item.title) + '</h3>' +
+      (item.description ? '<p class="listing-desc">' + escapeHtml(item.description) + '</p>' : '') +
+      '<p class="listing-price">' + price + ' €' + unit + '</p>' +
+      '<div style="margin-top:12px;">' +
+      '<button type="button" class="btn btn-ghost delete-btn" data-id="' + escapeHtml(item.id) + '">Supprimer</button>' +
       '</div>' +
-      '<p class="edit-msg" style="margin-top:8px;display:none;"></p>' +
-      '</form>' +
       '</div>'
     );
   }
 
-  function attachHandlersToCurrentForm() {
-    const form = container.querySelector('.edit-listing-form');
-    if (!form) return;
+  function attachDeleteHandler() {
+    const deleteBtn = container.querySelector('.delete-btn');
+    if (!deleteBtn) return;
 
-    form.addEventListener('submit', async function (e) {
-      e.preventDefault();
-      const listingId = form.getAttribute('data-id');
-      const msgEl = form.querySelector('.edit-msg');
-
-      const { data: { session } } = await supabaseClient.auth.getSession();
-
-      const payload = {
-        listingId: listingId,
-        title: form.title.value,
-        description: form.description.value,
-        price: parseFloat(form.price.value),
-        unit: form.unit.value,
-        imageUrl: form.imageUrl.value,
-      };
-
-      try {
-        const r = await fetch('/api/update-listing', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + session.access_token,
-          },
-          body: JSON.stringify(payload),
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Erreur');
-
-        allListings[currentIndex] = {
-          ...allListings[currentIndex],
-          title: payload.title,
-          description: payload.description,
-          price: payload.price,
-          unit: payload.unit,
-          image_url: payload.imageUrl,
-        };
-
-        msgEl.textContent = 'Annonce mise a jour !';
-        msgEl.style.color = '#4C7A50';
-        msgEl.style.display = 'block';
-      } catch (err) {
-        msgEl.textContent = 'Erreur : ' + err.message;
-        msgEl.style.color = '#C8352F';
-        msgEl.style.display = 'block';
-      }
-    });
-
-    const deleteBtn = form.querySelector('.delete-btn');
     deleteBtn.addEventListener('click', async function () {
       if (!confirm('Supprimer definitivement cette annonce ?')) return;
 
@@ -186,35 +132,11 @@
     });
   }
 
-  // Le bouton des horaires devient vert et "validé" quand le vendeur a déjà réglé ses horaires
-  async function markPickupHoursStatus(link) {
-    try {
-      const { data: sellerId, error: idError } = await supabaseClient.rpc('get_my_seller_id');
-      if (idError || !sellerId) return;
-
-      const { data: rows, error: rowsError } = await supabaseClient
-        .from('pickup_hours')
-        .select('slot')
-        .eq('seller_id', sellerId)
-        .limit(1);
-
-      if (rowsError) return;
-
-      if (rows && rows.length > 0) {
-        link.textContent = '✓ Mes horaires sont validés';
-        link.classList.add('pickup-hours-ok');
-        link.title = 'Cliquez pour modifier vos horaires de retrait';
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
   function renderCurrentListing() {
     container.innerHTML = buildListingCardHtml(allListings[currentIndex]);
     prevBtn.disabled = currentIndex === 0;
     nextBtn.disabled = currentIndex === allListings.length - 1;
-    attachHandlersToCurrentForm();
+    attachDeleteHandler();
   }
 
   prevBtn.addEventListener('click', () => {
@@ -256,9 +178,6 @@
       }
 
       pageSubtitle.style.display = 'none';
-      const pickupLink = document.getElementById('pickupHoursLink');
-      pickupLink.style.display = 'inline-block';
-      markPickupHoursStatus(pickupLink);
       allListings = data.listings || [];
 
       if (allListings.length === 0) {

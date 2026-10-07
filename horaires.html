@@ -112,6 +112,7 @@
   const successEl = document.getElementById('hoursSuccess');
 
   let sellerId = null;
+  let redirecting = false;
   // Plages déjà enregistrées (pour savoir lesquelles supprimer) : "jour-plage"
   let savedSlots = new Set();
 
@@ -366,14 +367,22 @@
       }
 
       savedSlots = wanted;
-      successEl.textContent = 'Vos horaires de retrait sont enregistrés.';
+      successEl.textContent = 'Vos horaires de retrait sont enregistrés. Retour à vos annonces...';
       successEl.style.display = 'block';
+
+      // Retour automatique sur Mes annonces, pour continuer à publier
+      redirecting = true;
+      setTimeout(() => {
+        window.location.href = 'mes-annonces.html';
+      }, 1200);
     } catch (err) {
       errorEl.textContent = "Impossible d'enregistrer vos horaires pour le moment : " + err.message;
       errorEl.style.display = 'block';
     } finally {
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Enregistrer mes horaires';
+      if (!redirecting) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Enregistrer mes horaires';
+      }
     }
   }
 

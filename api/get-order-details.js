@@ -25,6 +25,7 @@ export default async function handler(req, res) {
 
     // Retrouver les vendeurs concernés par ce paiement
     let sellersInfo = [];
+    let listingIds = [];
     const cartId = session.metadata?.cart_id;
 
     if (cartId) {
@@ -39,10 +40,14 @@ export default async function handler(req, res) {
         ? [...new Set(cart.lines.map((line) => line.seller_id).filter(Boolean))]
         : [];
 
+      listingIds = cart && Array.isArray(cart.lines)
+        ? [...new Set(cart.lines.map((line) => line.listing_id).filter(Boolean))]
+        : [];
+
       if (sellerIds.length > 0) {
         const { data: sellers, error } = await supabase
           .from('sellers')
-          .select('email, address, city, stripe_account_id')
+          .select('id, email, address, city, stripe_account_id')
           .in('id', sellerIds);
 
         if (!error && sellers) {
@@ -57,10 +62,18 @@ export default async function handler(req, res) {
         .filter(Boolean)
         .map((entry) => entry.split(':')[0]);
 
+      listingIds = [...new Set(
+        (session.metadata?.items || '')
+          .split(',')
+          .filter(Boolean)
+          .map((entry) => entry.split(':')[0])
+          .filter(Boolean)
+      )];
+
       if (accountIds.length > 0) {
         const { data: sellers, error } = await supabase
           .from('sellers')
-          .select('email, address, city, stripe_account_id')
+          .select('id, email, address, city, stripe_account_id')
           .in('stripe_account_id', accountIds);
 
         if (!error && sellers) {
@@ -69,10 +82,41 @@ export default async function handler(req, res) {
       }
     }
 
+    // Les articles achetés chez chaque vendeur, avec leurs horaires de retrait
+    const itemsBySeller = {};
+    if (listingIds.length > 0) {
+      const { data: listings, error: listingsError } = await supabase
+        .from('listings')
+        .select('id, title, seller_id, listing_pickup_hours(day_of_week, slot, start_time, end_time)')
+        .in('id', listingIds);
+
+      if (listingsError) {
+        // Pas bloquant : l'adresse du vendeur reste affichée même sans les horaires
+        console.error('Erreur Supabase (articles du paiement) :', listingsError);
+      } else {
+        const byId = {};
+        (listings || []).forEach((l) => { byId[l.id] = l; });
+        listingIds.forEach((id) => {
+          const l = byId[id];
+          if (!l) return;
+          (itemsBySeller[l.seller_id] = itemsBySeller[l.seller_id] || []).push({
+            title: l.title,
+            pickup_hours: l.listing_pickup_hours || [],
+          });
+        });
+      }
+    }
+
+    // Le numéro interne du vendeur ne sert qu'à relier les articles : il n'est pas envoyé à la page
+    const sellersOut = sellersInfo.map(({ id, ...seller }) => ({
+      ...seller,
+      items: itemsBySeller[id] || [],
+    }));
+
     res.status(200).json({
       paid: true,
       amountTotal: session.amount_total,
-      sellers: sellersInfo,
+      sellers: sellersOut,
     });
 
   } catch (error) {

@@ -24,6 +24,10 @@
       <h1 id="listingTitle" style="margin:6px 0 10px;font-size:1.7rem;"></h1>
       <p id="listingFreshness" style="display:none;font-weight:600;color:var(--leaf-deep);margin-bottom:8px;"></p>
       <p id="listingSeller" style="font-size:0.95rem;margin-bottom:16px;"></p>
+      <div id="listingPickup" style="display:none;margin-bottom:18px;padding:12px 14px;border-radius:12px;background:var(--cream-soft);text-align:left;">
+        <p style="font-size:0.75rem;font-weight:700;color:var(--leaf-deep);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.05em;">Horaires de retrait</p>
+        <div id="listingPickupLines" style="font-size:0.9rem;line-height:1.7;"></div>
+      </div>
       <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
       <p style="margin-bottom:22px;"><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span></p>
 
@@ -130,6 +134,54 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
+  // Horaires de retrait : une ligne par groupe de jours, par exemple "lun-ven" -> "18h-20h"
+  const PICKUP_DAYS = [
+    { n: 1, short: 'lun' }, { n: 2, short: 'mar' }, { n: 3, short: 'mer' }, { n: 4, short: 'jeu' },
+    { n: 5, short: 'ven' }, { n: 6, short: 'sam' }, { n: 7, short: 'dim' },
+  ];
+
+  // "18:00:00" -> "18h" ; "08:30:00" -> "8h30"
+  function formatPickupTime(value) {
+    const [h, m] = String(value).split(':');
+    const hour = String(parseInt(h, 10));
+    return m && m !== '00' ? hour + 'h' + m : hour + 'h';
+  }
+
+  function pickupGroups(rows) {
+    const byDay = {};
+    (rows || []).forEach((r) => {
+      (byDay[r.day_of_week] = byDay[r.day_of_week] || []).push(r);
+    });
+
+    const dayTexts = [];
+    PICKUP_DAYS.forEach((d) => {
+      const list = byDay[d.n];
+      if (!list || list.length === 0) return;
+      list.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+      dayTexts.push({
+        n: d.n,
+        short: d.short,
+        text: list.map((r) => formatPickupTime(r.start_time) + '-' + formatPickupTime(r.end_time)).join(' et '),
+      });
+    });
+
+    const groups = [];
+    dayTexts.forEach((d) => {
+      const last = groups[groups.length - 1];
+      if (last && last.text === d.text && last.lastN === d.n - 1) {
+        last.lastN = d.n;
+        last.lastShort = d.short;
+      } else {
+        groups.push({ text: d.text, firstShort: d.short, lastShort: d.short, lastN: d.n });
+      }
+    });
+
+    return groups.map((g) => ({
+      days: g.firstShort === g.lastShort ? g.firstShort : g.firstShort + '-' + g.lastShort,
+      text: g.text,
+    }));
+  }
+
   function renderListing(item) {
     document.title = item.title + ' — Agrivoisin';
 
@@ -149,6 +201,21 @@
       sellerText += ' · à ' + (d < 1 ? Math.round(d * 1000) + ' m' : d.toFixed(1).replace('.', ',') + ' km');
     }
     document.getElementById('listingSeller').textContent = sellerText;
+
+    const pickupLines = pickupGroups(item.listing_pickup_hours);
+    if (pickupLines.length > 0) {
+      const linesEl = document.getElementById('listingPickupLines');
+      linesEl.innerHTML = '';
+      pickupLines.forEach((line) => {
+        const row = document.createElement('div');
+        const days = document.createElement('strong');
+        days.textContent = line.days;
+        row.appendChild(days);
+        row.appendChild(document.createTextNode(' ' + line.text));
+        linesEl.appendChild(row);
+      });
+      document.getElementById('listingPickup').style.display = 'block';
+    }
 
     const descEl = document.getElementById('listingDescription');
     if (item.description) {

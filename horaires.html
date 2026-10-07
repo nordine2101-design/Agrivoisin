@@ -24,11 +24,6 @@
     <p id="notSellerMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous n'avez pas encore de compte vendeur. <a href="vendre.html" style="color:var(--leaf-deep);font-weight:700;">Devenir vendeur</a></p>
 
     <div id="hoursEditor" style="display:none;text-align:left;">
-      <div class="hours-tools">
-        <button type="button" class="btn btn-ghost" id="copyWeekBtn">Copier le lundi sur du mardi au vendredi</button>
-        <button type="button" class="btn btn-ghost" id="copyWeekendBtn">Copier le samedi sur le dimanche</button>
-      </div>
-
       <div id="daysList"></div>
 
       <p id="hoursPreview" class="hours-preview"></p>
@@ -280,12 +275,6 @@
     return { open, ranges };
   }
 
-  function copyDay(fromN, toList) {
-    const source = readDay(fromN);
-    toList.forEach((n) => setDay(n, source.ranges.map((r) => ({ start: r.start, end: r.end }))));
-    renderPreview();
-  }
-
   // ---------- Vérification et lecture de tout l'écran ----------
 
   function collectRows() {
@@ -430,8 +419,6 @@
 
       savedSlots = new Set((rows || []).map((r) => r.day_of_week + '-' + r.slot));
 
-      document.getElementById('copyWeekBtn').addEventListener('click', () => copyDay(1, [2, 3, 4, 5]));
-      document.getElementById('copyWeekendBtn').addEventListener('click', () => copyDay(6, [7]));
       saveBtn.addEventListener('click', saveHours);
 
       hoursEditor.style.display = 'block';
@@ -447,8 +434,6 @@
 </script>
 
 <style>
-  .hours-tools { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
-  .hours-tools .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
   .day-row { border-top:1px solid #eee; padding:10px 0; }
   .day-head { display:flex; align-items:center; gap:10px; font-weight:600; color:var(--leaf-deep); cursor:pointer; }
   .day-head input { width:18px; height:18px; }

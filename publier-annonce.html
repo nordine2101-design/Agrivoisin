@@ -56,7 +56,7 @@
 
       <div class="pickup-section">
         <p class="pickup-title">Horaires de retrait</p>
-        <p class="pickup-help">Indiquez quand l'acheteur peut venir chercher cette récolte. Au moins un jour est obligatoire.</p>
+        <p class="pickup-help">Indiquez quand l'acheteur peut venir chercher cette récolte. Au moins un jour est obligatoire. Faites glisser les poignées pour régler les heures.</p>
         <div id="pickupDays"></div>
         <p id="pickupPreview" class="pickup-preview"></p>
       </div>
@@ -230,8 +230,12 @@
     { n: 6, label: 'Samedi', short: 'sam' },
     { n: 7, label: 'Dimanche', short: 'dim' },
   ];
-  const PICKUP_DEFAULT_START = '18:00';
-  const PICKUP_DEFAULT_END = '20:00';
+  // Le curseur va de 6h00 à 23h00, par quarts d'heure (valeurs en minutes depuis minuit)
+  const PICKUP_MIN = 6 * 60;
+  const PICKUP_MAX = 23 * 60;
+  const PICKUP_STEP = 15;
+  const PICKUP_DEFAULT_START = 18 * 60;
+  const PICKUP_DEFAULT_END = 20 * 60;
   const pickupDays = document.getElementById('pickupDays');
   const pickupPreview = document.getElementById('pickupPreview');
 
@@ -277,6 +281,147 @@
       .join(' · ');
   }
 
+  // Minutes depuis minuit -> "HH:MM"
+  function minutesToTime(m) {
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  }
+
+  // Curseur à deux poignées : on fait glisser le début et la fin.
+  // getBounds() donne les limites de ce curseur (elles dépendent de l'autre plage du même jour).
+  function createRangeSlider(label, startValue, endValue, getBounds, onChange) {
+    const el = document.createElement('div');
+    el.className = 'rs';
+
+    const ticks = [6, 9, 12, 15, 18, 21].map((h) => {
+      const left = ((h * 60 - PICKUP_MIN) / (PICKUP_MAX - PICKUP_MIN)) * 100;
+      return '<span style="left:' + left + '%">' + h + 'h</span>';
+    }).join('');
+
+    el.innerHTML = `
+      <div class="rs-label"></div>
+      <div class="rs-track">
+        <div class="rs-rail"></div>
+        <div class="rs-fill"></div>
+        <button type="button" class="rs-thumb" data-which="start" role="slider" aria-label="${label} : début"></button>
+        <button type="button" class="rs-thumb" data-which="end" role="slider" aria-label="${label} : fin"></button>
+      </div>
+      <div class="rs-ticks">${ticks}</div>
+    `;
+
+    const track = el.querySelector('.rs-track');
+    const fill = el.querySelector('.rs-fill');
+    const labelEl = el.querySelector('.rs-label');
+    const thumbs = {
+      start: el.querySelector('[data-which="start"]'),
+      end: el.querySelector('[data-which="end"]'),
+    };
+    const state = { start: startValue, end: endValue };
+
+    function percent(value) {
+      return ((value - PICKUP_MIN) / (PICKUP_MAX - PICKUP_MIN)) * 100;
+    }
+
+    function render() {
+      thumbs.start.style.left = percent(state.start) + '%';
+      thumbs.end.style.left = percent(state.end) + '%';
+      fill.style.left = percent(state.start) + '%';
+      fill.style.width = (percent(state.end) - percent(state.start)) + '%';
+
+      const startText = formatPickupTime(minutesToTime(state.start));
+      const endText = formatPickupTime(minutesToTime(state.end));
+      labelEl.textContent = 'De ' + startText + ' à ' + endText;
+
+      const b = getBounds();
+      thumbs.start.setAttribute('aria-valuemin', b.min);
+      thumbs.start.setAttribute('aria-valuemax', state.end - PICKUP_STEP);
+      thumbs.start.setAttribute('aria-valuenow', state.start);
+      thumbs.start.setAttribute('aria-valuetext', startText);
+      thumbs.end.setAttribute('aria-valuemin', state.start + PICKUP_STEP);
+      thumbs.end.setAttribute('aria-valuemax', b.max);
+      thumbs.end.setAttribute('aria-valuenow', state.end);
+      thumbs.end.setAttribute('aria-valuetext', endText);
+
+      el.dataset.start = state.start;
+      el.dataset.end = state.end;
+    }
+
+    // Déplace une poignée en respectant les limites : jamais de fin avant le début,
+    // jamais de chevauchement avec l'autre plage du jour
+    function move(which, value) {
+      const b = getBounds();
+      if (which === 'start') {
+        state.start = Math.max(b.min, Math.min(value, state.end - PICKUP_STEP));
+      } else {
+        state.end = Math.min(b.max, Math.max(value, state.start + PICKUP_STEP));
+      }
+      render();
+      onChange();
+    }
+
+    function valueFromClientX(clientX) {
+      const rect = track.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      return Math.round((PICKUP_MIN + ratio * (PICKUP_MAX - PICKUP_MIN)) / PICKUP_STEP) * PICKUP_STEP;
+    }
+
+    ['start', 'end'].forEach((which) => {
+      const thumb = thumbs[which];
+
+      thumb.addEventListener('pointermove', (e) => {
+        if (!thumb.hasPointerCapture(e.pointerId)) return;
+        move(which, valueFromClientX(e.clientX));
+      });
+      const release = (e) => {
+        thumb.classList.remove('rs-active');
+        if (thumb.hasPointerCapture(e.pointerId)) thumb.releasePointerCapture(e.pointerId);
+      };
+      thumb.addEventListener('pointerup', release);
+      thumb.addEventListener('pointercancel', release);
+
+      thumb.addEventListener('keydown', (e) => {
+        const current = which === 'start' ? state.start : state.end;
+        let next = null;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowUp') next = current + PICKUP_STEP;
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') next = current - PICKUP_STEP;
+        else if (e.key === 'PageUp') next = current + 60;
+        else if (e.key === 'PageDown') next = current - 60;
+        else if (e.key === 'Home') next = PICKUP_MIN;
+        else if (e.key === 'End') next = PICKUP_MAX;
+        if (next === null) return;
+        e.preventDefault();
+        move(which, next);
+      });
+    });
+
+    // Où que l'on touche la barre, c'est la poignée la plus proche qui est attrapée.
+    // Ainsi, même quand les deux poignées sont presque superposées, on prend toujours la bonne.
+    track.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const startRect = thumbs.start.getBoundingClientRect();
+      const endRect = thumbs.end.getBoundingClientRect();
+      const startCenter = startRect.left + startRect.width / 2;
+      const endCenter = endRect.left + endRect.width / 2;
+      const which = Math.abs(e.clientX - startCenter) <= Math.abs(e.clientX - endCenter) ? 'start' : 'end';
+      const thumb = thumbs[which];
+
+      thumb.setPointerCapture(e.pointerId);
+      thumb.classList.add('rs-active');
+      thumb.focus();
+
+      // Un appui sur la barre (hors poignée) fait sauter la poignée à cet endroit, puis on peut continuer à glisser
+      if (!e.target.closest('.rs-thumb')) {
+        move(which, valueFromClientX(e.clientX));
+      }
+    });
+
+    el.setValues = (s, e) => { state.start = s; state.end = e; render(); };
+    el.getValues = () => ({ start: state.start, end: state.end });
+    el.refresh = render;
+
+    render();
+    return el;
+  }
+
   function buildPickupDays() {
     pickupDays.innerHTML = '';
     PICKUP_DAYS.forEach((d) => {
@@ -290,14 +435,9 @@
           <span class="day-closed-label">fermé</span>
         </label>
         <div class="day-ranges" style="display:none;">
-          <div class="range" data-slot="1">
-            <span>de</span><input type="time" class="t-start" step="900" value="${PICKUP_DEFAULT_START}" aria-label="${d.label} : début">
-            <span>à</span><input type="time" class="t-end" step="900" value="${PICKUP_DEFAULT_END}" aria-label="${d.label} : fin">
-          </div>
+          <div class="range" data-slot="1"></div>
           <div class="range" data-slot="2" style="display:none;">
-            <span>de</span><input type="time" class="t-start" step="900" value="" aria-label="${d.label} : début de la 2e plage">
-            <span>à</span><input type="time" class="t-end" step="900" value="" aria-label="${d.label} : fin de la 2e plage">
-            <button type="button" class="range-remove" aria-label="Retirer la 2e plage de ${d.label}">✕</button>
+            <button type="button" class="range-remove" aria-label="Retirer la 2e plage de ${d.label}">✕ Retirer cette plage</button>
           </div>
           <button type="button" class="add-range">+ Ajouter une 2e plage</button>
         </div>
@@ -305,50 +445,83 @@
       pickupDays.appendChild(row);
 
       const openBox = row.querySelector('.day-open');
-      const ranges = row.querySelector('.day-ranges');
+      const rangesBox = row.querySelector('.day-ranges');
       const closedLabel = row.querySelector('.day-closed-label');
-      const second = row.querySelector('.range[data-slot="2"]');
+      const range1 = row.querySelector('.range[data-slot="1"]');
+      const range2 = row.querySelector('.range[data-slot="2"]');
       const addBtn = row.querySelector('.add-range');
+      const removeBtn = row.querySelector('.range-remove');
+      let secondOpen = false;
+
+      function updateAddState() {
+        const noRoom = slider1.getValues().end > PICKUP_MAX - PICKUP_STEP;
+        addBtn.disabled = noRoom;
+        addBtn.title = noRoom ? 'Plus de place après la 1re plage' : '';
+      }
+
+      function onSliderChange() {
+        updateAddState();
+        renderPickupPreview();
+      }
+
+      const slider1 = createRangeSlider(
+        d.label, PICKUP_DEFAULT_START, PICKUP_DEFAULT_END,
+        () => ({ min: PICKUP_MIN, max: secondOpen ? slider2.getValues().start : PICKUP_MAX }),
+        onSliderChange
+      );
+      const slider2 = createRangeSlider(
+        d.label + ' (2e plage)', PICKUP_MIN, PICKUP_MIN + PICKUP_STEP,
+        () => ({ min: slider1.getValues().end, max: PICKUP_MAX }),
+        onSliderChange
+      );
+      range1.appendChild(slider1);
+      range2.insertBefore(slider2, removeBtn);
 
       openBox.addEventListener('change', () => {
-        ranges.style.display = openBox.checked ? '' : 'none';
+        rangesBox.style.display = openBox.checked ? '' : 'none';
         closedLabel.style.display = openBox.checked ? 'none' : '';
         renderPickupPreview();
       });
+
       addBtn.addEventListener('click', () => {
-        second.style.display = '';
+        const firstEnd = slider1.getValues().end;
+        // La 2e plage démarre un peu après la fin de la 1re, et dure 2 h si la place le permet
+        let s = Math.min(firstEnd + 30, PICKUP_MAX - 60);
+        if (s < firstEnd) s = firstEnd;
+        const e = Math.min(s + 120, PICKUP_MAX);
+        slider2.setValues(s, e);
+        secondOpen = true;
+        range2.style.display = '';
         addBtn.style.display = 'none';
-        const s = second.querySelector('.t-start');
-        const e = second.querySelector('.t-end');
-        if (!s.value) s.value = '14:00';
-        if (!e.value) e.value = '16:00';
+        slider1.refresh();
         renderPickupPreview();
       });
-      row.querySelector('.range-remove').addEventListener('click', () => {
-        second.style.display = 'none';
-        second.querySelector('.t-start').value = '';
-        second.querySelector('.t-end').value = '';
+
+      removeBtn.addEventListener('click', () => {
+        secondOpen = false;
+        range2.style.display = 'none';
         addBtn.style.display = '';
+        slider1.refresh();
+        updateAddState();
         renderPickupPreview();
-      });
-      row.querySelectorAll('input[type="time"]').forEach((input) => {
-        input.addEventListener('input', renderPickupPreview);
       });
     });
   }
 
-  // Lit un jour tel qu'il est à l'écran : { open, ranges: [{ start, end }] }
+  // Lit un jour tel qu'il est à l'écran : { open, ranges: [{ start, end }] } (heures au format "HH:MM")
   function readPickupDay(n) {
     const row = pickupDays.querySelector('.day-row[data-day="' + n + '"]');
     const open = row.querySelector('.day-open').checked;
     const ranges = [];
     if (open) {
-      const first = row.querySelector('.range[data-slot="1"]');
-      ranges.push({ start: first.querySelector('.t-start').value, end: first.querySelector('.t-end').value });
-      const second = row.querySelector('.range[data-slot="2"]');
-      if (second.style.display !== 'none') {
-        ranges.push({ start: second.querySelector('.t-start').value, end: second.querySelector('.t-end').value });
-      }
+      row.querySelectorAll('.range').forEach((range) => {
+        if (range.style.display === 'none') return;
+        const slider = range.querySelector('.rs');
+        ranges.push({
+          start: minutesToTime(Number(slider.dataset.start)),
+          end: minutesToTime(Number(slider.dataset.end)),
+        });
+      });
     }
     return { open, ranges };
   }
@@ -511,12 +684,24 @@
   .auth-form .pickup-section .day-head { display:flex; align-items:center; gap:10px; font-size:0.9rem; font-weight:600; color:var(--leaf-deep); cursor:pointer; margin-top:0; }
   .auth-form .pickup-section .day-head input { width:18px; height:18px; padding:0; border:none; }
   .pickup-section .day-closed-label { font-weight:400; color:#999; font-size:0.85rem; }
-  .pickup-section .day-ranges { margin:8px 0 0 28px; display:flex; flex-direction:column; gap:8px; }
-  .pickup-section .range { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:0.9rem; }
-  .auth-form .pickup-section .range input[type="time"] { padding:6px 8px; border-radius:8px; border:1.5px solid rgba(107,88,66,0.2); font-size:0.9rem; }
-  .pickup-section .range-remove, .pickup-section .add-range { background:none; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:var(--leaf-deep); font-weight:600; padding:4px 6px; text-align:left; }
+  .pickup-section .day-ranges { margin:8px 0 0 0; display:flex; flex-direction:column; gap:10px; }
+  .pickup-section .range { text-align:left; }
+  .pickup-section .range-remove, .pickup-section .add-range { background:none; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:var(--leaf-deep); font-weight:600; padding:4px 0; text-align:left; }
   .pickup-section .range-remove { color:#C8352F; }
+  .pickup-section .add-range:disabled { opacity:0.4; cursor:not-allowed; }
   .pickup-preview { margin:12px 0 4px; padding:12px; border-radius:10px; background:var(--cream-soft); font-size:0.9rem; color:var(--soil); text-align:left; }
+
+  /* Curseur à deux poignées */
+  .pickup-section .rs { width:100%; user-select:none; -webkit-user-select:none; }
+  .pickup-section .rs-label { font-size:0.95rem; font-weight:700; color:var(--leaf-deep); }
+  .pickup-section .rs-track { position:relative; height:40px; margin:0 16px; touch-action:pan-y; cursor:pointer; }
+  .pickup-section .rs-rail { position:absolute; left:0; right:0; top:17px; height:6px; border-radius:999px; background:#e6e0d3; }
+  .pickup-section .rs-fill { position:absolute; top:17px; height:6px; border-radius:999px; background:var(--leaf); }
+  .pickup-section .rs-thumb { position:absolute; top:20px; width:28px; height:28px; margin:-14px 0 0 -14px; padding:0; border-radius:50%; background:#fff; border:3px solid var(--leaf-deep); box-shadow:0 2px 6px rgba(0,0,0,0.25); cursor:grab; touch-action:none; }
+  .pickup-section .rs-thumb:focus-visible { outline:3px solid rgba(131,193,61,0.55); outline-offset:2px; }
+  .pickup-section .rs-thumb.rs-active { cursor:grabbing; transform:scale(1.12); }
+  .pickup-section .rs-ticks { position:relative; height:16px; margin:0 16px; }
+  .pickup-section .rs-ticks span { position:absolute; top:0; transform:translateX(-50%); font-size:0.7rem; color:#999; }
 </style>
 </body>
 </html>

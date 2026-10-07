@@ -54,6 +54,13 @@
         <img id="photoPreview" style="max-width:160px;border-radius:12px;display:block;">
       </p>
 
+      <div class="pickup-section">
+        <p class="pickup-title">Horaires de retrait</p>
+        <p class="pickup-help">Indiquez quand l'acheteur peut venir chercher cette récolte. Au moins un jour est obligatoire.</p>
+        <div id="pickupDays"></div>
+        <p id="pickupPreview" class="pickup-preview"></p>
+      </div>
+
       <button type="submit" class="btn btn-primary auth-submit" id="listingSubmitBtn">Publier l'annonce</button>
     </form>
 
@@ -212,11 +219,201 @@
     reader.readAsDataURL(file);
   });
 
+  // ---------- Horaires de retrait de cette annonce (vides à chaque nouvelle annonce) ----------
+
+  const PICKUP_DAYS = [
+    { n: 1, label: 'Lundi', short: 'lun' },
+    { n: 2, label: 'Mardi', short: 'mar' },
+    { n: 3, label: 'Mercredi', short: 'mer' },
+    { n: 4, label: 'Jeudi', short: 'jeu' },
+    { n: 5, label: 'Vendredi', short: 'ven' },
+    { n: 6, label: 'Samedi', short: 'sam' },
+    { n: 7, label: 'Dimanche', short: 'dim' },
+  ];
+  const PICKUP_DEFAULT_START = '18:00';
+  const PICKUP_DEFAULT_END = '20:00';
+  const pickupDays = document.getElementById('pickupDays');
+  const pickupPreview = document.getElementById('pickupPreview');
+
+  // "18:00" -> "18h" ; "08:30" -> "8h30"
+  function formatPickupTime(value) {
+    const [h, m] = String(value).split(':');
+    const hour = String(parseInt(h, 10));
+    return m && m !== '00' ? hour + 'h' + m : hour + 'h';
+  }
+
+  // Résumé lisible : "lun-ven 18h-20h · sam-dim 12h-14h et 18h-20h"
+  function formatPickupSummary(rows) {
+    const byDay = {};
+    rows.forEach((r) => {
+      (byDay[r.day_of_week] = byDay[r.day_of_week] || []).push(r);
+    });
+
+    const dayTexts = [];
+    PICKUP_DAYS.forEach((d) => {
+      const list = byDay[d.n];
+      if (!list || list.length === 0) return;
+      list.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+      dayTexts.push({
+        n: d.n,
+        short: d.short,
+        text: list.map((r) => formatPickupTime(r.start_time) + '-' + formatPickupTime(r.end_time)).join(' et '),
+      });
+    });
+
+    const groups = [];
+    dayTexts.forEach((d) => {
+      const last = groups[groups.length - 1];
+      if (last && last.text === d.text && last.lastN === d.n - 1) {
+        last.lastN = d.n;
+        last.lastShort = d.short;
+      } else {
+        groups.push({ text: d.text, firstShort: d.short, lastShort: d.short, lastN: d.n });
+      }
+    });
+
+    return groups
+      .map((g) => (g.firstShort === g.lastShort ? g.firstShort : g.firstShort + '-' + g.lastShort) + ' ' + g.text)
+      .join(' · ');
+  }
+
+  function buildPickupDays() {
+    pickupDays.innerHTML = '';
+    PICKUP_DAYS.forEach((d) => {
+      const row = document.createElement('div');
+      row.className = 'day-row';
+      row.dataset.day = d.n;
+      row.innerHTML = `
+        <label class="day-head">
+          <input type="checkbox" class="day-open" aria-label="${d.label} : retrait possible">
+          <span>${d.label}</span>
+          <span class="day-closed-label">fermé</span>
+        </label>
+        <div class="day-ranges" style="display:none;">
+          <div class="range" data-slot="1">
+            <span>de</span><input type="time" class="t-start" step="900" value="${PICKUP_DEFAULT_START}" aria-label="${d.label} : début">
+            <span>à</span><input type="time" class="t-end" step="900" value="${PICKUP_DEFAULT_END}" aria-label="${d.label} : fin">
+          </div>
+          <div class="range" data-slot="2" style="display:none;">
+            <span>de</span><input type="time" class="t-start" step="900" value="" aria-label="${d.label} : début de la 2e plage">
+            <span>à</span><input type="time" class="t-end" step="900" value="" aria-label="${d.label} : fin de la 2e plage">
+            <button type="button" class="range-remove" aria-label="Retirer la 2e plage de ${d.label}">✕</button>
+          </div>
+          <button type="button" class="add-range">+ Ajouter une 2e plage</button>
+        </div>
+      `;
+      pickupDays.appendChild(row);
+
+      const openBox = row.querySelector('.day-open');
+      const ranges = row.querySelector('.day-ranges');
+      const closedLabel = row.querySelector('.day-closed-label');
+      const second = row.querySelector('.range[data-slot="2"]');
+      const addBtn = row.querySelector('.add-range');
+
+      openBox.addEventListener('change', () => {
+        ranges.style.display = openBox.checked ? '' : 'none';
+        closedLabel.style.display = openBox.checked ? 'none' : '';
+        renderPickupPreview();
+      });
+      addBtn.addEventListener('click', () => {
+        second.style.display = '';
+        addBtn.style.display = 'none';
+        const s = second.querySelector('.t-start');
+        const e = second.querySelector('.t-end');
+        if (!s.value) s.value = '14:00';
+        if (!e.value) e.value = '16:00';
+        renderPickupPreview();
+      });
+      row.querySelector('.range-remove').addEventListener('click', () => {
+        second.style.display = 'none';
+        second.querySelector('.t-start').value = '';
+        second.querySelector('.t-end').value = '';
+        addBtn.style.display = '';
+        renderPickupPreview();
+      });
+      row.querySelectorAll('input[type="time"]').forEach((input) => {
+        input.addEventListener('input', renderPickupPreview);
+      });
+    });
+  }
+
+  // Lit un jour tel qu'il est à l'écran : { open, ranges: [{ start, end }] }
+  function readPickupDay(n) {
+    const row = pickupDays.querySelector('.day-row[data-day="' + n + '"]');
+    const open = row.querySelector('.day-open').checked;
+    const ranges = [];
+    if (open) {
+      const first = row.querySelector('.range[data-slot="1"]');
+      ranges.push({ start: first.querySelector('.t-start').value, end: first.querySelector('.t-end').value });
+      const second = row.querySelector('.range[data-slot="2"]');
+      if (second.style.display !== 'none') {
+        ranges.push({ start: second.querySelector('.t-start').value, end: second.querySelector('.t-end').value });
+      }
+    }
+    return { open, ranges };
+  }
+
+  // Vérifie les horaires saisis et les prépare pour l'envoi : { rows } ou { error }
+  function collectPickupRows() {
+    const rows = [];
+    for (const d of PICKUP_DAYS) {
+      const day = readPickupDay(d.n);
+      if (!day.open) continue;
+
+      for (let i = 0; i < day.ranges.length; i++) {
+        const r = day.ranges[i];
+        const which = i === 0 ? '' : ' (2e plage)';
+        if (!r.start || !r.end) {
+          return { error: 'Horaires de retrait, ' + d.label + which + ' : indiquez une heure de début et une heure de fin.' };
+        }
+        if (r.end <= r.start) {
+          return { error: 'Horaires de retrait, ' + d.label + which + " : l'heure de fin doit être après l'heure de début." };
+        }
+        if (i === 1 && r.start < day.ranges[0].end) {
+          return { error: 'Horaires de retrait, ' + d.label + " : la 2e plage doit commencer après la fin de la 1re." };
+        }
+        rows.push({ day_of_week: d.n, slot: i + 1, start_time: r.start, end_time: r.end });
+      }
+    }
+    if (rows.length === 0) {
+      return { error: 'Indiquez au moins un jour de retrait dans les horaires de retrait.' };
+    }
+    return { rows };
+  }
+
+  // Résumé "en direct" : on ne tient compte que des plages complètes et correctes
+  function renderPickupPreview() {
+    const rows = [];
+    PICKUP_DAYS.forEach((d) => {
+      const day = readPickupDay(d.n);
+      day.ranges.forEach((r, i) => {
+        if (r.start && r.end && r.end > r.start) {
+          rows.push({ day_of_week: d.n, slot: i + 1, start_time: r.start, end_time: r.end });
+        }
+      });
+    });
+    const text = formatPickupSummary(rows);
+    pickupPreview.textContent = text ? 'Vos acheteurs verront : retrait ' + text : "Aucun jour de retrait choisi pour l'instant.";
+  }
+
+  buildPickupDays();
+  renderPickupPreview();
+
   listingForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = document.getElementById('listingSubmitBtn');
     const errorEl = document.getElementById('listingError');
     const successEl = document.getElementById('listingSuccess');
+
+    // Les horaires de retrait sont vérifiés en premier : avant l'envoi de la photo, avant la publication
+    errorEl.style.display = 'none';
+    successEl.style.display = 'none';
+    const pickup = collectPickupRows();
+    if (pickup.error) {
+      errorEl.textContent = 'Erreur : ' + pickup.error;
+      errorEl.style.display = 'block';
+      return;
+    }
 
     btn.textContent = 'Publication en cours...';
     btn.disabled = true;
@@ -262,6 +459,7 @@
         price: parseFloat(document.getElementById('price').value),
         unit: document.getElementById('unit').value,
         imageUrl: imageUrl,
+        pickupHours: pickup.rows,
       };
 
       const response = await fetch('/api/create-listing', {
@@ -288,6 +486,8 @@
       harvestDateLabel.style.display = 'none';
       harvestDateHint.style.display = 'none';
       photoPreviewWrap.style.display = 'none';
+      buildPickupDays();
+      renderPickupPreview();
 
       setTimeout(function () {
         window.location.href = 'mes-annonces.html';
@@ -302,5 +502,21 @@
     }
   });
 </script>
+
+<style>
+  .pickup-section { margin-top:20px; padding-top:6px; border-top:1px solid #eee; }
+  .pickup-title { font-size:0.85rem; font-weight:600; color:var(--leaf-deep); margin:12px 0 0; text-align:left; }
+  .pickup-help { font-size:0.8rem; color:#888; margin:2px 0 8px; text-align:left; }
+  .pickup-section .day-row { border-top:1px solid #eee; padding:10px 0; text-align:left; }
+  .auth-form .pickup-section .day-head { display:flex; align-items:center; gap:10px; font-size:0.9rem; font-weight:600; color:var(--leaf-deep); cursor:pointer; margin-top:0; }
+  .auth-form .pickup-section .day-head input { width:18px; height:18px; padding:0; border:none; }
+  .pickup-section .day-closed-label { font-weight:400; color:#999; font-size:0.85rem; }
+  .pickup-section .day-ranges { margin:8px 0 0 28px; display:flex; flex-direction:column; gap:8px; }
+  .pickup-section .range { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:0.9rem; }
+  .auth-form .pickup-section .range input[type="time"] { padding:6px 8px; border-radius:8px; border:1.5px solid rgba(107,88,66,0.2); font-size:0.9rem; }
+  .pickup-section .range-remove, .pickup-section .add-range { background:none; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:var(--leaf-deep); font-weight:600; padding:4px 6px; text-align:left; }
+  .pickup-section .range-remove { color:#C8352F; }
+  .pickup-preview { margin:12px 0 4px; padding:12px; border-radius:10px; background:var(--cream-soft); font-size:0.9rem; color:var(--soil); text-align:left; }
+</style>
 </body>
 </html>

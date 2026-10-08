@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('id, order_id, seller_id, listing_id, listings(title, image_url)')
+      .select('id, order_id, seller_id, listing_id, listings(title, image_url, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
       .in('order_id', orderIds);
 
     if (itemsError) throw itemsError;
@@ -89,9 +89,20 @@ export default async function handler(req, res) {
             sellerId: it.seller_id,
             sellerEmail: sellersById[it.seller_id] || 'Vendeur',
             products: [],
+            items: [],
           };
         }
         sellersMap[it.seller_id].products.push(it.listings ? it.listings.title : 'Produit');
+
+        // Les articles avec leurs horaires de retrait (une seule fois par annonce, même achetée plusieurs fois)
+        const alreadyListed = sellersMap[it.seller_id].items.some((x) => x.listingId === it.listing_id);
+        if (!alreadyListed) {
+          sellersMap[it.seller_id].items.push({
+            listingId: it.listing_id,
+            title: it.listings ? it.listings.title : 'Produit',
+            pickup_hours: (it.listings && it.listings.listing_pickup_hours) || [],
+          });
+        }
       });
 
       const sellersList = Object.values(sellersMap).map((s) => {
@@ -121,4 +132,4 @@ export default async function handler(req, res) {
     console.error(error);
     res.status(500).json({ error: error.message });
   }
-}
+

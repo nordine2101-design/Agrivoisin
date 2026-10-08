@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       if (sellerIds.length > 0) {
         const { data: sellers, error } = await supabase
           .from('sellers')
-          .select('id, email, address, city, stripe_account_id')
+          .select('id, city, address')
           .in('id', sellerIds);
 
         if (!error && sellers) {
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
       if (accountIds.length > 0) {
         const { data: sellers, error } = await supabase
           .from('sellers')
-          .select('id, email, address, city, stripe_account_id')
+          .select('id, city, address')
           .in('stripe_account_id', accountIds);
 
         if (!error && sellers) {
@@ -107,10 +107,56 @@ export default async function handler(req, res) {
       }
     }
 
-    // Le numéro interne du vendeur ne sert qu'à relier les articles : il n'est pas envoyé à la page
-    const sellersOut = sellersInfo.map(({ id, ...seller }) => ({
-      ...seller,
-      items: itemsBySeller[id] || [],
+    // L'adresse du vendeur n'est donnée que tant que l'acheteur n'a pas confirmé la réception
+    // (même règle que dans « Mes commandes ») : rouvrir ce lien plus tard ne la redonne pas.
+    let orderRow = null;
+    let payoutRows = [];
+    let ruleAvailable = true; // devient faux si l'état du paiement n'a pas pu être vérifié : par prudence, pas d'adresse
+
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .select('id, created_at')
+      .eq('stripe_session_id', session_id)
+      .maybeSingle();
+
+    if (orderError) {
+      console.error('Erreur Supabase (commande du paiement) :', orderError);
+      ruleAvailable = false;
+    } else if (orderData) {
+      orderRow = orderData;
+      const { data: payoutsData, error: payoutsError } = await supabase
+        .from('payouts')
+        .select('seller_id, status')
+        .eq('order_id', orderData.id);
+
+      if (payoutsError) {
+        console.error('Erreur Supabase (versements du paiement) :', payoutsError);
+        ruleAvailable = false;
+      } else {
+        payoutRows = payoutsData || [];
+      }
+    }
+
+    const RECENT_ORDER_MS = 15 * 60 * 1000;
+    // Heure du paiement chez Stripe (sert si la commande n'est pas dans notre base)
+    const paymentAgeMs = session.created ? Date.now() - session.created * 1000 : 0;
+
+    function addressStillVisible(sellerId) {
+      if (!ruleAvailable) return false;
+      // Commande pas encore enregistrée : adresse seulement si le paiement vient tout juste d'être fait
+      if (!orderRow) return paymentAgeMs < RECENT_ORDER_MS;
+      const payout = payoutRows.find((p) => p.seller_id === sellerId);
+      if (payout) return payout.status === 'en_attente';
+      // Pas encore de versement enregistré : adresse seulement pour une commande toute récente
+      return Date.now() - new Date(orderRow.created_at).getTime() < RECENT_ORDER_MS;
+    }
+
+    // Seuls la ville, l'adresse (si elle est encore visible) et les articles sont envoyés :
+    // ni e-mail, ni compte de paiement, ni numéro interne du vendeur
+    const sellersOut = sellersInfo.map((seller) => ({
+      city: seller.city || null,
+      address: addressStillVisible(seller.id) ? (seller.address || null) : null,
+      items: itemsBySeller[seller.id] || [],
     }));
 
     res.status(200).json({

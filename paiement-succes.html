@@ -82,6 +82,111 @@
 <script>
   localStorage.removeItem('agrivoisin_cart');
 
+  // ---------- Horaires de retrait ----------
+
+  const PICKUP_DAYS = [
+    { n: 1, short: 'lun' }, { n: 2, short: 'mar' }, { n: 3, short: 'mer' }, { n: 4, short: 'jeu' },
+    { n: 5, short: 'ven' }, { n: 6, short: 'sam' }, { n: 7, short: 'dim' },
+  ];
+
+  // "18:00:00" -> "18h" ; "08:30:00" -> "8h30"
+  function formatPickupTime(value) {
+    const [h, m] = String(value).split(':');
+    const hour = String(parseInt(h, 10));
+    return m && m !== '00' ? hour + 'h' + m : hour + 'h';
+  }
+
+  // Une ligne par groupe de jours : [{ days: 'lun-ven', text: '18h-20h' }, ...]
+  function pickupGroups(rows) {
+    const byDay = {};
+    (rows || []).forEach((r) => {
+      (byDay[r.day_of_week] = byDay[r.day_of_week] || []).push(r);
+    });
+
+    const dayTexts = [];
+    PICKUP_DAYS.forEach((d) => {
+      const list = byDay[d.n];
+      if (!list || list.length === 0) return;
+      list.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+      dayTexts.push({
+        n: d.n,
+        short: d.short,
+        text: list.map((r) => formatPickupTime(r.start_time) + '-' + formatPickupTime(r.end_time)).join(' et '),
+      });
+    });
+
+    const groups = [];
+    dayTexts.forEach((d) => {
+      const last = groups[groups.length - 1];
+      if (last && last.text === d.text && last.lastN === d.n - 1) {
+        last.lastN = d.n;
+        last.lastShort = d.short;
+      } else {
+        groups.push({ text: d.text, firstShort: d.short, lastShort: d.short, lastN: d.n });
+      }
+    });
+
+    return groups.map((g) => ({
+      days: g.firstShort === g.lastShort ? g.firstShort : g.firstShort + '-' + g.lastShort,
+      text: g.text,
+    }));
+  }
+
+  // Encadré des horaires d'un vendeur. Les articles qui ont les mêmes horaires sont regroupés :
+  // si tous ont les mêmes, on n'affiche pas leurs noms ; sinon on nomme chaque groupe d'articles.
+  function buildPickupBlock(items) {
+    const withHours = items
+      .map((item) => ({ title: item.title, groups: pickupGroups(item.pickup_hours) }))
+      .filter((item) => item.groups.length > 0);
+    if (withHours.length === 0) return null;
+
+    const sets = [];
+    withHours.forEach((item) => {
+      const key = JSON.stringify(item.groups);
+      let set = sets.find((s) => s.key === key);
+      if (!set) {
+        set = { key, groups: item.groups, titles: [] };
+        sets.push(set);
+      }
+      set.titles.push(item.title);
+    });
+
+    const showNames = sets.length > 1 || withHours.length < items.length;
+
+    const box = document.createElement('div');
+    box.style.cssText = 'margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--white);';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:0.75rem;font-weight:700;color:var(--leaf-deep);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;';
+    title.textContent = 'Horaires de retrait';
+    box.appendChild(title);
+
+    sets.forEach((set) => {
+      const setEl = document.createElement('div');
+      setEl.style.cssText = 'font-size:0.9rem;line-height:1.6;margin-top:4px;';
+
+      if (showNames) {
+        const names = document.createElement('div');
+        names.style.cssText = 'font-style:italic;color:#6B5842;';
+        names.textContent = set.titles.join(', ');
+        setEl.appendChild(names);
+      }
+
+      set.groups.forEach((g) => {
+        const line = document.createElement('div');
+        const days = document.createElement('strong');
+        days.textContent = g.days;
+        line.appendChild(days);
+        line.appendChild(document.createTextNode(' ' + g.text));
+        setEl.appendChild(line);
+      });
+
+      box.appendChild(setEl);
+    });
+
+    return box;
+  }
+
   const urlParams = new URLSearchParams(window.location.search);
   const sessionId = urlParams.get('session_id');
 
@@ -94,10 +199,20 @@
           const list = document.getElementById('sellerAddressList');
 
           data.sellers.forEach((seller) => {
-            const p = document.createElement('p');
-            p.style.marginBottom = '8px';
-            p.innerHTML = `<strong>${seller.email}</strong><br>${seller.address || 'Adresse non renseignée'}`;
-            list.appendChild(p);
+            const block = document.createElement('div');
+            block.style.marginBottom = '14px';
+
+            // E-mail et adresse affichés comme du simple texte (jamais interprétés comme du code)
+            const email = document.createElement('strong');
+            email.textContent = seller.email;
+            block.appendChild(email);
+            block.appendChild(document.createElement('br'));
+            block.appendChild(document.createTextNode(seller.address || 'Adresse non renseignée'));
+
+            const hours = buildPickupBlock(seller.items || []);
+            if (hours) block.appendChild(hours);
+
+            list.appendChild(block);
           });
 
           container.style.display = 'block';

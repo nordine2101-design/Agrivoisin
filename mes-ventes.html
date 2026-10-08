@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mes ventes — Agrivoisin</title>
+<meta name="description" content="Retrouvez les commandes passées chez vous sur Agrivoisin.">
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ MES VENTES ============ -->
+<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;flex-wrap:wrap;">
+  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;min-height:533px;box-sizing:border-box;text-align:center;">
+    <div style="text-align:left;margin:-24px 0 12px -20px;">
+      <a href="index.html" class="btn btn-ghost">Retour</a>
+    </div>
+    <h1>Mes ventes</h1>
+    <p id="pageSubtitle">Retrouvez ici les commandes passées chez vous.</p>
+
+    <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de vos ventes...</p>
+    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous devez être connecté pour voir vos ventes. <a href="connexion.html?retour=mes-ventes.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
+    <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;"></p>
+    <p id="noSalesMessage" style="display:none;margin-top:16px;">Vous n'avez pas encore de vente. Elles apparaîtront ici dès qu'un acheteur aura passé commande.</p>
+
+    <div id="notSellerSection" style="display:none;margin-top:16px;">
+      <p style="margin-bottom:14px;">Vous n'avez pas encore de compte vendeur.</p>
+      <a href="vendre.html" class="btn btn-primary">Devenir vendeur</a>
+    </div>
+
+    <div id="salesContainer" style="text-align:left;margin-top:16px;"></div>
+  </div>
+  <div style="width:440px;max-width:100%;min-height:400px;align-self:stretch;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;">
+    <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="width:auto;height:auto;max-width:80%;max-height:80%;">
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const pageSubtitle = document.getElementById('pageSubtitle');
+  const loadingMessage = document.getElementById('loadingMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const noSalesMessage = document.getElementById('noSalesMessage');
+  const notSellerSection = document.getElementById('notSellerSection');
+  const salesContainer = document.getElementById('salesContainer');
+
+  // Protège l'affichage : un titre d'annonce n'est jamais interprété comme du code
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString('fr-FR');
+  }
+
+  function formatAmount(value) {
+    return Number(value).toFixed(2).replace('.', ',') + ' €';
+  }
+
+  // État de l'argent pour cette vente
+  function renderMoneyBox(payout) {
+    // Anciennes ventes (avant l'argent retenu) : rien à afficher
+    if (!payout) return '';
+
+    if (payout.status === 'verse') {
+      const when = payout.releasedAt ? ' le ' + formatDate(payout.releasedAt) : '';
+      return '<div class="money-box money-done">Argent versé' + escapeHtml(when) + '.</div>';
+    }
+    if (payout.status === 'probleme') {
+      return '<div class="money-box money-problem">Problème signalé par l\'acheteur : le versement est suspendu le temps qu\'Agrivoisin examine la situation.</div>';
+    }
+    if (payout.status === 'en_cours') {
+      return '<div class="money-box">Versement en cours de traitement...</div>';
+    }
+
+    // En attente : l'argent est gardé par Agrivoisin
+    const releaseDate = payout.autoReleaseAt ? new Date(payout.autoReleaseAt) : null;
+    const when = releaseDate && releaseDate.getTime() > Date.now()
+      ? 'le ' + formatDate(payout.autoReleaseAt)
+      : 'très prochainement';
+    return '<div class="money-box">L\'argent est gardé par Agrivoisin. Il vous sera versé dès que l\'acheteur confirme avoir reçu sa commande, ou automatiquement ' + escapeHtml(when) + '.</div>';
+  }
+
+  function renderSale(sale) {
+    let itemsHtml = '';
+    (sale.items || []).forEach((item) => {
+      const quantity = item.quantity > 1 ? ' × ' + item.quantity : '';
+      itemsHtml += '<div class="sale-item">' + escapeHtml(item.title) + escapeHtml(quantity) + '</div>';
+    });
+
+    return (
+      '<div class="sale-card">' +
+      '<div class="sale-head"><span class="sale-date">Vente du ' + escapeHtml(formatDate(sale.createdAt)) + '</span>' +
+      '<span class="sale-total">' + escapeHtml(formatAmount(sale.totalAmount)) + '</span></div>' +
+      itemsHtml +
+      renderMoneyBox(sale.payout) +
+      '</div>'
+    );
+  }
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    if (!session) {
+      loadingMessage.style.display = 'none';
+      pageSubtitle.style.display = 'none';
+      notLoggedMessage.style.display = 'block';
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        headers: { Authorization: 'Bearer ' + session.access_token },
+      });
+      const data = await response.json();
+
+      loadingMessage.style.display = 'none';
+
+      if (!response.ok) {
+        if (data.error && data.error.includes('vendeur')) {
+          pageSubtitle.style.display = 'none';
+          notSellerSection.style.display = 'block';
+          return;
+        }
+        throw new Error(data.error || 'Erreur');
+      }
+
+      const sales = data.sales || [];
+
+      if (sales.length === 0) {
+        noSalesMessage.style.display = 'block';
+        return;
+      }
+
+      salesContainer.innerHTML = sales.map(renderSale).join('');
+
+    } catch (err) {
+      console.error(err);
+      loadingMessage.style.display = 'none';
+      errorMessage.textContent = 'Impossible de charger vos ventes pour le moment.';
+      errorMessage.style.display = 'block';
+    }
+  }
+
+  init();
+</script>
+
+<style>
+  .sale-card { background:#f9f7f2; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .sale-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px; }
+  .sale-date { font-family:var(--font-display); font-weight:700; font-size:0.95rem; color:var(--leaf-deep); }
+  .sale-total { font-weight:700; font-size:0.95rem; color:var(--leaf-deep); white-space:nowrap; }
+  .sale-item { font-size:0.9rem; line-height:1.6; }
+  .money-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin-top:10px; font-size:0.85rem; line-height:1.5; }
+  .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
+  .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
+</style>
+
+</body>
+</html>

@@ -95,6 +95,12 @@
     }[c]));
   }
 
+  // Comment un vendeur est désigné : « Vendeur de Lyon » (jamais de contact direct)
+  function sellerLabel(seller) {
+    if (seller.sellerCity) return 'Vendeur de ' + seller.sellerCity;
+    return seller.sellerEmail || 'Vendeur';
+  }
+
   // ---------- Horaires de retrait ----------
 
   const PICKUP_DAYS = [
@@ -403,7 +409,7 @@
         order.sellers.forEach((seller) => {
           sellersHtml += `
             <div class="order-seller-block">
-              <p><strong>${escapeHtml(seller.sellerEmail)}</strong> — ${escapeHtml(seller.products.join(', '))}</p>
+              <p><strong>${escapeHtml(sellerLabel(seller))}</strong> — ${escapeHtml(seller.products.join(', '))}</p>
               ${renderAddressSection(seller)}
               ${renderPickupSection(seller.items)}
               ${renderPayoutSection(order.orderId, seller)}

@@ -88,6 +88,99 @@
     return new Date(iso).toLocaleDateString('fr-FR');
   }
 
+  // Protège l'affichage : un nom saisi par un vendeur n'est jamais interprété comme du code
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  // ---------- Horaires de retrait ----------
+
+  const PICKUP_DAYS = [
+    { n: 1, short: 'lun' }, { n: 2, short: 'mar' }, { n: 3, short: 'mer' }, { n: 4, short: 'jeu' },
+    { n: 5, short: 'ven' }, { n: 6, short: 'sam' }, { n: 7, short: 'dim' },
+  ];
+
+  // "18:00:00" -> "18h" ; "08:30:00" -> "8h30"
+  function formatPickupTime(value) {
+    const [h, m] = String(value).split(':');
+    const hour = String(parseInt(h, 10));
+    return m && m !== '00' ? hour + 'h' + m : hour + 'h';
+  }
+
+  // Une ligne par groupe de jours : [{ days: 'lun-ven', text: '18h-20h' }, ...]
+  function pickupGroups(rows) {
+    const byDay = {};
+    (rows || []).forEach((r) => {
+      (byDay[r.day_of_week] = byDay[r.day_of_week] || []).push(r);
+    });
+
+    const dayTexts = [];
+    PICKUP_DAYS.forEach((d) => {
+      const list = byDay[d.n];
+      if (!list || list.length === 0) return;
+      list.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+      dayTexts.push({
+        n: d.n,
+        short: d.short,
+        text: list.map((r) => formatPickupTime(r.start_time) + '-' + formatPickupTime(r.end_time)).join(' et '),
+      });
+    });
+
+    const groups = [];
+    dayTexts.forEach((d) => {
+      const last = groups[groups.length - 1];
+      if (last && last.text === d.text && last.lastN === d.n - 1) {
+        last.lastN = d.n;
+        last.lastShort = d.short;
+      } else {
+        groups.push({ text: d.text, firstShort: d.short, lastShort: d.short, lastN: d.n });
+      }
+    });
+
+    return groups.map((g) => ({
+      days: g.firstShort === g.lastShort ? g.firstShort : g.firstShort + '-' + g.lastShort,
+      text: g.text,
+    }));
+  }
+
+  // Encadré des horaires d'un vendeur. Les articles qui ont les mêmes horaires sont regroupés :
+  // si tous ont les mêmes, on n'affiche pas leurs noms ; sinon on nomme chaque groupe d'articles.
+  function renderPickupSection(items) {
+    const withHours = (items || [])
+      .map((item) => ({ title: item.title, groups: pickupGroups(item.pickup_hours) }))
+      .filter((item) => item.groups.length > 0);
+    if (withHours.length === 0) return '';
+
+    const sets = [];
+    withHours.forEach((item) => {
+      const key = JSON.stringify(item.groups);
+      let set = sets.find((s) => s.key === key);
+      if (!set) {
+        set = { key, groups: item.groups, titles: [] };
+        sets.push(set);
+      }
+      set.titles.push(item.title);
+    });
+
+    const showNames = sets.length > 1 || withHours.length < items.length;
+
+    let html = '<div class="pickup-box"><div class="pickup-box-title">Horaires de retrait</div>';
+    sets.forEach((set) => {
+      html += '<div class="pickup-set">';
+      if (showNames) {
+        html += '<div class="pickup-names">' + escapeHtml(set.titles.join(', ')) + '</div>';
+      }
+      set.groups.forEach((g) => {
+        html += '<div><strong>' + escapeHtml(g.days) + '</strong> ' + escapeHtml(g.text) + '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
   function payoutDoneHtml() {
     return '<div class="payout-box payout-done"><p>Paiement versé au vendeur.</p></div>';
   }
@@ -294,7 +387,8 @@
         order.sellers.forEach((seller) => {
           sellersHtml += `
             <div class="order-seller-block">
-              <p><strong>${seller.sellerEmail}</strong> — ${seller.products.join(', ')}</p>
+              <p><strong>${escapeHtml(seller.sellerEmail)}</strong> — ${escapeHtml(seller.products.join(', '))}</p>
+              ${renderPickupSection(seller.items)}
               ${renderPayoutSection(order.orderId, seller)}
               ${seller.review ? renderExistingReview(seller.review, false) : renderStrawberryPicker(order.orderId, seller.sellerId)}
             </div>
@@ -338,6 +432,10 @@
   .payout-actions .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
   .payout-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .payout-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
+  .pickup-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; }
+  .pickup-box-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .pickup-set { font-size:0.85rem; line-height:1.6; margin-top:3px; }
+  .pickup-names { font-style:italic; color:#6B5842; }
 </style>
 
 </body>

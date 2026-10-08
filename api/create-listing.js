@@ -68,6 +68,16 @@ function validatePickupHours(input) {
   };
 }
 
+// Quantité disponible : un nombre entier d'unités (par exemple 5 kg ou 3 bottes), de 1 à 9999
+const MAX_QUANTITY = 9999;
+
+function validateQuantity(value) {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_QUANTITY) {
+    return { error: 'Indiquez la quantité disponible : un nombre entier entre 1 et ' + MAX_QUANTITY + '.' };
+  }
+  return { quantity: value };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -88,7 +98,7 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
-    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours } = req.body;
+    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity } = req.body;
 
     // 1. Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
@@ -117,7 +127,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: hours.error });
     }
 
-    // 4. Créer l'annonce liée à ce vendeur
+    // 4. La quantité disponible est obligatoire pour une nouvelle annonce, et vérifiée ici
+    const stock = validateQuantity(quantity);
+    if (stock.error) {
+      return res.status(400).json({ error: stock.error });
+    }
+
+    // 5. Créer l'annonce liée à ce vendeur
     const { data: listing, error: listingError } = await supabase
       .from('listings')
       .insert({
@@ -130,6 +146,7 @@ export default async function handler(req, res) {
         subcategory,
         harvest_date: harvestDate,
         image_url: imageUrl,
+        quantity_available: stock.quantity,
       })
       .select()
       .single();
@@ -138,7 +155,7 @@ export default async function handler(req, res) {
       throw listingError;
     }
 
-    // 5. Ranger les horaires de retrait avec l'annonce
+    // 6. Ranger les horaires de retrait avec l'annonce
     const { error: hoursError } = await supabase
       .from('listing_pickup_hours')
       .insert(hours.rows.map((h) => ({ ...h, listing_id: listing.id })));

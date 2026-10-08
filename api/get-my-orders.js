@@ -45,16 +45,17 @@ export default async function handler(req, res) {
     if (itemsError) throw itemsError;
 
     const sellerIds = [...new Set(items.map((it) => it.seller_id).filter(Boolean))];
-    let sellersById = {};
+    let citiesById = {};
     let addressesById = {};
     if (sellerIds.length > 0) {
+      // L'e-mail des vendeurs n'est jamais lu ni envoyé à l'acheteur : pas de contact direct possible
       const { data: sellersData, error: sellersError } = await supabase
         .from('sellers')
-        .select('id, email, address')
+        .select('id, city, address')
         .in('id', sellerIds);
       if (sellersError) throw sellersError;
       sellersData.forEach((s) => {
-        sellersById[s.id] = s.email;
+        citiesById[s.id] = s.city;
         addressesById[s.id] = s.address;
       });
     }
@@ -89,7 +90,7 @@ export default async function handler(req, res) {
         if (!sellersMap[it.seller_id]) {
           sellersMap[it.seller_id] = {
             sellerId: it.seller_id,
-            sellerEmail: sellersById[it.seller_id] || 'Vendeur',
+            sellerCity: citiesById[it.seller_id] || null,
             products: [],
             items: [],
           };

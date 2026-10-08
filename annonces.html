@@ -102,6 +102,13 @@
     chipsContainer.appendChild(btn);
   });
 
+  // Protège l'affichage : un titre ou un nom saisi par un vendeur n'est jamais interprété comme du code
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
   function normalizeText(text) {
     return (text || '')
       .toString()
@@ -248,17 +255,17 @@
       }
 
       card.innerHTML = `
-        <a href="produit.html?id=${item.id}" class="produce-card-image" style="display:block;">
-          <img src="${item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop'}" alt="${item.title}">
+        <a href="produit.html?id=${escapeHtml(item.id)}" class="produce-card-image" style="display:block;">
+          <img src="${escapeHtml(item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop')}" alt="${escapeHtml(item.title)}">
         </a>
         <div class="produce-card-body">
-          <span class="tag">${item.subcategory || item.category || 'Récolte'}</span>
-          <h4><a href="produit.html?id=${item.id}">${item.title}</a></h4>
+          <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>
+          <h4><a href="produit.html?id=${escapeHtml(item.id)}">${escapeHtml(item.title)}</a></h4>
           ${freshnessHtml}
-          <p class="seller">${locationText}</p>
+          <p class="seller">${escapeHtml(locationText)}</p>
           <div class="produce-card-footer">
-            <span class="price">${Number(item.price).toFixed(2).replace('.', ',')} €/${item.unit || 'kg'}</span>
-            <button class="icon-btn" aria-label="Ajouter au panier" data-stripe-account="${item.sellers ? item.sellers.stripe_account_id : ''}" data-listing-id="${item.id}">
+            <span class="price">${Number(item.price).toFixed(2).replace('.', ',')} €/${escapeHtml(item.unit || 'kg')}</span>
+            <button class="icon-btn" aria-label="Ajouter au panier" data-stripe-account="${escapeHtml(item.sellers ? item.sellers.stripe_account_id : '')}" data-listing-id="${escapeHtml(item.id)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           </div>

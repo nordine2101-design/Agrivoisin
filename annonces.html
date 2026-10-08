@@ -109,6 +109,29 @@
     }[c]));
   }
 
+  // ---------- Stock disponible ----------
+
+  const LOW_STOCK_THRESHOLD = 5;
+
+  // null = sans limite (les anciennes annonces, publiées avant la quantité)
+  function stockOf(item) {
+    return item.quantity_available == null ? null : Number(item.quantity_available);
+  }
+
+  function stockBadge(item) {
+    const stock = stockOf(item);
+    if (stock === null) return '';
+    if (stock <= 0) return '<p class="stock-badge stock-out">Épuisé</p>';
+    if (stock <= LOW_STOCK_THRESHOLD) return '<p class="stock-badge">Plus que ' + stock + '</p>';
+    return '';
+  }
+
+  // Combien d'unités de cette annonce l'acheteur a déjà dans son panier
+  function unitsInCart(listingId) {
+    const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+    return cart.filter((c) => String(c.listingId) === String(listingId)).length;
+  }
+
   function normalizeText(text) {
     return (text || '')
       .toString()
@@ -254,6 +277,11 @@
         locationText += ' · à ' + (distance < 1 ? Math.round(distance * 1000) + ' m' : distance.toFixed(1).replace('.', ',') + ' km');
       }
 
+      // Stock : le bouton « + » est grisé si l'annonce est épuisée ou si le panier contient déjà tout ce qui reste
+      const stock = stockOf(item);
+      const noMore = stock !== null && unitsInCart(item.id) >= stock;
+      const buttonNote = stock !== null && stock <= 0 ? 'Épuisé' : 'Vous avez déjà pris tout le stock disponible';
+
       card.innerHTML = `
         <a href="produit.html?id=${escapeHtml(item.id)}" class="produce-card-image" style="display:block;">
           <img src="${escapeHtml(item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop')}" alt="${escapeHtml(item.title)}">
@@ -262,10 +290,11 @@
           <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>
           <h4><a href="produit.html?id=${escapeHtml(item.id)}">${escapeHtml(item.title)}</a></h4>
           ${freshnessHtml}
+          ${stockBadge(item)}
           <p class="seller">${escapeHtml(locationText)}</p>
           <div class="produce-card-footer">
             <span class="price">${Number(item.price).toFixed(2).replace('.', ',')} €/${escapeHtml(item.unit || 'kg')}</span>
-            <button class="icon-btn" aria-label="Ajouter au panier" data-stripe-account="${escapeHtml(item.sellers ? item.sellers.stripe_account_id : '')}" data-listing-id="${escapeHtml(item.id)}">
+            <button class="icon-btn" aria-label="${noMore ? buttonNote : 'Ajouter au panier'}" ${noMore ? 'disabled title="' + buttonNote + '"' : ''} data-stock="${stock === null ? '' : stock}" data-stripe-account="${escapeHtml(item.sellers ? item.sellers.stripe_account_id : '')}" data-listing-id="${escapeHtml(item.id)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
           </div>
@@ -276,16 +305,33 @@
 
     container.querySelectorAll('.icon-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
+        if (btn.disabled) return;
         const card = btn.closest('.produce-card');
         const name = card.querySelector('h4').textContent;
         const price = card.querySelector('.price').textContent;
         const stripeAccountId = btn.dataset.stripeAccount;
         const listingId = btn.dataset.listingId;
+        const stock = btn.dataset.stock === '' ? null : Number(btn.dataset.stock);
         const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+
+        // Jamais plus d'unités dans le panier qu'il n'en reste en stock
+        const alreadyInCart = cart.filter((c) => String(c.listingId) === String(listingId)).length;
+        if (stock !== null && alreadyInCart >= stock) {
+          btn.disabled = true;
+          return;
+        }
+
         cart.push({ name, price, stripeAccountId, listingId });
         localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
         const cartCountEl = document.querySelector('.cart-count');
         if (cartCountEl) cartCountEl.textContent = cart.length;
+
+        // Le panier contient maintenant tout ce qui reste : on grise le bouton
+        if (stock !== null && alreadyInCart + 1 >= stock) {
+          btn.disabled = true;
+          btn.title = 'Vous avez déjà pris tout le stock disponible';
+          btn.setAttribute('aria-label', 'Vous avez déjà pris tout le stock disponible');
+        }
       });
     });
   }
@@ -366,5 +412,11 @@
 </footer>
 
 <script src="script.js"></script>
+
+<style>
+  .produce-card-body p.stock-badge { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
+  .produce-card-body p.stock-badge.stock-out { color:#C8352F; }
+  .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
+</style>
 </body>
 </html>

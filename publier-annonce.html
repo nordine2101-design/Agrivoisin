@@ -48,6 +48,10 @@
       <label for="unit">Unité</label>
       <input type="text" id="unit" placeholder="Ex : kg, botte, barquette" value="kg">
 
+      <label for="quantity">Quantité disponible</label>
+      <input type="number" id="quantity" min="1" max="9999" step="1" placeholder="Ex : 5" required>
+      <p style="font-size:0.85em;color:#888;margin-top:-8px;">Le nombre d'unités que vous avez à vendre, dans l'unité choisie ci-dessus (par exemple 5 si vous avez 5 kg). Quand il n'y en a plus, l'annonce s'affiche « Épuisé ».</p>
+
       <label for="photoFile">Photo de votre récolte</label>
       <input type="file" id="photoFile" accept="image/*">
       <p id="photoPreviewWrap" style="display:none;margin-top:8px;">
@@ -581,6 +585,15 @@
     // Les horaires de retrait sont vérifiés en premier : avant l'envoi de la photo, avant la publication
     errorEl.style.display = 'none';
     successEl.style.display = 'none';
+
+    // La quantité disponible : un nombre entier de 1 à 9999
+    const quantityValue = Number(document.getElementById('quantity').value);
+    if (!Number.isInteger(quantityValue) || quantityValue < 1 || quantityValue > 9999) {
+      errorEl.textContent = 'Erreur : Indiquez la quantité disponible : un nombre entier entre 1 et 9999.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
     const pickup = collectPickupRows();
     if (pickup.error) {
       errorEl.textContent = 'Erreur : ' + pickup.error;
@@ -633,6 +646,7 @@
         unit: document.getElementById('unit').value,
         imageUrl: imageUrl,
         pickupHours: pickup.rows,
+        quantity: quantityValue,
       };
 
       const response = await fetch('/api/create-listing', {

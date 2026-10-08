@@ -118,11 +118,34 @@
     return item.quantity_available == null ? null : Number(item.quantity_available);
   }
 
+  // Une quantité s'écrit toujours avec son unité : « 3 kg », « 1 botte », « 3 bottes », « 2 bocaux »
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  // Met un mot au pluriel : « botte » -> « bottes », « bocal » -> « bocaux », « kg » reste « kg »
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'kg';
+    if (count <= 1) return u;
+    // « botte de radis » -> « bottes de radis », « pot de 500g » -> « pots de 500g »
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u; // autre unité en plusieurs mots : on n'y touche pas
+    return pluralWord(u);
+  }
+
   function stockBadge(item) {
     const stock = stockOf(item);
     if (stock === null) return '';
     if (stock <= 0) return '<p class="stock-badge stock-out">Épuisé</p>';
-    if (stock <= LOW_STOCK_THRESHOLD) return '<p class="stock-badge">Plus que ' + stock + '</p>';
+    if (stock <= LOW_STOCK_THRESHOLD) {
+      return '<p class="stock-badge">Plus que ' + stock + ' ' + escapeHtml(unitLabel(item.unit, stock)) + '</p>';
+    }
     return '';
   }
 

@@ -46,14 +46,16 @@ export default async function handler(req, res) {
 
     const sellerIds = [...new Set(items.map((it) => it.seller_id).filter(Boolean))];
     let sellersById = {};
+    let addressesById = {};
     if (sellerIds.length > 0) {
       const { data: sellersData, error: sellersError } = await supabase
         .from('sellers')
-        .select('id, email')
+        .select('id, email, address')
         .in('id', sellerIds);
       if (sellersError) throw sellersError;
       sellersData.forEach((s) => {
         sellersById[s.id] = s.email;
+        addressesById[s.id] = s.address;
       });
     }
 
@@ -108,8 +110,14 @@ export default async function handler(req, res) {
       const sellersList = Object.values(sellersMap).map((s) => {
         const existingReview = reviews.find((r) => r.order_id === order.id && r.seller_id === s.sellerId);
         const payoutRow = payouts.find((p) => p.order_id === order.id && p.seller_id === s.sellerId);
+
+        // L'adresse du vendeur n'est donnée que tant que l'acheteur n'a pas confirmé la réception :
+        // dès que le paiement est versé (ou suspendu), elle disparaît et n'est plus jamais renvoyée
+        const addressStillVisible = payoutRow && payoutRow.status === 'en_attente';
+
         return {
           ...s,
+          sellerAddress: addressStillVisible ? (addressesById[s.sellerId] || null) : null,
           review: existingReview || null,
           // null pour les anciennes commandes (payées avant l'argent retenu)
           payout: payoutRow

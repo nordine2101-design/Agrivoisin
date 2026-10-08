@@ -141,11 +141,25 @@
 
       const row = document.createElement('div');
       row.className = 'cart-item-row';
-      row.innerHTML = `
-        <span class="cart-item-name">${item.name}</span>
-        <span class="cart-item-price">${item.price}</span>
-        <button class="cart-item-remove" data-index="${index}" aria-label="Retirer">✕</button>
-      `;
+
+      // Nom et prix affichés comme du simple texte (jamais interprétés comme du code)
+      const nameEl = document.createElement('span');
+      nameEl.className = 'cart-item-name';
+      nameEl.textContent = item.name;
+
+      const priceEl = document.createElement('span');
+      priceEl.className = 'cart-item-price';
+      priceEl.textContent = item.price;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'cart-item-remove';
+      removeBtn.dataset.index = index;
+      removeBtn.setAttribute('aria-label', 'Retirer');
+      removeBtn.textContent = '✕';
+
+      row.appendChild(nameEl);
+      row.appendChild(priceEl);
+      row.appendChild(removeBtn);
       itemsEl.appendChild(row);
     });
 

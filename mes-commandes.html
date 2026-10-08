@@ -181,6 +181,15 @@
     return html;
   }
 
+  // Adresse de retrait : affichée seulement tant que le serveur la donne (avant la confirmation de réception)
+  function renderAddressSection(seller) {
+    if (!seller.sellerAddress) return '';
+    return '<div class="seller-address">' +
+      '<div class="seller-address-title">Adresse de retrait</div>' +
+      '<div>' + escapeHtml(seller.sellerAddress) + '</div>' +
+      '</div>';
+  }
+
   function payoutDoneHtml() {
     return '<div class="payout-box payout-done"><p>Paiement versé au vendeur.</p></div>';
   }
@@ -246,6 +255,13 @@
 
       if (!response.ok) {
         throw new Error(data.error || 'Une erreur est survenue');
+      }
+
+      // L'adresse du vendeur disparaît tout de suite de l'écran (et le serveur ne la renverra plus)
+      const sellerBlock = box.closest('.order-seller-block');
+      if (sellerBlock) {
+        const addressEl = sellerBlock.querySelector('.seller-address');
+        if (addressEl) addressEl.remove();
       }
 
       box.outerHTML = data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml();
@@ -388,6 +404,7 @@
           sellersHtml += `
             <div class="order-seller-block">
               <p><strong>${escapeHtml(seller.sellerEmail)}</strong> — ${escapeHtml(seller.products.join(', '))}</p>
+              ${renderAddressSection(seller)}
               ${renderPickupSection(seller.items)}
               ${renderPayoutSection(order.orderId, seller)}
               ${seller.review ? renderExistingReview(seller.review, false) : renderStrawberryPicker(order.orderId, seller.sellerId)}
@@ -432,6 +449,8 @@
   .payout-actions .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
   .payout-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .payout-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
+  .seller-address { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
+  .seller-address-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
   .pickup-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; }
   .pickup-box-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
   .pickup-set { font-size:0.85rem; line-height:1.6; margin-top:3px; }

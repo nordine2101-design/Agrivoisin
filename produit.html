@@ -30,8 +30,10 @@
       </div>
       <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
       <p style="margin-bottom:22px;"><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span></p>
+      <p id="listingStock" style="display:none;margin:-10px 0 18px;font-weight:700;"></p>
 
       <button type="button" id="addToCartBtn" class="btn btn-primary" style="width:100%;">Ajouter au panier</button>
+      <p id="listingStockNote" style="display:none;margin-top:12px;font-size:0.9rem;color:#6B5842;"></p>
       <a id="viewCartLink" href="panier.html" style="display:none;margin-top:14px;font-weight:700;color:var(--leaf-deep);">Voir mon panier</a>
 
       <p class="product-trust-note" style="margin-top:20px;text-align:left;">
@@ -182,6 +184,29 @@
     }));
   }
 
+  // ---------- Stock disponible : une quantité s'écrit toujours avec son unité ----------
+
+  const LOW_STOCK_THRESHOLD = 5;
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  // Met un mot au pluriel : « botte » -> « bottes », « bocal » -> « bocaux », « kg » reste « kg »
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'kg';
+    if (count <= 1) return u;
+    // « botte de radis » -> « bottes de radis », « pot de 500g » -> « pots de 500g »
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u; // autre unité en plusieurs mots : on n'y touche pas
+    return pluralWord(u);
+  }
+
   function renderListing(item) {
     document.title = item.title + ' — Agrivoisin';
 
@@ -233,8 +258,61 @@
     imageEl.style.maxHeight = '533px';
     imageEl.style.borderRadius = '28px';
 
-    addBtn.addEventListener('click', () => {
+    // Stock : « Plus que 3 kg » / « Épuisé », et le bouton se grise s'il n'y en a plus ou si le panier contient déjà tout
+    const stock = item.quantity_available == null ? null : Number(item.quantity_available);
+    const stockEl = document.getElementById('listingStock');
+    const stockNoteEl = document.getElementById('listingStockNote');
+
+    function unitsInCart() {
       const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+      return cart.filter((c) => String(c.listingId) === String(item.id)).length;
+    }
+
+    function refreshStock() {
+      stockEl.style.display = 'none';
+      stockNoteEl.style.display = 'none';
+
+      if (stock === null) {
+        addBtn.disabled = false;
+        return;
+      }
+
+      if (stock <= 0) {
+        stockEl.textContent = 'Épuisé';
+        stockEl.style.color = '#C8352F';
+        stockEl.style.display = 'block';
+        addBtn.disabled = true;
+        addBtn.textContent = 'Épuisé';
+        return;
+      }
+
+      if (stock <= LOW_STOCK_THRESHOLD) {
+        stockEl.textContent = 'Plus que ' + stock + ' ' + unitLabel(item.unit, stock);
+        stockEl.style.color = '#C26A1E';
+        stockEl.style.display = 'block';
+      }
+
+      if (unitsInCart() >= stock) {
+        addBtn.disabled = true;
+        stockNoteEl.textContent = 'Votre panier contient déjà tout le stock disponible (' + stock + ' ' + unitLabel(item.unit, stock) + ').';
+        stockNoteEl.style.display = 'block';
+      } else {
+        addBtn.disabled = false;
+      }
+    }
+
+    refreshStock();
+
+    addBtn.addEventListener('click', () => {
+      if (addBtn.disabled) return;
+      const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+
+      // Jamais plus d'unités dans le panier qu'il n'en reste en stock
+      if (stock !== null && cart.filter((c) => String(c.listingId) === String(item.id)).length >= stock) {
+        refreshStock();
+        return;
+      }
+
       cart.push({
         name: item.title,
         price: priceText,
@@ -244,6 +322,7 @@
       localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
       addBtn.textContent = 'Ajouté au panier';
       viewCartLink.style.display = 'inline-block';
+      refreshStock();
       setTimeout(() => { addBtn.textContent = 'Ajouter au panier'; }, 2000);
     });
 

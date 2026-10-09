@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+
+    import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
   realtime: {
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at')
+      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at')
       .eq('seller_id', seller.id)
       .order('created_at', { ascending: false });
 
@@ -56,7 +57,5 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-
-    
 
     

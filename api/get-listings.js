@@ -25,12 +25,15 @@ export default async function handler(req, res) {
 
     // Une annonce n'apparaît sur le site que si la ville de son vendeur est connue
     // et reconnue sur la carte (la distance doit toujours pouvoir être calculée)
+    // Une annonce épuisée (stock à 0) disparaît tout de suite de la liste.
+    // Une quantité vide veut dire « sans limite » : c'est le cas des anciennes annonces.
     const visibleListings = (listings || []).filter(
       (item) =>
         item.sellers &&
         item.sellers.city &&
         item.sellers.latitude != null &&
-        item.sellers.longitude != null
+        item.sellers.longitude != null &&
+        (item.quantity_available == null || Number(item.quantity_available) > 0)
     );
 
     res.status(200).json({ listings: visibleListings });

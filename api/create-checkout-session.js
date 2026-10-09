@@ -145,17 +145,34 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: stockProblems.join(' ') });
     }
 
-    // Transformer chaque article en ligne de paiement Stripe
-    const lineItems = lines.map(({ listing, cents }) => ({
-      price_data: {
-        currency: 'eur',
-        product_data: {
-          name: listing.title || 'Récolte Agrivoisin',
+    // Une seule ligne de paiement par annonce, avec sa quantité (comme sur un ticket de caisse) :
+    // « Tomates, quantité 2 » et non deux fois « Tomates ». Le total payé reste exactement le même.
+    const grouped = [];
+    const groupedByListing = {};
+    lines.forEach(({ listing, cents }) => {
+      const key = String(listing.id);
+      if (!groupedByListing[key]) {
+        groupedByListing[key] = { listing, cents, quantity: 0 };
+        grouped.push(groupedByListing[key]);
+      }
+      groupedByListing[key].quantity += 1;
+    });
+
+    const lineItems = grouped.map(({ listing, cents, quantity }) => {
+      const unit = String(listing.unit == null ? '' : listing.unit).trim() || 'kg';
+      return {
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: listing.title || 'Récolte Agrivoisin',
+            // Sous le nom, Stripe affiche le détail avec l'unité : « 2 × 1 kg = 2 kg »
+            description: `${quantity} × 1 ${unit} = ${quantity} ${unitLabel(unit, quantity)}`,
+          },
+          unit_amount: cents,
         },
-        unit_amount: cents,
-      },
-      quantity: 1,
-    }));
+        quantity,
+      };
+    });
 
     // Le détail du panier est rangé dans notre base (calculé par le serveur, jamais par le navigateur).
     // Stripe ne reçoit que le numéro de ce panier : plus de limite due à la taille du message.

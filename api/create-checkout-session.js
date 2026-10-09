@@ -5,6 +5,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
 const MAX_ITEMS = 50; // nombre maximum d'articles par paiement
+const SERVICE_FEE_CENTS = 25;   // frais de service payés par l'acheteur : 0,25 €, une seule fois par commande
+const MIN_ORDER_CENTS = 500;    // commande minimum : 5 € d'articles (sans compter les frais de service)
+
+function formatEuros(cents) {
+  return (cents / 100).toFixed(2).replace('.', ',') + ' €';
+}
 
 // Une quantité s'écrit toujours avec son unité : « 3 kg », « 1 botte », « 3 bottes », « 2 bocaux »
 const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
@@ -145,6 +151,15 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: stockProblems.join(' ') });
     }
 
+    // Commande minimum : 5 € d'articles, sans compter les frais de service
+    const itemsTotalCents = lines.reduce((sum, line) => sum + line.cents, 0);
+    if (itemsTotalCents < MIN_ORDER_CENTS) {
+      return res.status(400).json({
+        error: `Le minimum de commande est de ${formatEuros(MIN_ORDER_CENTS)} d'articles (sans compter les frais de service). ` +
+          `Il vous manque ${formatEuros(MIN_ORDER_CENTS - itemsTotalCents)}.`,
+      });
+    }
+
     // Une seule ligne de paiement par annonce, avec sa quantité (comme sur un ticket de caisse) :
     // « Tomates, quantité 2 » et non deux fois « Tomates ». Le total payé reste exactement le même.
     const grouped = [];
@@ -172,6 +187,19 @@ export default async function handler(req, res) {
         },
         quantity,
       };
+    });
+
+    // Les frais de service de l'acheteur : une seule ligne par commande, même avec plusieurs vendeurs
+    lineItems.push({
+      price_data: {
+        currency: 'eur',
+        product_data: {
+          name: 'Frais de service Agrivoisin',
+          description: 'Une seule fois par commande',
+        },
+        unit_amount: SERVICE_FEE_CENTS,
+      },
+      quantity: 1,
     });
 
     // Le détail du panier est rangé dans notre base (calculé par le serveur, jamais par le navigateur).
@@ -204,6 +232,7 @@ export default async function handler(req, res) {
         metadata: {
           cart_id: savedCart.id,
           buyer_id: buyerId,
+          service_fee_cents: String(SERVICE_FEE_CENTS),
         },
         success_url: `${req.headers.origin}/paiement-succes.html?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.headers.origin}/panier.html`,

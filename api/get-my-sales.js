@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     // Les articles vendus par CE vendeur (jamais l'identité de l'acheteur)
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('order_id, listing_id, price_at_purchase, listings(title)')
+      .select('order_id, listing_id, price_at_purchase, listings(title, unit)')
       .eq('seller_id', seller.id);
 
     if (itemsError) throw itemsError;
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
     const sales = orders.map((order) => {
       const orderItems = items.filter((it) => it.order_id === order.id);
 
-      // Les articles regroupés par annonce, avec la quantité vendue
+      // Les articles regroupés par annonce : quantité vendue, unité et montant de la ligne
       const byListing = {};
       let totalCents = 0;
       orderItems.forEach((it) => {
@@ -91,18 +91,28 @@ export default async function handler(req, res) {
         if (!byListing[key]) {
           byListing[key] = {
             title: it.listings ? it.listings.title : 'Annonce supprimée',
+            // L'unité de l'annonce (kg par défaut) ; « unité » si l'annonce a été supprimée depuis la vente
+            unit: it.listings ? (String(it.listings.unit == null ? '' : it.listings.unit).trim() || 'kg') : 'unité',
             quantity: 0,
+            amountCents: 0,
           };
         }
+        const cents = Math.round(Number(it.price_at_purchase || 0) * 100);
         byListing[key].quantity += 1;
-        totalCents += Math.round(Number(it.price_at_purchase || 0) * 100);
+        byListing[key].amountCents += cents;
+        totalCents += cents;
       });
 
       const payoutRow = payouts.find((p) => p.order_id === order.id);
 
       return {
         createdAt: order.created_at,
-        items: Object.values(byListing),
+        items: Object.values(byListing).map((l) => ({
+          title: l.title,
+          unit: l.unit,
+          quantity: l.quantity,
+          amount: l.amountCents / 100,
+        })),
         totalAmount: totalCents / 100,
         payout: payoutRow
           ? { status: payoutRow.status, autoReleaseAt: payoutRow.auto_release_at, releasedAt: payoutRow.released_at }

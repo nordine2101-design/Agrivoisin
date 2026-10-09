@@ -12,7 +12,7 @@ const BATCH_SIZE = 50;
 const DEFAULT_TIME_BUDGET_MS = 50000;
 
 // ---------------------------------------------------------------------------
-// Verse l'argent d'un versement au vendeur (commission et frais Stripe déduits).
+// Verse l'argent d'un versement au vendeur (commission, frais de carte et frais de service mensuels déduits).
 // fromStatuses : états dans lesquels le versement peut être pris en charge.
 // Sûr même en cas de double demande : un seul traitement peut réserver le versement.
 // ---------------------------------------------------------------------------
@@ -87,9 +87,28 @@ async function releasePayout(payoutId, fromStatuses) {
     }
 
     const orderTotal = siblings.reduce((sum, p) => sum + p.amount_cents, 0);
+    // Chaque vendeur paie sa part des frais de carte, au prorata du montant TOTAL payé par l'acheteur
+    // (articles + frais de service). Agrivoisin garde à sa charge la part des frais de service de l'acheteur
+    // et des articles remboursés. Pour une ancienne commande (sans frais de service), le total payé
+    // est la somme des articles : le calcul est le même qu'avant.
+    const chargedTotal = Math.max(Number(charge.amount) || 0, orderTotal);
     // Arrondi vers le bas : le vendeur ne paie jamais plus que sa part
-    const feeShare = orderTotal > 0 ? Math.floor((totalFee * payout.amount_cents) / orderTotal) : 0;
-    const sellerCents = payout.amount_cents - payout.commission_cents - feeShare;
+    const feeShare = chargedTotal > 0 ? Math.floor((totalFee * payout.amount_cents) / chargedTotal) : 0;
+    const beforeMonthlyFee = payout.amount_cents - payout.commission_cents - feeShare;
+
+    // Les 2 € de frais de service vendeur actif : une seule fois par vendeur et par mois,
+    // prélevés sur ce versement sans jamais dépasser ce qu'il rapporte (le reste, s'il y en a un,
+    // sera pris sur les ventes suivantes du même mois). Un versement retenté ne paie jamais deux fois.
+    const available = Math.max(beforeMonthlyFee, 0);
+    const { data: collectedFee, error: monthlyFeeError } = await supabase.rpc('collect_monthly_fee', {
+      p_payout_id: payout.id,
+      p_available_cents: available,
+    });
+    if (monthlyFeeError) {
+      throw new Error('Frais de service mensuels : ' + monthlyFeeError.message);
+    }
+    const monthlyFeeCents = Math.max(0, Math.min(Number(collectedFee) || 0, available));
+    const sellerCents = beforeMonthlyFee - monthlyFeeCents;
 
     // 5. Montant nul après commission et frais : rien à envoyer
     if (sellerCents <= 0) {

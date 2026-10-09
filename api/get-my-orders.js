@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('id, order_id, seller_id, listing_id, listings(title, image_url, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
+      .select('id, order_id, seller_id, listing_id, price_at_purchase, listings(title, unit, image_url, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
       .in('order_id', orderIds);
 
     if (itemsError) throw itemsError;
@@ -97,14 +97,23 @@ export default async function handler(req, res) {
         }
         sellersMap[it.seller_id].products.push(it.listings ? it.listings.title : 'Produit');
 
-        // Les articles avec leurs horaires de retrait (une seule fois par annonce, même achetée plusieurs fois)
-        const alreadyListed = sellersMap[it.seller_id].items.some((x) => x.listingId === it.listing_id);
-        if (!alreadyListed) {
+        // Les articles avec leurs horaires de retrait (une seule fois par annonce, même achetée plusieurs fois),
+        // avec la quantité achetée, son unité et le montant de la ligne
+        const cents = Math.round(Number(it.price_at_purchase || 0) * 100);
+        const existingItem = sellersMap[it.seller_id].items.find((x) => x.listingId === it.listing_id);
+        if (!existingItem) {
           sellersMap[it.seller_id].items.push({
             listingId: it.listing_id,
             title: it.listings ? it.listings.title : 'Produit',
+            // L'unité de l'annonce (kg par défaut) ; « unité » si l'annonce a été supprimée depuis l'achat
+            unit: it.listings ? (String(it.listings.unit == null ? '' : it.listings.unit).trim() || 'kg') : 'unité',
+            quantity: 1,
+            amountCents: cents,
             pickup_hours: (it.listings && it.listings.listing_pickup_hours) || [],
           });
+        } else {
+          existingItem.quantity += 1;
+          existingItem.amountCents += cents;
         }
       });
 
@@ -118,6 +127,7 @@ export default async function handler(req, res) {
 
         return {
           ...s,
+          items: s.items.map(({ amountCents, ...item }) => ({ ...item, amount: amountCents / 100 })),
           sellerAddress: addressStillVisible ? (addressesById[s.sellerId] || null) : null,
           review: existingReview || null,
           // null pour les anciennes commandes (payées avant l'argent retenu)

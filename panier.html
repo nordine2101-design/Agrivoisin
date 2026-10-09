@@ -96,6 +96,18 @@
 </footer>
 
 <script src="script.js"></script>
+<style>
+  .cart-item-row.cart-line { flex-direction:column; align-items:stretch; gap:8px; }
+  .cart-line-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .cart-line-calc { font-size:0.95rem; color:var(--ink); }
+  .cart-line-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .cart-line-unitprice { font-size:0.85rem; color:var(--soil); }
+  .cart-line-qty { display:inline-flex; align-items:center; gap:10px; }
+  .cart-qty-value { min-width:64px; text-align:center; font-weight:600; color:var(--ink); }
+  .cart-qty-btn { background:var(--cream-soft); color:var(--soil); width:28px; height:28px; border-radius:50%; font-size:1rem; font-weight:700; line-height:1; cursor:pointer; }
+  .cart-qty-btn:hover:not(:disabled) { background:#e6e0d3; }
+  .cart-qty-btn:disabled { opacity:0.4; cursor:not-allowed; }
+</style>
 <script>
   const supabaseClient = window.supabase.createClient(
     'https://eipksfszadhratfvavvs.supabase.co',
@@ -109,6 +121,85 @@
   function parsePrice(priceText) {
     const match = priceText.replace(',', '.').match(/[\d.]+/);
     return match ? parseFloat(match[0]) : 0;
+  }
+
+  // ---------- Unités : une quantité s'écrit toujours avec son unité ----------
+
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  // Met un mot au pluriel : « botte » -> « bottes », « bocal » -> « bocaux », « kg » reste « kg »
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'kg';
+    if (count <= 1) return u;
+    // « botte de radis » -> « bottes de radis », « pot de 500g » -> « pots de 500g »
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u; // autre unité en plusieurs mots : on n'y touche pas
+    return pluralWord(u);
+  }
+
+  // Unité et stock des annonces, relus dans la base (le panier fonctionne aussi sans)
+  let listingInfo = {};
+
+  function unitFromPrice(priceText) {
+    const m = String(priceText || '').match(/€\s*\/\s*(.+)$/);
+    return m ? m[1].trim() : 'kg';
+  }
+
+  function cartKey(item) {
+    return item.listingId ? 'id:' + item.listingId : 'nom:' + item.name + '|' + item.price;
+  }
+
+  // Regroupe les unités du panier par annonce : une seule ligne « Tomates · 2 kg »
+  function groupCart(cart) {
+    const groups = [];
+    const byKey = {};
+    cart.forEach((item) => {
+      const key = cartKey(item);
+      if (!byKey[key]) {
+        const info = item.listingId ? listingInfo[String(item.listingId)] : null;
+        byKey[key] = {
+          key,
+          name: item.name,
+          price: item.price,
+          unit: (info && info.unit) || unitFromPrice(item.price),
+          unitCents: Math.round(parsePrice(item.price) * 100),
+          qty: 0,
+          stock: info && info.quantity_available != null ? Number(info.quantity_available) : null,
+          sample: item,
+        };
+        groups.push(byKey[key]);
+      }
+      byKey[key].qty += 1;
+    });
+    return groups;
+  }
+
+  function formatEuros(cents) {
+    return (cents / 100).toFixed(2).replace('.', ',') + ' €';
+  }
+
+  function saveCart(cart) {
+    localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
+    const cartCountEl = document.querySelector('.cart-count');
+    if (cartCountEl) cartCountEl.textContent = cart.length;
+    renderCart();
+  }
+
+  function makeRoundButton(className, label, text) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = className;
+    btn.setAttribute('aria-label', label);
+    btn.textContent = text;
+    return btn;
   }
 
   function renderCart() {
@@ -133,50 +224,112 @@
     contentEl.style.display = 'block';
 
     itemsEl.innerHTML = '';
-    let total = 0;
+    let totalCents = 0;
 
-    cart.forEach((item, index) => {
-      const price = parsePrice(item.price);
-      total += price;
+    groupCart(cart).forEach((g) => {
+      const lineCents = g.unitCents * g.qty;
+      totalCents += lineCents;
 
       const row = document.createElement('div');
-      row.className = 'cart-item-row';
+      row.className = 'cart-item-row cart-line';
 
-      // Nom et prix affichés comme du simple texte (jamais interprétés comme du code)
+      // Première ligne du ticket : le nom, et le retrait de toute la ligne
+      const top = document.createElement('div');
+      top.className = 'cart-line-top';
+
+      // Nom, prix et unité affichés comme du simple texte (jamais interprétés comme du code)
       const nameEl = document.createElement('span');
       nameEl.className = 'cart-item-name';
-      nameEl.textContent = item.name;
+      nameEl.textContent = g.name;
 
       const priceEl = document.createElement('span');
       priceEl.className = 'cart-item-price';
-      priceEl.textContent = item.price;
+      priceEl.textContent = formatEuros(lineCents);
 
-      const removeBtn = document.createElement('button');
-      removeBtn.className = 'cart-item-remove';
-      removeBtn.dataset.index = index;
-      removeBtn.setAttribute('aria-label', 'Retirer');
-      removeBtn.textContent = '✕';
+      const removeBtn = makeRoundButton('cart-item-remove', 'Retirer ' + g.name + ' du panier', '✕');
+      removeBtn.addEventListener('click', () => {
+        saveCart(getCart().filter((item) => cartKey(item) !== g.key));
+      });
 
-      row.appendChild(nameEl);
-      row.appendChild(priceEl);
-      row.appendChild(removeBtn);
+      top.appendChild(nameEl);
+      top.appendChild(removeBtn);
+
+      // La ligne de calcul du ticket : « 2 × 1 kg = 2 kg, soit 6,00 € »
+      const calc = document.createElement('div');
+      calc.className = 'cart-line-calc';
+      calc.appendChild(document.createTextNode(
+        g.qty + ' × 1 ' + g.unit + ' = ' + g.qty + ' ' + unitLabel(g.unit, g.qty) + ', soit '
+      ));
+      calc.appendChild(priceEl);
+
+      // Deuxième ligne : le prix à l'unité, et la quantité avec son unité
+      const bottom = document.createElement('div');
+      bottom.className = 'cart-line-bottom';
+
+      const unitPriceEl = document.createElement('span');
+      unitPriceEl.className = 'cart-line-unitprice';
+      unitPriceEl.textContent = formatEuros(g.unitCents) + '/' + g.unit;
+
+      const qtyBox = document.createElement('span');
+      qtyBox.className = 'cart-line-qty';
+
+      const minusBtn = makeRoundButton('cart-qty-btn cart-qty-minus', 'Une unité de moins : ' + g.name, '−');
+      minusBtn.addEventListener('click', () => {
+        const current = getCart();
+        for (let i = current.length - 1; i >= 0; i--) {
+          if (cartKey(current[i]) === g.key) {
+            current.splice(i, 1);
+            break;
+          }
+        }
+        saveCart(current);
+      });
+
+      const qtyEl = document.createElement('span');
+      qtyEl.className = 'cart-qty-value';
+      qtyEl.textContent = g.qty + ' ' + unitLabel(g.unit, g.qty);
+
+      const plusBtn = makeRoundButton('cart-qty-btn cart-qty-plus', 'Une unité de plus : ' + g.name, '+');
+      // Jamais plus que ce qui reste en stock (le serveur le vérifie aussi au paiement)
+      const atMax = g.stock !== null && g.qty >= g.stock;
+      if (atMax) {
+        plusBtn.disabled = true;
+        plusBtn.title = 'Il ne reste que ' + g.stock + ' ' + unitLabel(g.unit, g.stock);
+      }
+      plusBtn.addEventListener('click', () => {
+        if (atMax) return;
+        const current = getCart();
+        current.push(Object.assign({}, g.sample));
+        saveCart(current);
+      });
+
+      qtyBox.appendChild(minusBtn);
+      qtyBox.appendChild(qtyEl);
+      qtyBox.appendChild(plusBtn);
+
+      bottom.appendChild(unitPriceEl);
+      bottom.appendChild(qtyBox);
+
+      row.appendChild(top);
+      row.appendChild(calc);
+      row.appendChild(bottom);
       itemsEl.appendChild(row);
     });
 
-    document.getElementById('cartSubtotal').textContent = total.toFixed(2).replace('.', ',') + ' €';
-    document.getElementById('cartTotal').textContent = total.toFixed(2).replace('.', ',') + ' €';
-
-    document.querySelectorAll('.cart-item-remove').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const cart = getCart();
-        cart.splice(parseInt(btn.dataset.index), 1);
-        localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
-        renderCart();
-        const cartCountEl = document.querySelector('.cart-count');
-        if (cartCountEl) cartCountEl.textContent = cart.length;
-      });
-    });
+    document.getElementById('cartSubtotal').textContent = formatEuros(totalCents);
+    document.getElementById('cartTotal').textContent = formatEuros(totalCents);
   }
+
+  // On relit l'unité exacte et le stock de chaque annonce, puis on réaffiche le panier
+  fetch('/api/get-listings')
+    .then((res) => res.json())
+    .then((data) => {
+      (data.listings || []).forEach((l) => {
+        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available };
+      });
+      renderCart();
+    })
+    .catch((err) => console.error('Erreur chargement des annonces du panier :', err));
 
   // Le paiement est réservé aux personnes connectées
   const checkoutBtn = document.getElementById('checkoutBtn');

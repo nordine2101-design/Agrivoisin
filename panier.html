@@ -100,6 +100,8 @@
   .cart-item-row.cart-line { flex-direction:column; align-items:stretch; gap:8px; }
   .cart-line-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .cart-line-calc { font-size:0.95rem; color:var(--ink); }
+  .cart-line-note { font-size:0.85rem; font-weight:600; color:#C8352F; }
+  .cart-checkout-btn:disabled { opacity:0.5; cursor:not-allowed; box-shadow:none; }
   .cart-line-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .cart-line-unitprice { font-size:0.85rem; color:var(--soil); }
   .cart-line-qty { display:inline-flex; align-items:center; gap:10px; }
@@ -147,6 +149,8 @@
 
   // Unité et stock des annonces, relus dans la base (le panier fonctionne aussi sans)
   let listingInfo = {};
+  // Vrai seulement si la liste des annonces a bien été relue : sinon on ne dit jamais « plus disponible »
+  let listingInfoLoaded = false;
 
   function unitFromPrice(priceText) {
     const m = String(priceText || '').match(/€\s*\/\s*(.+)$/);
@@ -174,12 +178,32 @@
           qty: 0,
           stock: info && info.quantity_available != null ? Number(info.quantity_available) : null,
           sample: item,
+          // L'annonce n'apparaît plus sur le site (épuisée, supprimée, vendeur incomplet) : elle n'est plus achetable
+          unavailable: !!(listingInfoLoaded && item.listingId && !info),
         };
         groups.push(byKey[key]);
       }
       byKey[key].qty += 1;
     });
     return groups;
+  }
+
+  // Le bouton de paiement : grisé tant qu'un article du panier n'est plus disponible ou dépasse le stock
+  const PAY_LABEL = 'Payer en toute sécurité';
+  const LOGIN_LABEL = 'Se connecter pour payer';
+  const FIX_LABEL = 'Corrigez votre panier pour payer';
+  let isLoggedIn = null;
+  let cartHasProblem = false;
+
+  function updateCheckoutButton() {
+    const btn = document.getElementById('checkoutBtn');
+    if (cartHasProblem) {
+      btn.disabled = true;
+      btn.textContent = FIX_LABEL;
+    } else {
+      btn.disabled = false;
+      btn.textContent = isLoggedIn === false ? LOGIN_LABEL : PAY_LABEL;
+    }
   }
 
   function formatEuros(cents) {
@@ -225,6 +249,7 @@
 
     itemsEl.innerHTML = '';
     let totalCents = 0;
+    let problem = false;
 
     groupCart(cart).forEach((g) => {
       const lineCents = g.unitCents * g.qty;
@@ -291,8 +316,11 @@
 
       const plusBtn = makeRoundButton('cart-qty-btn cart-qty-plus', 'Une unité de plus : ' + g.name, '+');
       // Jamais plus que ce qui reste en stock (le serveur le vérifie aussi au paiement)
-      const atMax = g.stock !== null && g.qty >= g.stock;
-      if (atMax) {
+      const atMax = g.unavailable || (g.stock !== null && g.qty >= g.stock);
+      if (g.unavailable) {
+        plusBtn.disabled = true;
+        plusBtn.title = 'Cette annonce n\'est plus disponible';
+      } else if (atMax) {
         plusBtn.disabled = true;
         plusBtn.title = 'Il ne reste que ' + g.stock + ' ' + unitLabel(g.unit, g.stock);
       }
@@ -313,8 +341,27 @@
       row.appendChild(top);
       row.appendChild(calc);
       row.appendChild(bottom);
+
+      // Le problème est dit en rouge sous la ligne, avec l'unité
+      let note = '';
+      if (g.unavailable) {
+        note = 'Cette annonce n\'est plus disponible. Retirez-la de votre panier.';
+      } else if (g.stock !== null && g.qty > g.stock) {
+        note = 'Il ne reste que ' + g.stock + ' ' + unitLabel(g.unit, g.stock) + ' : réduisez la quantité.';
+      }
+      if (note) {
+        problem = true;
+        const noteEl = document.createElement('div');
+        noteEl.className = 'cart-line-note';
+        noteEl.textContent = note;
+        row.appendChild(noteEl);
+      }
+
       itemsEl.appendChild(row);
     });
+
+    cartHasProblem = problem;
+    updateCheckoutButton();
 
     document.getElementById('cartSubtotal').textContent = formatEuros(totalCents);
     document.getElementById('cartTotal').textContent = formatEuros(totalCents);
@@ -322,26 +369,30 @@
 
   // On relit l'unité exacte et le stock de chaque annonce, puis on réaffiche le panier
   fetch('/api/get-listings')
-    .then((res) => res.json())
-    .then((data) => {
-      (data.listings || []).forEach((l) => {
+    .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok || !Array.isArray(data.listings)) {
+        throw new Error('liste des annonces indisponible');
+      }
+      data.listings.forEach((l) => {
         listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available };
       });
+      listingInfoLoaded = true;
       renderCart();
     })
     .catch((err) => console.error('Erreur chargement des annonces du panier :', err));
 
   // Le paiement est réservé aux personnes connectées
   const checkoutBtn = document.getElementById('checkoutBtn');
-  const PAY_LABEL = 'Payer en toute sécurité';
-  const LOGIN_LABEL = 'Se connecter pour payer';
   const LOGIN_PAGE = 'connexion.html?retour=panier.html';
 
   supabaseClient.auth.getSession().then(({ data: { session } }) => {
-    checkoutBtn.textContent = session ? PAY_LABEL : LOGIN_LABEL;
+    isLoggedIn = !!session;
+    updateCheckoutButton();
   });
 
   checkoutBtn.addEventListener('click', async () => {
+    if (cartHasProblem) return;
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     // Pas connecté : on envoie vers la connexion, le panier est conservé et on revient ici ensuite
@@ -380,8 +431,7 @@
 
     } catch (err) {
       alert('Erreur : ' + err.message);
-      checkoutBtn.textContent = PAY_LABEL;
-      checkoutBtn.disabled = false;
+      updateCheckoutButton();
     }
   });
 

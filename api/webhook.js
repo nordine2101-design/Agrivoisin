@@ -5,7 +5,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
 // --- Réglages de l'argent retenu ---
-const COMMISSION_RATE = 0.10; // commission d'Agrivoisin : 10 % du prix, par vendeur et par commande
+const COMMISSION_RATE = 0.15; // commission d'Agrivoisin : 15 % du prix, par vendeur et par commande
 const AUTO_RELEASE_DAYS = 3;  // délai avant le versement automatique au vendeur
 
 export const config = {
@@ -21,6 +21,14 @@ function buffer(readable) {
     readable.on('end', () => resolve(Buffer.concat(chunks)));
     readable.on('error', reject);
   });
+}
+
+// Les frais de service payés par l'acheteur (0,25 € par commande), annoncés par le paiement.
+// Valeur prudente : un entier de 0 à 100 centimes, sinon 0.
+function readServiceFee(session) {
+  const raw = session.metadata?.service_fee_cents;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 && value <= 100 ? value : 0;
 }
 
 // Retrouve les articles d'un paiement : [{ listing_id, seller_id, cents }]
@@ -149,6 +157,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ received: true });
     }
 
+    const serviceFeeCents = readServiceFee(session);
+
     // 2. Anti-doublon : on réserve la commande avec l'identifiant du paiement Stripe.
     //    Si ce paiement a déjà été traité, la base refuse (identifiant déjà présent) et on s'arrête là.
     const { data: order, error: orderError } = await supabase
@@ -156,6 +166,7 @@ export default async function handler(req, res) {
       .insert({
         buyer_id: buyerId,
         total_amount: session.amount_total / 100,
+        service_fee_cents: serviceFeeCents,
         stripe_session_id: session.id,
       })
       .select()
@@ -172,8 +183,8 @@ export default async function handler(req, res) {
 
     // Petite vérification de cohérence (informative)
     const linesTotal = lines.reduce((sum, l) => sum + l.cents, 0);
-    if (linesTotal !== session.amount_total) {
-      console.warn(`Paiement ${session.id} : total des articles (${linesTotal}) différent du montant payé (${session.amount_total}).`);
+    if (linesTotal + serviceFeeCents !== session.amount_total) {
+      console.warn(`Paiement ${session.id} : total des articles (${linesTotal}) et frais de service (${serviceFeeCents}) différents du montant payé (${session.amount_total}).`);
     }
 
     // 3. Le stock : on prend les unités achetées (jamais plus que ce qui reste)
@@ -270,6 +281,8 @@ export default async function handler(req, res) {
     // 7. Le remboursement des articles qui n'étaient plus en stock vient EN DERNIER :
     //    tout le reste est déjà enregistré. La clé empêche de rembourser deux fois si Stripe réessaie.
     if (refundCents > 0) {
+      // Plus rien à livrer : les frais de service de l'acheteur sont remboursés avec le reste
+      const totalRefundCents = refundCents + (servedLines.length === 0 ? serviceFeeCents : 0);
       try {
         if (!session.payment_intent) {
           throw new Error('paiement Stripe introuvable');
@@ -277,12 +290,12 @@ export default async function handler(req, res) {
         await stripe.refunds.create(
           {
             payment_intent: session.payment_intent,
-            amount: refundCents,
+            amount: totalRefundCents,
             metadata: { raison: 'stock_epuise', paiement: session.id },
           },
           { idempotencyKey: 'stock-refund-' + session.id }
         );
-        console.log(`Paiement ${session.id} : ${refundCents} centimes remboursés (articles plus en stock).`);
+        console.log(`Paiement ${session.id} : ${totalRefundCents} centimes remboursés (articles plus en stock).`);
       } catch (err) {
         console.error('Remboursement impossible :', err.message);
         await rollbackOrder(order.id, stock.taken);

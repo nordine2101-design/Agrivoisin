@@ -32,11 +32,16 @@
           <span>Sous-total</span>
           <span id="cartSubtotal">0,00 €</span>
         </div>
+        <div class="cart-summary-row">
+          <span>Frais de service <span class="cart-fee-hint">(une seule fois par commande)</span></span>
+          <span id="cartServiceFee">0,25 €</span>
+        </div>
         <div class="cart-summary-row cart-summary-total">
           <span>Total à payer</span>
           <span id="cartTotal">0,00 €</span>
         </div>
 
+        <p id="cartMinNote" class="cart-min-note" style="display:none;"></p>
         <button class="btn btn-primary cart-checkout-btn" id="checkoutBtn">Payer en toute sécurité</button>
 
         <p class="product-trust-note" style="margin-top:20px;">
@@ -101,6 +106,9 @@
   .cart-line-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .cart-line-calc { font-size:0.95rem; color:var(--ink); }
   .cart-line-note { font-size:0.85rem; font-weight:600; color:#C8352F; }
+  .cart-fee-hint { font-size:0.75rem; color:#888; }
+  .cart-summary p.cart-min-note { font-size:0.85rem; font-weight:600; color:#C8352F; margin:0 0 10px; text-align:left; }
+  #cartServiceFee, #cartSubtotal, #cartTotal { white-space:nowrap; }
   .cart-checkout-btn:disabled { opacity:0.5; cursor:not-allowed; box-shadow:none; }
   .cart-line-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .cart-line-unitprice { font-size:0.85rem; color:var(--soil); }
@@ -192,14 +200,22 @@
   const PAY_LABEL = 'Payer en toute sécurité';
   const LOGIN_LABEL = 'Se connecter pour payer';
   const FIX_LABEL = 'Corrigez votre panier pour payer';
+  const MIN_LABEL = 'Ajoutez des articles pour payer';
+  // Les réglages du plan (le serveur les vérifie aussi au paiement)
+  const SERVICE_FEE_CENTS = 25;  // frais de service de l'acheteur, une seule fois par commande
+  const MIN_ORDER_CENTS = 500;   // commande minimum : 5 € d'articles, sans compter les frais de service
   let isLoggedIn = null;
   let cartHasProblem = false;
+  let belowMinimum = false;
 
   function updateCheckoutButton() {
     const btn = document.getElementById('checkoutBtn');
     if (cartHasProblem) {
       btn.disabled = true;
       btn.textContent = FIX_LABEL;
+    } else if (belowMinimum) {
+      btn.disabled = true;
+      btn.textContent = MIN_LABEL;
     } else {
       btn.disabled = false;
       btn.textContent = isLoggedIn === false ? LOGIN_LABEL : PAY_LABEL;
@@ -361,10 +377,21 @@
     });
 
     cartHasProblem = problem;
+    belowMinimum = totalCents < MIN_ORDER_CENTS;
     updateCheckoutButton();
 
+    // Commande minimum : dite clairement, avec ce qu'il manque
+    const minNote = document.getElementById('cartMinNote');
+    if (belowMinimum) {
+      minNote.textContent = 'Commande minimum : ' + formatEuros(MIN_ORDER_CENTS) + " d'articles (sans compter les frais de service). Il vous manque " + formatEuros(MIN_ORDER_CENTS - totalCents) + '.';
+      minNote.style.display = 'block';
+    } else {
+      minNote.style.display = 'none';
+    }
+
     document.getElementById('cartSubtotal').textContent = formatEuros(totalCents);
-    document.getElementById('cartTotal').textContent = formatEuros(totalCents);
+    document.getElementById('cartServiceFee').textContent = formatEuros(SERVICE_FEE_CENTS);
+    document.getElementById('cartTotal').textContent = formatEuros(totalCents + SERVICE_FEE_CENTS);
   }
 
   // On relit l'unité exacte et le stock de chaque annonce, puis on réaffiche le panier
@@ -392,7 +419,7 @@
   });
 
   checkoutBtn.addEventListener('click', async () => {
-    if (cartHasProblem) return;
+    if (cartHasProblem || belowMinimum) return;
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     // Pas connecté : on envoie vers la connexion, le panier est conservé et on revient ici ensuite

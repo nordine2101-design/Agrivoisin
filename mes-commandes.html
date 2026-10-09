@@ -238,6 +238,12 @@
       '</div>';
   }
 
+  // Un avis n'est possible qu'une fois la réception confirmée (paiement versé).
+  // Les anciennes commandes, sans versement enregistré, ne sont pas concernées.
+  function reviewAllowed(seller) {
+    return !seller.payout || seller.payout.status === 'verse';
+  }
+
   function payoutDoneHtml() {
     return '<div class="payout-box payout-done"><p>Paiement versé au vendeur.</p></div>';
   }
@@ -313,6 +319,15 @@
       }
 
       box.outerHTML = data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml();
+
+      // Réception confirmée : l'acheteur peut maintenant laisser son avis
+      if (data.status !== 'probleme' && sellerBlock) {
+        const reviewSlot = sellerBlock.querySelector('.review-slot');
+        if (reviewSlot && reviewSlot.innerHTML.trim() === '') {
+          reviewSlot.innerHTML = renderStrawberryPicker(orderId, sellerId);
+          attachReviewFormHandlers();
+        }
+      }
     } catch (err) {
       errorEl.textContent = err.message;
       errorEl.style.display = 'block';
@@ -377,6 +392,8 @@
 
   function attachReviewFormHandlers() {
     document.querySelectorAll('.review-form').forEach((form) => {
+      if (form.dataset.bound) return;
+      form.dataset.bound = '1';
       form.addEventListener('submit', async function (e) {
         e.preventDefault();
         const orderId = form.dataset.orderId;
@@ -456,7 +473,7 @@
               ${renderAddressSection(seller)}
               ${renderPickupSection(seller.items)}
               ${renderPayoutSection(order.orderId, seller)}
-              ${seller.review ? renderExistingReview(seller.review, false) : renderStrawberryPicker(order.orderId, seller.sellerId)}
+              <div class="review-slot">${seller.review ? renderExistingReview(seller.review, false) : (reviewAllowed(seller) ? renderStrawberryPicker(order.orderId, seller.sellerId) : '')}</div>
             </div>
           `;
         });

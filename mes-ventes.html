@@ -110,6 +110,28 @@
     return Number(value).toFixed(2).replace('.', ',') + ' €';
   }
 
+  // ---------- Unités : une quantité s'écrit toujours avec son unité ----------
+
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  // Met un mot au pluriel : « botte » -> « bottes », « bocal » -> « bocaux », « kg » reste « kg »
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'unité';
+    if (count <= 1) return u;
+    // « botte de radis » -> « bottes de radis », « pot de 500g » -> « pots de 500g »
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u; // autre unité en plusieurs mots : on n'y touche pas
+    return pluralWord(u);
+  }
+
   // État de l'argent pour cette vente
   function renderMoneyBox(payout) {
     // Anciennes ventes (avant l'argent retenu) : rien à afficher
@@ -137,8 +159,11 @@
   function renderSale(sale) {
     let itemsHtml = '';
     (sale.items || []).forEach((item) => {
-      const quantity = item.quantity > 1 ? ' × ' + item.quantity : '';
-      itemsHtml += '<div class="sale-item">' + escapeHtml(item.title) + escapeHtml(quantity) + '</div>';
+      const qty = Number(item.quantity) || 1;
+      const unit = String(item.unit == null ? '' : item.unit).trim() || 'unité';
+      const calc = qty + ' × 1 ' + unit + ' = ' + qty + ' ' + unitLabel(unit, qty) +
+        (item.amount != null ? ', soit ' + formatAmount(item.amount) : '');
+      itemsHtml += '<div class="sale-item"><strong>' + escapeHtml(item.title) + '</strong> : ' + escapeHtml(calc) + '</div>';
     });
 
     return (

@@ -6,6 +6,25 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 
 const MAX_ITEMS = 50; // nombre maximum d'articles par paiement
 
+// Une quantité s'écrit toujours avec son unité : « 3 kg », « 1 botte », « 3 bottes », « 2 bocaux »
+const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+function pluralWord(word) {
+  if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+  if (/[sxz]$/i.test(word)) return word;
+  if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+  return word + 's';
+}
+
+function unitLabel(unit, count) {
+  const u = String(unit == null ? '' : unit).trim() || 'kg';
+  if (count <= 1) return u;
+  const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+  if (withDe) return pluralWord(withDe[1]) + withDe[2];
+  if (/[\s\d]/.test(u)) return u;
+  return pluralWord(u);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -52,7 +71,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, sellers(id, city, latitude, longitude, stripe_account_id)')
+      .select('id, title, price, unit, quantity_available, sellers(id, city, latitude, longitude, stripe_account_id)')
       .in('id', listingIds);
 
     if (listingsError) {
@@ -97,6 +116,33 @@ export default async function handler(req, res) {
       }
 
       lines.push({ listing, seller, cents });
+    }
+
+    // Le stock : jamais plus d'unités achetées qu'il n'en reste (la quantité est relue dans notre base)
+    const requested = {};
+    cart.forEach((item) => {
+      const key = String(item.listingId);
+      requested[key] = (requested[key] || 0) + 1;
+    });
+
+    const stockProblems = [];
+    Object.keys(requested).forEach((key) => {
+      const listing = listingsById[key];
+      if (!listing || listing.quantity_available == null) return; // annonce sans limite
+      const stock = Number(listing.quantity_available);
+      const title = String(listing.title || 'cette annonce').slice(0, 60);
+      if (stock <= 0) {
+        stockProblems.push(`L'annonce « ${title} » est épuisée. Retirez-la de votre panier.`);
+      } else if (requested[key] > stock) {
+        stockProblems.push(
+          `Il ne reste que ${stock} ${unitLabel(listing.unit, stock)} de « ${title} », ` +
+          `et votre panier en contient ${requested[key]} ${unitLabel(listing.unit, requested[key])}. Réduisez la quantité.`
+        );
+      }
+    });
+
+    if (stockProblems.length > 0) {
+      return res.status(409).json({ error: stockProblems.join(' ') });
     }
 
     // Transformer chaque article en ligne de paiement Stripe

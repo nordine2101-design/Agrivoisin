@@ -4,12 +4,40 @@ import { createClient } from '@supabase/supabase-js';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
+// Les vendeurs sont virés à leur banque une seule fois par mois, le 5
+const MONTHLY_PAYOUT_DAY = 5;
+
 // Un versement "en cours" depuis plus d'une heure après son échéance est considéré comme bloqué et repris
 const STUCK_AFTER_MS = 60 * 60 * 1000;
 // Nombre maximum de versements traités à chaque passage automatique
 const BATCH_SIZE = 50;
 // Temps maximum consacré à un passage automatique (en millisecondes)
 const DEFAULT_TIME_BUDGET_MS = 50000;
+
+// ---------------------------------------------------------------------------
+// S'assure que le compte de paiement du vendeur est viré à sa banque une seule fois par mois, le 5.
+// Les comptes créés avant ce choix reçoivent le réglage au prochain versement.
+// Jamais bloquant : si cela échoue, le versement continue normalement (l'argent du vendeur passe avant).
+// ---------------------------------------------------------------------------
+async function ensureMonthlyPayouts(accountId) {
+  try {
+    const account = await stripe.accounts.retrieve(accountId);
+    const schedule = account && account.settings && account.settings.payouts && account.settings.payouts.schedule;
+    if (schedule && schedule.interval === 'monthly' && schedule.monthly_anchor === MONTHLY_PAYOUT_DAY) {
+      return;
+    }
+    await stripe.accounts.update(accountId, {
+      settings: {
+        payouts: {
+          schedule: { interval: 'monthly', monthly_anchor: MONTHLY_PAYOUT_DAY },
+        },
+      },
+    });
+    console.log(`Compte ${accountId} : virement mensuel le ${MONTHLY_PAYOUT_DAY} activé.`);
+  } catch (err) {
+    console.error(`Compte ${accountId} : virement mensuel non appliqué (le versement continue) :`, err.message);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Verse l'argent d'un versement au vendeur (commission, frais de carte et frais de service mensuels déduits).
@@ -44,6 +72,8 @@ async function releasePayout(payoutId, fromStatuses) {
     if (sellerError || !seller || !seller.stripe_account_id) {
       throw new Error('Vendeur sans compte de paiement');
     }
+
+    await ensureMonthlyPayouts(seller.stripe_account_id);
 
     // 3. Le paiement de l'acheteur chez Stripe (retrouvé si on ne l'avait pas noté)
     let chargeId = payout.stripe_charge_id;

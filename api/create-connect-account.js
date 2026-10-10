@@ -4,6 +4,10 @@ import { createClient } from '@supabase/supabase-js';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
+// Les vendeurs sont virés à leur banque une seule fois par mois, le 5 :
+// Stripe garde leur argent sur leur compte de paiement et le vire ce jour-là.
+const MONTHLY_PAYOUT_DAY = 5;
+
 // --- Vérification ville + code postal (annuaire officiel des communes) ---
 function normalizeName(value) {
   return String(value || '')
@@ -164,6 +168,11 @@ export default async function handler(req, res) {
         capabilities: {
           transfers: { requested: true },
           card_payments: { requested: true },
+        },
+        settings: {
+          payouts: {
+            schedule: { interval: 'monthly', monthly_anchor: MONTHLY_PAYOUT_DAY },
+          },
         },
       });
       stripeAccountId = account.id;

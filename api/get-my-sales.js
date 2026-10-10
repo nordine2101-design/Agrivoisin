@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('order_id, status, auto_release_at, released_at')
+      .select('order_id, status, auto_release_at, released_at, amount_cents, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents')
       .eq('seller_id', seller.id)
       .in('order_id', shownOrderIds);
 
@@ -105,6 +105,27 @@ export default async function handler(req, res) {
 
       const payoutRow = payouts.find((p) => p.order_id === order.id);
 
+      // Ce que le vendeur voit de son argent (ses propres chiffres, jamais rien sur l'acheteur) :
+      // - argent versé : la commission, les frais retirés et le montant reçu
+      // - argent en attente : la commission et ce qui reste après elle (les frais de carte et les 2 € du mois
+      //   ne sont connus qu'au versement)
+      // - problème signalé : aucun chiffre tant que la situation n'est pas réglée
+      const toEuros = (cents) => (Number(cents) || 0) / 100;
+      let money = null;
+      if (payoutRow && payoutRow.status === 'verse') {
+        money = {
+          commission: toEuros(payoutRow.commission_cents),
+          cardFee: toEuros(payoutRow.stripe_fee_cents),
+          monthlyFee: toEuros(payoutRow.monthly_fee_cents),
+          received: payoutRow.seller_cents == null ? null : toEuros(payoutRow.seller_cents),
+        };
+      } else if (payoutRow && (payoutRow.status === 'en_attente' || payoutRow.status === 'en_cours')) {
+        money = {
+          commission: toEuros(payoutRow.commission_cents),
+          afterCommission: toEuros((Number(payoutRow.amount_cents) || 0) - (Number(payoutRow.commission_cents) || 0)),
+        };
+      }
+
       return {
         createdAt: order.created_at,
         items: Object.values(byListing).map((l) => ({
@@ -115,7 +136,7 @@ export default async function handler(req, res) {
         })),
         totalAmount: totalCents / 100,
         payout: payoutRow
-          ? { status: payoutRow.status, autoReleaseAt: payoutRow.auto_release_at, releasedAt: payoutRow.released_at }
+          ? { status: payoutRow.status, autoReleaseAt: payoutRow.auto_release_at, releasedAt: payoutRow.released_at, money }
           : null,
       };
     });

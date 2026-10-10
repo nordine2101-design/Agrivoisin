@@ -156,6 +156,43 @@
     return '<div class="money-box">L\'argent est gardé par Agrivoisin. Il vous sera versé dès que l\'acheteur confirme avoir reçu sa commande, ou automatiquement ' + escapeHtml(when) + '.</div>';
   }
 
+  // Le détail de l'argent d'une vente, avec les chiffres du vendeur lui-même :
+  // - versé : commission, frais de carte, frais de service du mois (s'il y en a eu) et « Vous recevez »
+  // - en attente : commission et « Après commission » (les frais ne sont connus qu'au versement)
+  function renderMoneyDetail(sale) {
+    const payout = sale.payout;
+    const m = payout && payout.money;
+    if (!m) return '';
+
+    const total = Number(sale.totalAmount) || 0;
+    const percent = total > 0 ? Math.round((Number(m.commission) / total) * 100) : null;
+    const commissionLabel = 'Commission Agrivoisin' + (percent != null ? ' (' + percent + ' %)' : '');
+    const line = (label, value, className) =>
+      '<div class="money-line' + (className ? ' ' + className : '') + '"><span>' + escapeHtml(label) +
+      '</span><span class="money-amount">' + escapeHtml(value) + '</span></div>';
+
+    if (payout.status === 'verse') {
+      // Ancienne vente sans montant reçu enregistré : rien d'inventé
+      if (m.received == null) return '';
+      let html = line(commissionLabel, '− ' + formatAmount(m.commission));
+      html += line('Frais de carte', '− ' + formatAmount(m.cardFee));
+      if (Number(m.monthlyFee) > 0) {
+        html += line('Frais de service du mois', '− ' + formatAmount(m.monthlyFee));
+      }
+      html += line('Vous recevez', formatAmount(m.received), 'money-total');
+      return '<div class="money-detail">' + html + '</div>';
+    }
+
+    if (m.afterCommission != null) {
+      return '<div class="money-detail">' +
+        line(commissionLabel, '− ' + formatAmount(m.commission)) +
+        line('Après commission', formatAmount(m.afterCommission), 'money-total') +
+        '<p class="money-note">Les frais de carte et, une seule fois par mois, 2 € de frais de service seront retirés au versement.</p>' +
+        '</div>';
+    }
+    return '';
+  }
+
   function renderSale(sale) {
     let itemsHtml = '';
     (sale.items || []).forEach((item) => {
@@ -172,6 +209,7 @@
       '<span class="sale-total">' + escapeHtml(formatAmount(sale.totalAmount)) + '</span></div>' +
       itemsHtml +
       renderMoneyBox(sale.payout) +
+      renderMoneyDetail(sale) +
       '</div>'
     );
   }
@@ -210,7 +248,9 @@
         return;
       }
 
-      salesContainer.innerHTML = sales.map(renderSale).join('');
+      salesContainer.innerHTML =
+        '<p class="payout-note">Votre argent est viré à votre banque une fois par mois, le 5.</p>' +
+        sales.map(renderSale).join('');
 
     } catch (err) {
       console.error(err);
@@ -230,6 +270,12 @@
   .sale-total { font-weight:700; font-size:0.95rem; color:var(--leaf-deep); white-space:nowrap; }
   .sale-item { font-size:0.9rem; line-height:1.6; }
   .money-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin-top:10px; font-size:0.85rem; line-height:1.5; }
+  .money-detail { margin-top:10px; font-size:0.85rem; color:#6B5842; }
+  .money-line { display:flex; justify-content:space-between; gap:12px; padding:2px 0; }
+  .money-amount { white-space:nowrap; }
+  .money-total { border-top:1px solid #e6e0d3; margin-top:4px; padding-top:6px; font-weight:700; color:var(--leaf-deep); }
+  .money-note { margin:8px 0 0; font-size:0.8rem; color:#888; line-height:1.4; }
+  .payout-note { font-size:0.85rem; color:#6B5842; margin:0 0 12px; }
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
 </style>

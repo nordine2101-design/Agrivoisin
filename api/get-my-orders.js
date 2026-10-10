@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, total_amount, created_at')
+      .select('id, total_amount, created_at, service_fee_cents')
       .eq('buyer_id', buyerId)
       .order('created_at', { ascending: false });
 
@@ -140,6 +140,8 @@ export default async function handler(req, res) {
       return {
         orderId: order.id,
         totalAmount: order.total_amount,
+        // Les frais de service payés par l'acheteur, une seule fois par commande (0 pour les anciennes commandes)
+        serviceFee: (Number(order.service_fee_cents) || 0) / 100,
         createdAt: order.created_at,
         sellers: sellersList,
       };

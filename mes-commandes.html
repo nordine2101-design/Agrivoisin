@@ -137,6 +137,14 @@
     }).join('');
   }
 
+  // Les frais de service payés par l'acheteur : une seule ligne par commande, à la fin du ticket.
+  // Rien pour les anciennes commandes (sans frais de service).
+  function renderServiceFeeLine(order) {
+    const fee = Number(order.serviceFee);
+    if (!(fee > 0)) return '';
+    return '<div class="order-fee-line"><span>Frais de service</span><span class="order-fee-amount">' + escapeHtml(formatAmount(fee)) + '</span></div>';
+  }
+
   // Comment un vendeur est désigné : « Vendeur de Lyon » (jamais de contact direct)
   function sellerLabel(seller) {
     if (seller.sellerCity) return 'Vendeur de ' + seller.sellerCity;
@@ -481,6 +489,7 @@
         orderDiv.innerHTML = `
           <h3>Commande du ${date} — ${Number(order.totalAmount).toFixed(2).replace('.', ',')} €</h3>
           ${sellersHtml}
+          ${renderServiceFeeLine(order)}
         `;
         ordersContainer.appendChild(orderDiv);
       });
@@ -502,6 +511,8 @@
   .order-card h3 { font-size:0.95rem; margin-bottom:8px; }
   .order-seller-block { border-top:1px solid #eee; padding-top:14px; margin-top:14px; }
   .order-item-line { font-size:0.9rem; line-height:1.6; }
+  .order-fee-line { display:flex; justify-content:space-between; gap:12px; border-top:1px solid #eee; margin-top:14px; padding-top:10px; font-size:0.9rem; color:#6B5842; }
+  .order-fee-amount { white-space:nowrap; }
   .strawberry-picker { display:flex; flex-direction:row; flex-wrap:nowrap; gap:8px; margin:10px 0; }
   .strawberry-option { cursor:pointer; display:inline-block; }
   .strawberry-row { display:inline-flex; flex-direction:row; flex-wrap:nowrap; align-items:center; gap:2px; }

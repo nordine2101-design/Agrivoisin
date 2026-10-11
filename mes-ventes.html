@@ -167,7 +167,7 @@
 
   // Le détail de l'argent d'une vente, avec les chiffres du vendeur lui-même :
   // - versé : commission, frais de carte, frais de service du mois (s'il y en a eu) et « Vous recevez »
-  // - en attente : commission et « Après commission » (les frais ne sont connus qu'au versement)
+  // - en attente : commission, vrais frais de carte, montant exact de la vente (et les 2 € du mois à part)
   function renderMoneyDetail(sale) {
     const payout = sale.payout;
     const m = payout && payout.money;
@@ -193,30 +193,28 @@
     }
 
     if (m.afterCommission != null) {
-      const est = m.estimate;
+      // Les chiffres EXACTS : les vrais frais de carte relevés chez Stripe dès le paiement.
+      // S'ils ne sont pas connus (ventes d'avant ce changement), on n'affiche rien à leur place.
+      const cardFeeKnown = m.cardFee != null && m.saleAmount != null;
       let html = line(commissionLabel, '− ' + formatAmount(m.commission));
-      html += line('Après commission', formatAmount(m.afterCommission));
+      let notes = '';
 
-      // Réponse d'un ancien serveur (sans estimation) : l'ancienne explication, rien d'inventé
-      if (!est) {
-        return '<div class="money-detail">' + html +
-          '<p class="money-note">Les frais de carte et, une seule fois par mois, 2 € de frais de service seront retirés au versement.</p>' +
-          '</div>';
+      if (cardFeeKnown) {
+        html += line('Frais de carte', '− ' + formatAmount(m.cardFee));
+        html += line('Montant de cette vente', formatAmount(m.saleAmount), 'money-total');
+      } else {
+        html += line('Après commission', formatAmount(m.afterCommission), 'money-total');
+        notes += '<p class="money-note">Les frais de carte de Stripe seront retirés au versement.</p>';
       }
 
-      // L'estimation : ce que le vendeur recevra, avec les frais d'une carte européenne
-      html += line('Vous recevrez environ', formatAmount(est.received), 'money-total');
-
-      // Si les frais de service du mois ne sont pas encore payés : le second montant
-      let notes = '';
-      if (est.receivedWithMonthlyFee != null) {
-        const due = Number(est.monthlyFeeDue) || 0;
+      // Les frais de service du mois, en ligne séparée : retirés une seule fois, du premier versement du mois
+      if (m.monthlyFeeDue != null && Number(m.monthlyFeeDue) > 0) {
+        const due = Number(m.monthlyFeeDue);
         const text = due >= MONTHLY_FEE_EUROS
-          ? "(environ " + formatAmount(est.receivedWithMonthlyFee) + " si c'est votre première vente versée ce mois-ci : " + shortAmount(due) + " de frais de service du mois)"
-          : "(environ " + formatAmount(est.receivedWithMonthlyFee) + " si c'est la prochaine vente versée ce mois-ci : " + shortAmount(due) + " de frais de service du mois restants)";
+          ? shortAmount(due) + ' de frais de service du mois sont retirés une seule fois, du premier versement du mois.'
+          : 'Il reste ' + shortAmount(due) + ' de frais de service du mois à retirer, une seule fois, du prochain versement du mois.';
         notes += '<p class="money-note">' + escapeHtml(text) + '</p>';
       }
-      notes += '<p class="money-note">Estimation : le montant exact est connu au versement.</p>';
 
       return '<div class="money-detail">' + html + notes + '</div>';
     }

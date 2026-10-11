@@ -5,10 +5,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 // Nombre maximum de ventes renvoyées (les plus récentes)
 const MAX_SALES = 100;
 
-// Pour l'estimation de ce que le vendeur recevra : frais d'une carte européenne chez Stripe
-// (1,5 % + 0,25 € du paiement total de l'acheteur), et frais de service mensuel du vendeur (2 €)
-const CARD_FEE_PERCENT = 0.015;
-const CARD_FEE_FIXED_CENTS = 25;
+// Frais de service mensuel d'un vendeur actif : 2 €, retirés une seule fois par mois
 const MONTHLY_FEE_CENTS = 200;
 
 // Le mois d'une vente, à l'heure de Paris (comme dans la base) : « 2026-10 »
@@ -67,7 +64,7 @@ export default async function handler(req, res) {
     // Les ventes les plus récentes d'abord (seulement la date : rien sur l'acheteur)
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, created_at, total_amount, service_fee_cents')
+      .select('id, created_at')
       .in('id', orderIds)
       .order('created_at', { ascending: false })
       .limit(MAX_SALES);
@@ -91,7 +88,7 @@ export default async function handler(req, res) {
       payouts = payoutsData || [];
     }
 
-    // Les frais de service mensuel de CE vendeur déjà payés, mois par mois (pour estimer ce qu'il recevra).
+    // Les frais de service mensuel de CE vendeur déjà payés, mois par mois (pour dire ce qu'il reste à payer).
     // Pas bloquant : si la lecture échoue, on suppose que les 2 € ne sont pas encore payés.
     let feesByMonth = {};
     const months = [...new Set(orders.map((o) => parisMonth(o.created_at)))];
@@ -134,8 +131,8 @@ export default async function handler(req, res) {
 
       // Ce que le vendeur voit de son argent (ses propres chiffres, jamais rien sur l'acheteur) :
       // - argent versé : la commission, les frais retirés et le montant reçu
-      // - argent en attente : la commission et ce qui reste après elle (les frais de carte et les 2 € du mois
-      //   ne sont connus qu'au versement)
+      // - argent en attente : la commission, les vrais frais de carte (relevés chez Stripe dès le paiement),
+      //   le montant exact de la vente, et ce qui reste à payer des 2 € du mois
       // - problème signalé : aucun chiffre tant que la situation n'est pas réglée
       const toEuros = (cents) => (Number(cents) || 0) / 100;
       let money = null;
@@ -150,25 +147,23 @@ export default async function handler(req, res) {
         const amountCents = Number(payoutRow.amount_cents) || 0;
         const commissionCents = Number(payoutRow.commission_cents) || 0;
 
-        // Estimation (« environ ») : frais de carte au prorata du paiement TOTAL de l'acheteur (articles + frais de
-        // service), calculés comme au versement réel, puis les 2 € du mois s'ils ne sont pas déjà payés.
-        const chargedCents = Math.max(Math.round(Number(order.total_amount) * 100) || 0, amountCents);
-        const totalCardFee = Math.round(chargedCents * CARD_FEE_PERCENT) + CARD_FEE_FIXED_CENTS;
-        const cardFeeShare = chargedCents > 0 ? Math.floor((totalCardFee * amountCents) / chargedCents) : 0;
-        const beforeMonthlyFee = Math.max(0, amountCents - commissionCents - cardFeeShare);
+        // Les frais de carte RÉELS, relevés chez Stripe dès le paiement (jamais une supposition).
+        // S'ils ne sont pas encore connus : rien n'est affiché à leur place.
+        const cardFeeKnown = payoutRow.stripe_fee_cents !== null && payoutRow.stripe_fee_cents !== undefined;
+        const cardFeeCents = cardFeeKnown ? Number(payoutRow.stripe_fee_cents) || 0 : 0;
 
+        // Ce qui reste à payer des 2 € de frais de service de ce mois (le mois de la vente, à l'heure de Paris)
         const feeRow = feesByMonth[parisMonth(order.created_at)];
         const monthlyFeeDue = Math.max(0, feeRow ? (Number(feeRow.due_cents) || 0) - (Number(feeRow.collected_cents) || 0) : MONTHLY_FEE_CENTS);
 
         money = {
           commission: toEuros(commissionCents),
           afterCommission: toEuros(amountCents - commissionCents),
-          estimate: {
-            received: toEuros(beforeMonthlyFee),
-            // Seulement s'il reste des frais de service du mois à payer : ce que le vendeur recevrait si cette vente est la prochaine versée
-            receivedWithMonthlyFee: monthlyFeeDue > 0 ? toEuros(beforeMonthlyFee - Math.min(monthlyFeeDue, beforeMonthlyFee)) : null,
-            monthlyFeeDue: toEuros(monthlyFeeDue),
-          },
+          // Exact : la vente moins la commission moins les vrais frais de carte (jamais en dessous de 0)
+          cardFee: cardFeeKnown ? toEuros(cardFeeCents) : null,
+          saleAmount: cardFeeKnown ? toEuros(Math.max(0, amountCents - commissionCents - cardFeeCents)) : null,
+          // Les 2 € du mois restent en ligne séparée : retirés une seule fois, du premier versement du mois
+          monthlyFeeDue: toEuros(monthlyFeeDue),
         };
       }
 

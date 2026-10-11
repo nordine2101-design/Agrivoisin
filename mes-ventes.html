@@ -153,7 +153,7 @@
     const when = releaseDate && releaseDate.getTime() > Date.now()
       ? 'le ' + formatDate(payout.autoReleaseAt)
       : 'très prochainement';
-    return '<div class="money-box">L\'argent est gardé par Agrivoisin. Il vous sera versé dès que l\'acheteur confirme avoir reçu sa commande, ou automatiquement ' + escapeHtml(when) + '.</div>';
+    return '<div class="money-box">L\'argent est gardé par Agrivoisin jusqu\'à ce que l\'acheteur confirme avoir reçu sa commande, ou automatiquement ' + escapeHtml(when) + '. Il rejoint alors votre compte de paiement, puis votre banque lors du virement mensuel (à partir du 05 de chaque mois).</div>';
   }
 
   // Le détail de l'argent d'une vente, avec les chiffres du vendeur lui-même :
@@ -249,7 +249,7 @@
       }
 
       salesContainer.innerHTML =
-        '<p class="payout-note">Votre argent est viré à votre banque une fois par mois, le 5.</p>' +
+        '<p class="payout-note">Votre argent est viré à votre banque une fois par mois, à partir du 05.</p>' +
         sales.map(renderSale).join('');
 
     } catch (err) {

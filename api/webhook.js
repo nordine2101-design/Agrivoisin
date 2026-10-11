@@ -217,6 +217,26 @@ export default async function handler(req, res) {
       console.error('Impossible de lire la charge Stripe :', err.message);
     }
 
+    // Les VRAIS frais de Stripe sur ce paiement, connus dès que l'acheteur a payé : chaque vendeur en verra
+    // sa part tout de suite (jamais une supposition). Si Stripe ne donne pas le chiffre, on note « inconnu »
+    // et le versement le relèvera plus tard. Jamais bloquant.
+    const servedTotalCents = servedLines.reduce((sum, l) => sum + l.cents, 0);
+    let totalCardFee = null;
+    let chargedTotalCents = null;
+    try {
+      if (chargeId) {
+        const charge = await stripe.charges.retrieve(chargeId, { expand: ['balance_transaction'] });
+        const balanceTransaction = charge && charge.balance_transaction;
+        if (balanceTransaction && typeof balanceTransaction === 'object' && Number.isInteger(balanceTransaction.fee)) {
+          totalCardFee = balanceTransaction.fee;
+          // Même base de calcul que le versement : le montant TOTAL payé (articles + frais de service)
+          chargedTotalCents = Math.max(Number(charge.amount) || 0, servedTotalCents);
+        }
+      }
+    } catch (err) {
+      console.error('Impossible de lire les frais Stripe (relevés plus tard, au versement) :', err.message);
+    }
+
     try {
       // 5. Un versement en attente par vendeur : l'argent reste chez Agrivoisin (seulement pour les articles servis)
       const amountBySeller = {};
@@ -231,6 +251,7 @@ export default async function handler(req, res) {
         seller_id: sellerId,
         amount_cents: amount,
         commission_cents: Math.round(amount * COMMISSION_RATE),
+        stripe_fee_cents: totalCardFee !== null && chargedTotalCents > 0 ? Math.floor((totalCardFee * amount) / chargedTotalCents) : null,
         stripe_charge_id: chargeId,
         status: 'en_attente',
         auto_release_at: releaseAt,

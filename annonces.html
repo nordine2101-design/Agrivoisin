@@ -293,7 +293,7 @@
 
       const freshness = freshnessInfo(item.harvest_date);
       const freshnessHtml = freshness
-        ? `<p class="freshness-badge" title="${freshness.label}">${freshnessIconsHtml(freshness.stars)} ${freshness.label}</p>`
+        ? `<p class="freshness-badge" title="${freshness.label}"><span class="freshness-icons">${freshnessIconsHtml(freshness.stars)}</span><span class="freshness-label">${freshness.label}</span></p>`
         : '';
 
       const distance = getDistanceForListing(item);
@@ -441,8 +441,9 @@
 <style>
   .produce-card-body p.stock-badge { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
   .produce-card-body p.stock-badge.stock-out { color:#C8352F; }
-  .produce-card-body p.freshness-badge { display:flex; align-items:center; gap:3px; }
-  .freshness-icon { width:40px; height:40px; object-fit:contain; flex-shrink:0; }
+  .produce-card-body p.freshness-badge { display:flex; flex-direction:column; align-items:flex-start; }
+  .freshness-icons { display:flex; gap:2px; }
+  .freshness-icon { width:56px; height:56px; object-fit:contain; flex-shrink:0; }
   .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
 </style>
 </body>

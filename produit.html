@@ -216,8 +216,18 @@
     const freshness = freshnessInfo(item.harvest_date);
     if (freshness) {
       const el = document.getElementById('listingFreshness');
-      el.textContent = '⭐'.repeat(freshness.stars) + ' ' + freshness.label;
-      el.style.display = 'block';
+      // Le flocon de neige d'Agrivoisin, répété 1, 2 ou 3 fois (à la place des étoiles), puis le texte.
+      // Les images sont décoratives : le texte (« Très frais »…) dit la même chose.
+      el.textContent = '';
+      for (let i = 0; i < freshness.stars; i++) {
+        const icon = document.createElement('img');
+        icon.src = 'flocon.png';
+        icon.alt = '';
+        icon.className = 'freshness-icon';
+        el.appendChild(icon);
+      }
+      el.appendChild(document.createTextNode(' ' + freshness.label));
+      el.style.display = 'flex';
     }
 
     let sellerText = item.sellers && item.sellers.city ? item.sellers.city : 'Vendeur Agrivoisin';
@@ -349,5 +359,9 @@
       });
   }
 </script>
+<style>
+  #listingFreshness { align-items:center; justify-content:center; gap:3px; }
+  .freshness-icon { width:34px; height:34px; object-fit:contain; flex-shrink:0; }
+</style>
 </body>
 </html>

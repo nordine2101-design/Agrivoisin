@@ -6,7 +6,82 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 
 // --- Réglages de l'argent retenu ---
 const COMMISSION_RATE = 0.15; // commission d'Agrivoisin : 15 % du prix, par vendeur et par commande
-const AUTO_RELEASE_DAYS = 3;  // délai avant le versement automatique au vendeur
+const AUTO_RELEASE_DAYS = 3;  // délai avant le versement automatique au vendeur (annonces sans horaires de retrait)
+const PICKUP_RELEASE_DELAY_MS = 48 * 60 * 60 * 1000; // avec horaires : libération 48 h après la fin du créneau de retrait
+
+// ---------------------------------------------------------------------------
+// Les créneaux de retrait : heure de Paris (avec l'heure d'été), jours 1 = lundi … 7 = dimanche
+// ---------------------------------------------------------------------------
+const WEEKDAYS = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+const parisFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Europe/Paris', hourCycle: 'h23', weekday: 'short',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+
+// Ce que dit l'horloge de Paris à un instant donné
+function parisParts(ms) {
+  const p = {};
+  parisFormatter.formatToParts(new Date(ms)).forEach((x) => { p[x.type] = x.value; });
+  return { y: +p.year, m: +p.month, d: +p.day, hh: +p.hour, mm: +p.minute, ss: +p.second, weekday: WEEKDAYS[p.weekday] };
+}
+
+// « 18 h à Paris ce jour-là » -> l'instant exact (en tenant compte de l'heure d'été ou d'hiver)
+function parisToUtcMs(y, m, d, hh, mm) {
+  const target = Date.UTC(y, m - 1, d, hh, mm);
+  let guess = target;
+  for (let i = 0; i < 2; i++) {
+    const p = parisParts(guess);
+    guess += target - Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm, p.ss);
+  }
+  return guess;
+}
+
+function parseTime(value) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(value || ''));
+  return match ? { h: +match[1], m: +match[2] } : null;
+}
+
+// Le premier créneau qui n'est pas encore terminé à l'instant donné (celui en cours compte) : { startMs, endMs } ou null
+function firstSlotAfter(slots, afterMs) {
+  const base = parisParts(afterMs);
+  for (let offset = 0; offset <= 7; offset++) {
+    const day = new Date(Date.UTC(base.y, base.m - 1, base.d + offset));
+    const y = day.getUTCFullYear();
+    const m = day.getUTCMonth() + 1;
+    const d = day.getUTCDate();
+    const weekday = ((base.weekday - 1 + offset) % 7) + 1;
+
+    let best = null;
+    (slots || []).forEach((s) => {
+      if (Number(s.day_of_week) !== weekday) return;
+      const st = parseTime(s.start_time);
+      const en = parseTime(s.end_time);
+      if (!st || !en) return;
+      const startMs = parisToUtcMs(y, m, d, st.h, st.m);
+      const endMs = parisToUtcMs(y, m, d, en.h, en.m);
+      if (!(endMs > startMs) || endMs <= afterMs) return;
+      if (!best || endMs < best.endMs) best = { startMs, endMs };
+    });
+    // Les jours suivants finissent forcément plus tard : on s'arrête au premier jour qui a un créneau
+    if (best) return best;
+  }
+  return null;
+}
+
+// Pour un vendeur : le début du premier créneau (pour signaler un problème) et la date de libération
+// automatique (48 h après la fin du créneau le plus tardif). null si aucun article n'a d'horaires.
+function computePickupWindow(listingIds, slotsByListing, purchaseMs) {
+  let startMs = null;
+  let endMs = null;
+  listingIds.forEach((id) => {
+    const first = firstSlotAfter(slotsByListing[id] || [], purchaseMs);
+    if (!first) return;
+    startMs = startMs === null ? first.startMs : Math.min(startMs, first.startMs);
+    endMs = endMs === null ? first.endMs : Math.max(endMs, first.endMs);
+  });
+  if (startMs === null) return null;
+  return { start: new Date(startMs), release: new Date(endMs + PICKUP_RELEASE_DELAY_MS) };
+}
 
 export const config = {
   api: {
@@ -237,6 +312,26 @@ export default async function handler(req, res) {
       console.error('Impossible de lire les frais Stripe (relevés plus tard, au versement) :', err.message);
     }
 
+    // Les horaires de retrait des articles servis : ils fixent le début du signalement possible et la date de
+    // libération automatique. Jamais bloquant : si la lecture échoue, la règle de 3 jours s'applique.
+    const slotsByListing = {};
+    try {
+      const servedListingIds = [...new Set(servedLines.map((l) => l.listing_id))];
+      const { data: slotRows, error: slotsError } = await supabase
+        .from('listing_pickup_hours')
+        .select('listing_id, day_of_week, start_time, end_time')
+        .in('listing_id', servedListingIds);
+      if (slotsError) {
+        throw new Error(slotsError.message);
+      }
+      (slotRows || []).forEach((r) => {
+        (slotsByListing[r.listing_id] = slotsByListing[r.listing_id] || []).push(r);
+      });
+    } catch (err) {
+      console.error('Impossible de lire les horaires de retrait (règle de 3 jours appliquée) :', err.message);
+    }
+    const purchaseMs = Number.isInteger(session.created) ? session.created * 1000 : Date.now();
+
     try {
       // 5. Un versement en attente par vendeur : l'argent reste chez Agrivoisin (seulement pour les articles servis)
       const amountBySeller = {};
@@ -244,18 +339,25 @@ export default async function handler(req, res) {
         amountBySeller[l.seller_id] = (amountBySeller[l.seller_id] || 0) + l.cents;
       });
 
-      const releaseAt = new Date(Date.now() + AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      const legacyReleaseAt = new Date(Date.now() + AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-      const payouts = Object.entries(amountBySeller).map(([sellerId, amount]) => ({
-        order_id: order.id,
-        seller_id: sellerId,
-        amount_cents: amount,
-        commission_cents: Math.round(amount * COMMISSION_RATE),
-        stripe_fee_cents: totalCardFee !== null && chargedTotalCents > 0 ? Math.floor((totalCardFee * amount) / chargedTotalCents) : null,
-        stripe_charge_id: chargeId,
-        status: 'en_attente',
-        auto_release_at: releaseAt,
-      }));
+      const payouts = Object.entries(amountBySeller).map(([sellerId, amount]) => {
+        const sellerListingIds = [...new Set(servedLines.filter((l) => l.seller_id === sellerId).map((l) => l.listing_id))];
+        const pickupWindow = computePickupWindow(sellerListingIds, slotsByListing, purchaseMs);
+        return {
+          order_id: order.id,
+          seller_id: sellerId,
+          amount_cents: amount,
+          commission_cents: Math.round(amount * COMMISSION_RATE),
+          stripe_fee_cents: totalCardFee !== null && chargedTotalCents > 0 ? Math.floor((totalCardFee * amount) / chargedTotalCents) : null,
+          stripe_charge_id: chargeId,
+          status: 'en_attente',
+          // Avec horaires de retrait : libération 48 h après la fin du créneau, signalement possible dès son début.
+          // Sans horaires : la règle de 3 jours, et aucune attente avant de signaler.
+          auto_release_at: pickupWindow ? pickupWindow.release.toISOString() : legacyReleaseAt,
+          pickup_start_at: pickupWindow ? pickupWindow.start.toISOString() : null,
+        };
+      });
 
       if (servedLines.length > 0) {
         const { error: payoutsError } = await supabase.from('payouts').insert(payouts);

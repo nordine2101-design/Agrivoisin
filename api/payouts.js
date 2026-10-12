@@ -220,7 +220,7 @@ async function releasePayout(payoutId, fromStatuses) {
 // ---------------------------------------------------------------------------
 async function handleBuyerAction(req, res) {
   try {
-    const { action, orderId, sellerId } = req.body || {};
+    const { action, orderId, sellerId, reason } = req.body || {};
 
     const token = (req.headers.authorization || '').replace('Bearer ', '');
     if (!token) {
@@ -237,6 +237,19 @@ async function handleBuyerAction(req, res) {
     }
     if (!orderId || !sellerId) {
       return res.status(400).json({ error: 'Commande ou vendeur manquant.' });
+    }
+
+    // Signaler un problème demande une explication écrite : 10 caractères au moins, 1000 au plus
+    // (la page le vérifie aussi, mais le serveur ne se fie jamais à la page)
+    let reasonText = '';
+    if (action === 'report') {
+      reasonText = typeof reason === 'string' ? reason.trim() : '';
+      if (reasonText.length < 10) {
+        return res.status(400).json({ error: "Merci d'expliquer le problème (au moins 10 caractères)." });
+      }
+      if (reasonText.length > 1000) {
+        return res.status(400).json({ error: "L'explication est trop longue (1000 caractères au maximum)." });
+      }
     }
 
     // La commande doit appartenir à l'acheteur connecté
@@ -317,7 +330,7 @@ async function handleBuyerAction(req, res) {
 
     const { data: updated, error: reportError } = await supabase
       .from('payouts')
-      .update({ status: 'probleme', problem_reported_at: new Date().toISOString() })
+      .update({ status: 'probleme', problem_reported_at: new Date().toISOString(), problem_reason: reasonText })
       .eq('id', payout.id)
       .eq('status', 'en_attente')
       .select()

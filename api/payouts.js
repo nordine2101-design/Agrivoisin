@@ -14,6 +14,16 @@ const BATCH_SIZE = 50;
 // Temps maximum consacré à un passage automatique (en millisecondes)
 const DEFAULT_TIME_BUDGET_MS = 50000;
 
+// « lundi 12 octobre à 18 h » ou « lundi 12 octobre à 18 h 30 » (heure de Paris)
+function formatParisMoment(iso) {
+  const parts = {};
+  new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+  const minutes = parts.minute === '00' ? '' : ' ' + parts.minute;
+  return parts.weekday + ' ' + parts.day + ' ' + parts.month + ' à ' + parseInt(parts.hour, 10) + ' h' + minutes;
+}
+
 // ---------------------------------------------------------------------------
 // S'assure que le compte de paiement du vendeur est viré à sa banque une seule fois par mois, le 5.
 // Les comptes créés avant ce choix reçoivent le réglage au prochain versement.
@@ -269,7 +279,7 @@ async function handleBuyerAction(req, res) {
 
     const { data: payout, error: payoutError } = await supabase
       .from('payouts')
-      .select('id, status')
+      .select('id, status, pickup_start_at')
       .eq('order_id', orderId)
       .eq('seller_id', sellerId)
       .maybeSingle();
@@ -326,6 +336,14 @@ async function handleBuyerAction(req, res) {
     }
     if (payout.status === 'en_cours') {
       return res.status(409).json({ error: 'Le versement est en cours de traitement. Réessayez dans un instant.' });
+    }
+
+    // Signaler un problème n'est possible qu'à partir du début du créneau de retrait : avant, la commande
+    // n'a pas pu être retirée. Sans début de créneau (anciennes commandes, annonces sans horaires), aucune attente.
+    if (payout.pickup_start_at && new Date(payout.pickup_start_at).getTime() > Date.now()) {
+      return res.status(409).json({
+        error: 'Vous pourrez signaler un problème à partir du ' + formatParisMoment(payout.pickup_start_at) + '.',
+      });
     }
 
     const { data: updated, error: reportError } = await supabase

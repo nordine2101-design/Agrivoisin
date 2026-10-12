@@ -266,6 +266,12 @@
     return '<div class="payout-box payout-done"><p>Paiement versé au vendeur.</p></div>';
   }
 
+  // Commande remboursée par Agrivoisin après un problème : plus aucun bouton, le vendeur n'est pas payé
+  function payoutRefundedHtml(payout) {
+    const amount = payout && payout.refundedAmount != null ? ' : ' + formatAmount(payout.refundedAmount) : '';
+    return '<div class="payout-box payout-refunded"><p>Commande remboursée' + escapeHtml(amount) + '. Le remboursement est fait sur la carte utilisée pour le paiement.</p></div>';
+  }
+
   function payoutProblemHtml() {
     return '<div class="payout-box payout-problem"><p>Problème signalé : le paiement est suspendu. Agrivoisin examine la situation.</p></div>';
   }
@@ -276,6 +282,7 @@
     if (!payout) return '';
 
     if (payout.status === 'verse') return payoutDoneHtml();
+    if (payout.status === 'rembourse') return payoutRefundedHtml(payout);
     if (payout.status === 'probleme') return payoutProblemHtml();
     if (payout.status === 'en_cours') {
       return '<div class="payout-box"><p>Versement au vendeur en cours de traitement...</p></div>';
@@ -582,6 +589,7 @@
   .payout-report-buttons .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
   .payout-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .payout-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
+  .payout-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
   .seller-address { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
   .seller-address-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
   .pickup-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; }

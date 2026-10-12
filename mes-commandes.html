@@ -252,6 +252,16 @@
     return !seller.payout || seller.payout.status === 'verse';
   }
 
+  // « lundi 12 octobre à 18 h » ou « lundi 12 octobre à 18 h 30 » (heure de Paris)
+  function formatParisMoment(iso) {
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    const minutes = parts.minute === '00' ? '' : ' ' + parts.minute;
+    return parts.weekday + ' ' + parts.day + ' ' + parts.month + ' à ' + parseInt(parts.hour, 10) + ' h' + minutes;
+  }
+
   function payoutDoneHtml() {
     return '<div class="payout-box payout-done"><p>Paiement versé au vendeur.</p></div>';
   }
@@ -277,13 +287,19 @@
       ? 'le ' + formatDate(payout.autoReleaseAt)
       : 'très prochainement';
 
+    // Avant le début du créneau de retrait, la commande n'a pas pu être retirée : pas de signalement possible.
+    // Sans début de créneau (anciennes commandes, annonces sans horaires), aucune attente.
+    const startsAt = payout.pickupStartAt ? new Date(payout.pickupStartAt) : null;
+    const reportLocked = !!(startsAt && !Number.isNaN(startsAt.getTime()) && startsAt.getTime() > Date.now());
+
     return `
       <div class="payout-box" data-order-id="${orderId}" data-seller-id="${seller.sellerId}">
         <p>Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ${when}, ou dès que vous confirmez la réception.</p>
         <div class="payout-actions">
           <button type="button" class="btn btn-primary payout-confirm-btn">J'ai bien reçu ma commande</button>
-          <button type="button" class="btn btn-ghost payout-report-btn">Signaler un problème</button>
+          <button type="button" class="btn btn-ghost payout-report-btn"${reportLocked ? ' disabled data-locked="1"' : ''}>Signaler un problème</button>
         </div>
+        ${reportLocked ? `<p class="payout-report-hint">Vous pourrez signaler un problème à partir du ${escapeHtml(formatParisMoment(payout.pickupStartAt))}.</p>` : ''}
         <div class="payout-report-form" style="display:none;">
           <label class="payout-report-label">Expliquez le problème (obligatoire)</label>
           <textarea class="payout-report-reason" maxlength="1000" placeholder="Par exemple : le vendeur n'était pas là, ou les légumes étaient abîmés"></textarea>
@@ -347,7 +363,7 @@
     } catch (err) {
       errorEl.textContent = err.message;
       errorEl.style.display = 'block';
-      buttons.forEach((b) => { b.disabled = false; });
+      buttons.forEach((b) => { b.disabled = b.dataset.locked === '1'; });
     }
   }
 
@@ -558,6 +574,8 @@
   .payout-box p:last-child { margin-bottom:0; }
   .payout-actions { display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
   .payout-actions .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
+  .payout-report-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .payout-box p.payout-report-hint { font-size:0.8rem; color:#888; margin:0 0 8px; }
   .payout-box .payout-report-label { display:block; font-size:0.8rem; font-weight:700; color:#6B5842; margin-bottom:6px; }
   .payout-box .payout-report-reason { width:100%; min-height:80px; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; font-size:0.85rem; box-sizing:border-box; resize:vertical; }
   .payout-report-buttons { display:flex; flex-direction:column; gap:8px; margin-top:8px; }

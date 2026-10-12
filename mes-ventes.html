@@ -150,6 +150,9 @@
       const when = payout.releasedAt ? ' le ' + formatDate(payout.releasedAt) : '';
       return '<div class="money-box money-done">Argent versé' + escapeHtml(when) + '.</div>';
     }
+    if (payout.status === 'rembourse') {
+      return '<div class="money-box money-refunded">Commande remboursée à l\'acheteur après un problème signalé : cette vente ne vous sera pas versée.</div>';
+    }
     if (payout.status === 'probleme') {
       return '<div class="money-box money-problem">Problème signalé par l\'acheteur : le versement est suspendu le temps qu\'Agrivoisin examine la situation.</div>';
     }
@@ -306,6 +309,7 @@
   #salesContainer p.payout-note { font-size:0.85rem; color:#6B5842; margin:0 0 12px; }
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
+  .money-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
 </style>
 
 </body>

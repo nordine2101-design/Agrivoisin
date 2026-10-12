@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Problèmes signalés — Agrivoisin</title>
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ PROBLÈMES SIGNALÉS (page réservée à l'administrateur) ============ -->
+<section class="page-header">
+  <div class="container admin-wrap">
+    <div style="text-align:left;margin-bottom:12px;">
+      <a href="index.html" class="btn btn-ghost">Retour au site</a>
+    </div>
+    <h1>Problèmes signalés</h1>
+    <p id="pageSubtitle">Page réservée à l'administrateur d'Agrivoisin.</p>
+
+    <p id="loadingMessage" class="admin-state">Chargement...</p>
+    <p id="notLoggedMessage" class="admin-state" style="display:none;">Vous devez être connecté. <a href="connexion.html?retour=admin-problemes.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
+    <p id="forbiddenMessage" class="admin-state" style="display:none;">Cette page est réservée à l'administrateur d'Agrivoisin.</p>
+    <p id="errorMessage" class="admin-state" style="display:none;"></p>
+    <button type="button" id="retryBtn" class="btn btn-primary" style="display:none;margin:0 auto 16px;">Réessayer</button>
+
+    <div id="content" style="display:none;">
+      <div class="admin-toolbar">
+        <h2 id="problemsTitle">À traiter</h2>
+        <button type="button" id="refreshBtn" class="btn btn-ghost">Actualiser</button>
+      </div>
+      <p id="noProblems" class="admin-empty" style="display:none;">Aucun problème à traiter pour le moment.</p>
+      <div id="problemsList"></div>
+
+      <h2 id="decidedTitle" style="margin-top:36px;">Dernières décisions</h2>
+      <p id="noDecided" class="admin-empty" style="display:none;">Aucune décision pour le moment.</p>
+      <div id="decidedList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const loadingMessage = document.getElementById('loadingMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const forbiddenMessage = document.getElementById('forbiddenMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const retryBtn = document.getElementById('retryBtn');
+  const content = document.getElementById('content');
+  const problemsList = document.getElementById('problemsList');
+  const decidedList = document.getElementById('decidedList');
+  const noProblems = document.getElementById('noProblems');
+  const noDecided = document.getElementById('noDecided');
+  const problemsTitle = document.getElementById('problemsTitle');
+  const decidedTitle = document.getElementById('decidedTitle');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  // Protège l'affichage : rien de ce qu'écrit un acheteur ou un vendeur n'est interprété comme du code
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function formatAmount(value) {
+    return Number(value).toFixed(2).replace('.', ',') + ' €';
+  }
+
+  function formatDate(iso) {
+    return iso ? new Date(iso).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' }) : '—';
+  }
+
+  // « 06/10/2026 à 12 h 00 » (heure de Paris)
+  function formatDateTime(iso) {
+    if (!iso) return '—';
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    return parts.day + '/' + parts.month + '/' + parts.year + ' à ' + parseInt(parts.hour, 10) + '\u00A0h\u00A0' + parts.minute;
+  }
+
+  // « lundi 5 octobre à 18 h » (heure de Paris)
+  function formatParisMoment(iso) {
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    const minutes = parts.minute === '00' ? '' : '\u00A0' + parts.minute;
+    return parts.weekday + ' ' + parts.day + ' ' + parts.month + ' à ' + parseInt(parts.hour, 10) + '\u00A0h' + minutes;
+  }
+
+  // ---------- Unités : une quantité s'écrit toujours avec son unité ----------
+
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'unité';
+    if (count <= 1) return u;
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u;
+    return pluralWord(u);
+  }
+
+  function ticketLine(item) {
+    const qty = Number(item.quantity) || 1;
+    const unit = String(item.unit == null ? '' : item.unit).trim() || 'unité';
+    const calc = qty + ' × 1 ' + unit + ' = ' + qty + ' ' + unitLabel(unit, qty) + (item.amount != null ? ', soit ' + formatAmount(item.amount) : '');
+    return '<div class="admin-item"><strong>' + escapeHtml(item.title) + '</strong> : ' + escapeHtml(calc) + '</div>';
+  }
+
+  // Une adresse e-mail devient un lien « écrire » seulement si elle a bien la forme d'une adresse
+  function emailHtml(email) {
+    if (!email) return '<span class="admin-muted">non disponible</span>';
+    if (/^[^\s@<>"']+@[^\s@<>"']+$/.test(email)) {
+      return '<a href="mailto:' + escapeHtml(email) + '">' + escapeHtml(email) + '</a>';
+    }
+    return escapeHtml(email);
+  }
+
+  // ---------- Les cartes ----------
+
+  function problemCard(p) {
+    const items = (p.items || []).map(ticketLine).join('');
+    return `
+      <div class="admin-card" data-payout-id="${escapeHtml(p.payoutId)}" data-amount="${escapeHtml(p.amount)}">
+        <div class="admin-card-head">
+          <span class="admin-card-title">Problème signalé le ${escapeHtml(formatDateTime(p.reportedAt))}</span>
+          <span class="admin-card-amount">${escapeHtml(formatAmount(p.amount))}</span>
+        </div>
+        <div class="admin-meta">Commande du ${escapeHtml(formatDate(p.orderDate))}</div>
+        ${items}
+        ${p.pickupStartAt ? '<div class="admin-meta">Début du créneau de retrait : ' + escapeHtml(formatParisMoment(p.pickupStartAt)) + '</div>' : ''}
+        <div class="admin-reason"><div class="admin-label">Explication de l'acheteur</div><div class="admin-reason-text">${escapeHtml(p.reason) || '<span class="admin-muted">aucune explication</span>'}</div></div>
+        <div class="admin-people">
+          <div><span class="admin-label">Acheteur</span> ${emailHtml(p.buyer && p.buyer.email)}</div>
+          <div><span class="admin-label">Vendeur</span> ${escapeHtml((p.seller && p.seller.city) || 'ville inconnue')} · ${emailHtml(p.seller && p.seller.email)}</div>
+        </div>
+        ${p.lastError ? '<div class="admin-error-last">Dernière erreur : ' + escapeHtml(p.lastError) + '</div>' : ''}
+        <label class="admin-label" for="note-${escapeHtml(p.payoutId)}">Note pour toi (facultative, 500 caractères au maximum)</label>
+        <textarea class="admin-note" id="note-${escapeHtml(p.payoutId)}" maxlength="500" placeholder="Par exemple : vendeur absent, confirmé par téléphone"></textarea>
+        <div class="admin-actions">
+          <button type="button" class="btn btn-primary admin-refund-btn">Rembourser l'acheteur (${escapeHtml(formatAmount(p.amount))})</button>
+          <button type="button" class="btn btn-ghost admin-pay-btn">Payer le vendeur</button>
+        </div>
+        <p class="admin-error" style="display:none;"></p>
+      </div>`;
+  }
+
+  function decidedCard(d) {
+    const refunded = d.resolution === 'rembourse';
+    const decision = refunded
+      ? 'Acheteur remboursé : ' + formatAmount(d.refundedAmount != null ? d.refundedAmount : d.amount)
+      : 'Vendeur payé';
+    return `
+      <div class="admin-card admin-card-done ${refunded ? 'admin-refunded' : 'admin-paid'}">
+        <div class="admin-card-head">
+          <span class="admin-card-title">${escapeHtml(decision)}</span>
+          <span class="admin-meta" style="margin:0;">le ${escapeHtml(formatDateTime(d.resolvedAt))}</span>
+        </div>
+        ${(d.items || []).map(ticketLine).join('')}
+        <div class="admin-people">
+          <div><span class="admin-label">Acheteur</span> ${emailHtml(d.buyer && d.buyer.email)}</div>
+          <div><span class="admin-label">Vendeur</span> ${escapeHtml((d.seller && d.seller.city) || 'ville inconnue')} · ${emailHtml(d.seller && d.seller.email)}</div>
+        </div>
+        ${d.reason ? '<div class="admin-meta">Explication de l\'acheteur : ' + escapeHtml(d.reason) + '</div>' : ''}
+        ${d.note ? '<div class="admin-meta">Ta note : ' + escapeHtml(d.note) + '</div>' : ''}
+      </div>`;
+  }
+
+  function showOnly(which) {
+    [loadingMessage, notLoggedMessage, forbiddenMessage, errorMessage, content].forEach((el) => { el.style.display = 'none'; });
+    retryBtn.style.display = 'none';
+    if (which) which.style.display = 'block';
+  }
+
+  async function getToken() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    return session ? session.access_token : null;
+  }
+
+  async function callAdmin(token, body) {
+    const response = await fetch('/api/payouts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    return { ok: response.ok, status: response.status, data };
+  }
+
+  async function load() {
+    showOnly(loadingMessage);
+    const token = await getToken();
+    if (!token) {
+      showOnly(notLoggedMessage);
+      return;
+    }
+
+    try {
+      const result = await callAdmin(token, { action: 'admin_list' });
+
+      if (result.status === 401) {
+        showOnly(notLoggedMessage);
+        return;
+      }
+      if (result.status === 403) {
+        showOnly(forbiddenMessage);
+        return;
+      }
+      if (!result.ok) {
+        throw new Error(result.data.error || 'Erreur');
+      }
+
+      const problems = result.data.problems || [];
+      const resolved = result.data.resolved || [];
+
+      problemsTitle.textContent = 'À traiter (' + problems.length + ')';
+      decidedTitle.textContent = 'Dernières décisions (' + resolved.length + ')';
+      problemsList.innerHTML = problems.map(problemCard).join('');
+      decidedList.innerHTML = resolved.map(decidedCard).join('');
+      noProblems.style.display = problems.length === 0 ? 'block' : 'none';
+      noDecided.style.display = resolved.length === 0 ? 'block' : 'none';
+      showOnly(content);
+    } catch (err) {
+      console.error(err);
+      errorMessage.textContent = 'Impossible de charger les problèmes pour le moment.';
+      showOnly(errorMessage);
+      retryBtn.style.display = 'block';
+    }
+  }
+
+  const CONFIRM_TEXTS = {
+    admin_refund: (amount) => "Rembourser l'acheteur de " + formatAmount(amount) + " ?\n\nL'argent est remboursé sur sa carte (les frais de carte de Stripe ne sont pas rendus, et les 0,25 € de frais de service ne sont pas remboursés). Le vendeur ne sera pas payé.\n\nCette action ne peut pas être annulée.",
+    admin_pay_seller: () => "Payer le vendeur ?\n\nIl recevra l'argent de cette vente, comme si l'acheteur avait confirmé la réception. L'acheteur ne sera pas remboursé.\n\nCette action ne peut pas être annulée.",
+  };
+
+  function resultBox(action, data) {
+    let text;
+    let css;
+    if (action === 'admin_refund') {
+      css = 'admin-refunded';
+      text = data.alreadyDone ? 'Déjà traité : acheteur remboursé.' : 'Acheteur remboursé : ' + formatAmount(data.refundedAmount) + '.';
+    } else {
+      css = 'admin-paid';
+      text = data.alreadyDone ? 'Déjà traité : vendeur payé.' : 'Vendeur payé' + (data.sellerAmount != null ? ' : ' + formatAmount(data.sellerAmount) : '') + '.';
+      if (data.decisionSaved === false) text += " Attention : le vendeur est payé, mais ta note n'a pas pu être enregistrée.";
+    }
+    return '<div class="admin-result ' + css + '">' + escapeHtml(text) + '</div>';
+  }
+
+  let busy = false;
+
+  async function decide(card, action) {
+    if (busy) return;
+    const amount = Number(card.dataset.amount);
+    if (!window.confirm(CONFIRM_TEXTS[action](amount))) return;
+
+    const errorEl = card.querySelector('.admin-error');
+    const controls = card.querySelectorAll('button, textarea');
+    errorEl.style.display = 'none';
+    busy = true;
+    controls.forEach((c) => { c.disabled = true; });
+
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Session expirée, reconnectez-vous.');
+
+      const result = await callAdmin(token, {
+        action,
+        payoutId: card.dataset.payoutId,
+        note: card.querySelector('.admin-note').value,
+      });
+
+      if (!result.ok) {
+        throw new Error(result.data.error || 'Une erreur est survenue');
+      }
+
+      card.innerHTML = resultBox(action, result.data);
+      card.classList.add('admin-card-done');
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+      controls.forEach((c) => { c.disabled = false; });
+    } finally {
+      busy = false;
+    }
+  }
+
+  problemsList.addEventListener('click', (e) => {
+    const card = e.target.closest('.admin-card[data-payout-id]');
+    if (!card) return;
+    if (e.target.closest('.admin-refund-btn')) decide(card, 'admin_refund');
+    else if (e.target.closest('.admin-pay-btn')) decide(card, 'admin_pay_seller');
+  });
+
+  refreshBtn.addEventListener('click', load);
+  retryBtn.addEventListener('click', load);
+
+  load();
+</script>
+
+<style>
+  .admin-wrap { max-width:860px; }
+  .admin-state { margin:16px 0; color:#C8352F; text-align:center; }
+  .admin-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+  .admin-toolbar h2, #decidedTitle { font-size:1.2rem; margin:0; text-align:left; }
+  .admin-empty { color:#6B5842; text-align:left; margin:8px 0; }
+  .admin-card { background:#fff; border:1px solid #e6e0d3; border-radius:16px; padding:16px; margin-bottom:16px; text-align:left; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+  .admin-card-done { background:#f9f7f2; }
+  .admin-card-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:10px; }
+  .admin-card-title { font-weight:700; color:var(--leaf-deep); }
+  .admin-card-amount { font-weight:700; white-space:nowrap; }
+  .admin-meta { font-size:0.85rem; color:#6B5842; margin:4px 0; }
+  .admin-item { font-size:0.95rem; line-height:1.6; }
+  .admin-label { display:block; font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px; }
+  .admin-people .admin-label, .admin-reason .admin-label { display:block; }
+  .admin-reason { background:#fdf3f2; border:1px solid #f0c9c6; border-radius:10px; padding:10px; margin:12px 0; }
+  .admin-reason-text { white-space:pre-wrap; word-break:break-word; font-size:0.95rem; }
+  .admin-people { display:grid; gap:8px; margin:10px 0; font-size:0.9rem; word-break:break-word; }
+  .admin-muted { color:#888; }
+  .admin-error-last { font-size:0.8rem; color:#C8352F; margin:8px 0; }
+  .admin-note { width:100%; min-height:60px; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; font-size:0.9rem; box-sizing:border-box; resize:vertical; margin:4px 0 12px; }
+  .admin-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .admin-actions .btn { font-size:0.9rem; padding:10px 16px; }
+  .admin-actions .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  p.admin-error { color:#C8352F; margin:10px 0 0; font-size:0.9rem; }
+  .admin-result { border-radius:10px; padding:12px; font-weight:700; }
+  .admin-refunded { border-left:4px solid #4169E1; }
+  .admin-paid { border-left:4px solid #4C7A50; }
+  .admin-result.admin-refunded { background:#f3f6fe; color:#3b4a7a; border:1px solid #cfd9f3; }
+  .admin-result.admin-paid { background:#f6f9f5; color:#4C7A50; border:1px solid #cfe3cf; }
+  @media (max-width: 540px) {
+    .admin-actions .btn { width:100%; }
+    .admin-card-head { flex-direction:column; gap:4px; }
+  }
+</style>
+
+</body>
+</html>

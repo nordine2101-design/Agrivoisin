@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('order_id, seller_id, status, auto_release_at, released_at, pickup_start_at')
+      .select('order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, refunded_cents')
       .in('order_id', orderIds);
 
     if (payoutsError) {
@@ -138,6 +138,8 @@ export default async function handler(req, res) {
                 releasedAt: payoutRow.released_at,
                 // Le début du créneau de retrait : avant ce moment, l'acheteur ne peut pas signaler de problème (vide = sans attente)
                 pickupStartAt: payoutRow.pickup_start_at || null,
+                // Le montant remboursé à l'acheteur, en euros (seulement quand la commande a été remboursée)
+                refundedAmount: payoutRow.status === 'rembourse' && payoutRow.refunded_cents != null ? (Number(payoutRow.refunded_cents) || 0) / 100 : null,
               }
             : null,
         };

@@ -207,6 +207,48 @@
     return pluralWord(u);
   }
 
+  // Ce que veut dire chaque niveau de fraîcheur : montré dans un encadré quand on survole (ou touche) les flocons
+  const FRESHNESS_LEVELS = [
+    { stars: 3, label: 'Très frais', text: 'Récolté il y a moins de 24 h' },
+    { stars: 2, label: 'Frais', text: 'Récolté entre 24 et 48 h' },
+    { stars: 1, label: 'Fraîcheur minimale', text: 'Récolté il y a plus de 48 h' },
+  ];
+
+  // L'encadré : les trois niveaux, celui de l'annonce est mis en valeur
+  function buildFreshnessTip(current) {
+    const tip = document.createElement('span');
+    tip.className = 'freshness-tip';
+    tip.id = 'freshnessTip';
+    tip.setAttribute('role', 'tooltip');
+    FRESHNESS_LEVELS.forEach((level) => {
+      const row = document.createElement('span');
+      row.className = 'freshness-tip-row' + (level.stars === current.stars ? ' current' : '');
+
+      const icons = document.createElement('span');
+      icons.className = 'freshness-tip-icons';
+      for (let i = 0; i < level.stars; i++) {
+        const icon = document.createElement('img');
+        icon.src = 'flocon.png';
+        icon.alt = '';
+        icon.className = 'tip-icon';
+        icons.appendChild(icon);
+      }
+
+      const text = document.createElement('span');
+      text.className = 'freshness-tip-text';
+      const name = document.createElement('strong');
+      name.textContent = level.label;
+      text.appendChild(name);
+      text.appendChild(document.createElement('br'));
+      text.appendChild(document.createTextNode(level.text));
+
+      row.appendChild(icons);
+      row.appendChild(text);
+      tip.appendChild(row);
+    });
+    return tip;
+  }
+
   function renderListing(item) {
     document.title = item.title + ' — Agrivoisin';
 
@@ -231,8 +273,15 @@
       const label = document.createElement('span');
       label.className = 'freshness-label';
       label.textContent = freshness.label;
-      el.appendChild(iconsRow);
-      el.appendChild(label);
+      // Les flocons et le texte forment un groupe : le survol (ou le toucher, ou le clavier) montre l'encadré
+      const group = document.createElement('span');
+      group.className = 'freshness-group';
+      group.tabIndex = 0;
+      group.setAttribute('aria-describedby', 'freshnessTip');
+      group.appendChild(iconsRow);
+      group.appendChild(label);
+      group.appendChild(buildFreshnessTip(freshness));
+      el.appendChild(group);
       el.style.display = 'flex';
     }
 
@@ -346,6 +395,24 @@
     detailEl.style.display = 'block';
   }
 
+  // Sur téléphone (pas de souris) : un toucher sur les flocons ouvre ou ferme l'encadré, un toucher ailleurs le ferme
+  document.addEventListener('click', (e) => {
+    const group = document.querySelector('.freshness-group');
+    if (!group || !window.matchMedia('(hover: none)').matches) return;
+    if (group.contains(e.target)) group.classList.toggle('open');
+    else group.classList.remove('open');
+  });
+
+  // La touche Échap ferme l'encadré
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const group = document.querySelector('.freshness-group');
+    if (group) {
+      group.classList.remove('open');
+      group.blur();
+    }
+  });
+
   if (!listingId) {
     showError('Cette annonce est introuvable. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>');
   } else {
@@ -371,6 +438,22 @@
   #listingFreshness .freshness-label { color:#4169E1; }
   .freshness-icon { width:72px; height:72px; object-fit:contain; flex-shrink:0; }
   @media (max-width: 540px) { .freshness-icon { width:60px; height:60px; } }
+  .freshness-group { position:relative; display:inline-flex; flex-direction:column; align-items:center; cursor:help; outline-offset:4px; }
+  .freshness-tip { display:none; position:absolute; left:calc(100% + 14px); top:50%; transform:translateY(-50%); z-index:50; width:300px; box-sizing:border-box; padding:10px; background:#fff; border:1px solid #e6e0d3; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.16); text-align:left; font-weight:400; font-size:0.85rem; line-height:1.4; color:#3d3a35; cursor:default; }
+  .freshness-group.open .freshness-tip { display:block; }
+  @media (hover: hover) { .freshness-group:hover .freshness-tip { display:block; } }
+  .freshness-group:focus-visible .freshness-tip { display:block; }
+  .freshness-tip-row { display:flex; align-items:center; gap:10px; padding:6px 8px; border-left:3px solid transparent; border-radius:8px; }
+  .freshness-tip-row + .freshness-tip-row { margin-top:4px; }
+  .freshness-tip-row.current { background:#EEF2FF; border-left-color:#4169E1; }
+  .freshness-tip-icons { display:flex; gap:1px; width:70px; flex-shrink:0; }
+  .tip-icon { width:22px; height:22px; object-fit:contain; }
+  .freshness-tip-text strong { color:#4169E1; }
+  @media (max-width: 899px) {
+    .freshness-group { position:static; }
+    #listingFreshness { position:relative; }
+    .freshness-tip { left:50%; top:calc(100% + 8px); transform:translateX(-50%); width:min(260px, calc(100vw - 32px)); }
+  }
 </style>
 </body>
 </html>

@@ -284,12 +284,20 @@
           <button type="button" class="btn btn-primary payout-confirm-btn">J'ai bien reçu ma commande</button>
           <button type="button" class="btn btn-ghost payout-report-btn">Signaler un problème</button>
         </div>
+        <div class="payout-report-form" style="display:none;">
+          <label class="payout-report-label">Expliquez le problème (obligatoire)</label>
+          <textarea class="payout-report-reason" maxlength="1000" placeholder="Par exemple : le vendeur n'était pas là, ou les légumes étaient abîmés"></textarea>
+          <div class="payout-report-buttons">
+            <button type="button" class="btn btn-primary payout-report-send">Envoyer le signalement</button>
+            <button type="button" class="btn btn-ghost payout-report-cancel">Annuler</button>
+          </div>
+        </div>
         <p class="payout-error" style="color:#C8352F;display:none;"></p>
       </div>
     `;
   }
 
-  async function sendPayoutAction(box, action) {
+  async function sendPayoutAction(box, action, reason) {
     const orderId = box.dataset.orderId;
     const sellerId = box.dataset.sellerId;
     const errorEl = box.querySelector('.payout-error');
@@ -310,7 +318,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ action, orderId, sellerId }),
+        body: JSON.stringify(action === 'report' ? { action, orderId, sellerId, reason } : { action, orderId, sellerId }),
       });
 
       const data = await response.json();
@@ -354,9 +362,34 @@
         }
       });
 
+      const actionsEl = box.querySelector('.payout-actions');
+      const formEl = box.querySelector('.payout-report-form');
+      const reasonEl = box.querySelector('.payout-report-reason');
+      const errorEl = box.querySelector('.payout-error');
+
+      // « Signaler un problème » ouvre d'abord le formulaire : l'explication est obligatoire
       reportBtn.addEventListener('click', () => {
+        errorEl.style.display = 'none';
+        actionsEl.style.display = 'none';
+        formEl.style.display = 'block';
+        reasonEl.focus();
+      });
+
+      box.querySelector('.payout-report-cancel').addEventListener('click', () => {
+        errorEl.style.display = 'none';
+        formEl.style.display = 'none';
+        actionsEl.style.display = '';
+      });
+
+      box.querySelector('.payout-report-send').addEventListener('click', () => {
+        const reason = reasonEl.value.trim();
+        if (reason.length < 10) {
+          errorEl.textContent = "Merci d'expliquer le problème (au moins 10 caractères).";
+          errorEl.style.display = 'block';
+          return;
+        }
         if (window.confirm("Signaler un problème avec cette commande ? Le paiement au vendeur sera suspendu le temps qu'Agrivoisin examine la situation.")) {
-          sendPayoutAction(box, 'report');
+          sendPayoutAction(box, 'report', reason);
         }
       });
     });
@@ -525,6 +558,10 @@
   .payout-box p:last-child { margin-bottom:0; }
   .payout-actions { display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
   .payout-actions .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
+  .payout-box .payout-report-label { display:block; font-size:0.8rem; font-weight:700; color:#6B5842; margin-bottom:6px; }
+  .payout-box .payout-report-reason { width:100%; min-height:80px; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; font-size:0.85rem; box-sizing:border-box; resize:vertical; }
+  .payout-report-buttons { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .payout-report-buttons .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
   .payout-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .payout-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
   .seller-address { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }

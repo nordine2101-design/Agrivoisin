@@ -207,11 +207,12 @@
     return pluralWord(u);
   }
 
-  // Ce que veut dire chaque niveau de fraîcheur : montré dans un encadré quand on survole (ou touche) les flocons
+  // Ce que veut dire chaque niveau de fraîcheur : montré dans un encadré quand on survole (ou touche) les flocons.
+  // L'espace insécable (\u00A0) colle le « h » à son chiffre : « 24 h » ne se coupe jamais en fin de ligne.
   const FRESHNESS_LEVELS = [
-    { stars: 3, label: 'Très frais', text: 'Récolté il y a moins de 24 h' },
-    { stars: 2, label: 'Frais', text: 'Récolté entre 24 et 48 h' },
-    { stars: 1, label: 'Fraîcheur minimale', text: 'Récolté il y a plus de 48 h' },
+    { stars: 3, label: 'Très frais', text: 'Récolté il y a moins de 24\u00A0h' },
+    { stars: 2, label: 'Frais', text: 'Récolté entre 24 et 48\u00A0h' },
+    { stars: 1, label: 'Fraîcheur minimale', text: 'Récolté il y a plus de 48\u00A0h' },
   ];
 
   // L'encadré : les trois niveaux, celui de l'annonce est mis en valeur
@@ -439,22 +440,24 @@
   .freshness-icon { width:72px; height:72px; object-fit:contain; flex-shrink:0; }
   @media (max-width: 540px) { .freshness-icon { width:60px; height:60px; } }
   .freshness-group { position:relative; display:inline-flex; flex-direction:column; align-items:center; cursor:help; outline-offset:4px; }
-  .freshness-tip { display:none; position:absolute; left:calc(100% + 14px); top:50%; transform:translateY(-50%); z-index:50; width:300px; box-sizing:border-box; padding:10px; background:#fff; border:1px solid #e6e0d3; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.16); text-align:left; font-weight:400; font-size:0.85rem; line-height:1.4; color:#3d3a35; cursor:default; }
+  .freshness-tip { display:none; position:absolute; left:calc(100% + 14px); top:50%; transform:translateY(-50%); z-index:50; width:360px; box-sizing:border-box; padding:14px; background:#fff; border:1px solid #e6e0d3; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.16); text-align:left; font-weight:400; font-size:1rem; line-height:1.4; color:#3d3a35; cursor:default; }
   .freshness-group.open .freshness-tip { display:block; }
   @media (hover: hover) { .freshness-group:hover .freshness-tip { display:block; } }
   .freshness-group:focus-visible .freshness-tip { display:block; }
-  .freshness-tip-row { display:flex; align-items:center; gap:10px; padding:6px 8px; border-left:3px solid transparent; border-radius:8px; }
+  .freshness-tip-row { display:flex; align-items:center; gap:14px; padding:10px 12px; border-left:3px solid transparent; border-radius:8px; }
   .freshness-tip-row + .freshness-tip-row { margin-top:4px; }
   .freshness-tip-row.current { background:#EEF2FF; border-left-color:#4169E1; }
-  .freshness-tip-icons { display:flex; gap:1px; width:70px; flex-shrink:0; }
-  .tip-icon { width:22px; height:22px; object-fit:contain; }
+  .freshness-tip-icons { display:flex; gap:1px; width:94px; flex-shrink:0; }
+  .tip-icon { width:30px; height:30px; object-fit:contain; }
   .freshness-tip-text strong { color:#4169E1; }
   @media (max-width: 899px) {
     .freshness-group { position:static; }
     #listingFreshness { position:relative; }
-    .freshness-tip { left:50%; top:calc(100% + 8px); transform:translateX(-50%); width:min(260px, calc(100vw - 32px)); }
+    .freshness-tip { left:50%; top:calc(100% + 8px); transform:translateX(-50%); width:min(260px, calc(100vw - 32px)); padding:10px; font-size:0.85rem; }
+    .freshness-tip-row { gap:10px; padding:6px 8px; }
+    .freshness-tip-icons { width:70px; }
+    .tip-icon { width:22px; height:22px; }
   }
 </style>
 </body>
 </html>
-

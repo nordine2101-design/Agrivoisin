@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('order_id, seller_id, status, auto_release_at, released_at')
+      .select('order_id, seller_id, status, auto_release_at, released_at, pickup_start_at')
       .in('order_id', orderIds);
 
     if (payoutsError) {
@@ -132,7 +132,13 @@ export default async function handler(req, res) {
           review: existingReview || null,
           // null pour les anciennes commandes (payées avant l'argent retenu)
           payout: payoutRow
-            ? { status: payoutRow.status, autoReleaseAt: payoutRow.auto_release_at, releasedAt: payoutRow.released_at }
+            ? {
+                status: payoutRow.status,
+                autoReleaseAt: payoutRow.auto_release_at,
+                releasedAt: payoutRow.released_at,
+                // Le début du créneau de retrait : avant ce moment, l'acheteur ne peut pas signaler de problème (vide = sans attente)
+                pickupStartAt: payoutRow.pickup_start_at || null,
+              }
             : null,
         };
       });

@@ -189,10 +189,12 @@
     }
   }
 
-  function starsHtml(count) {
+  // La fraîcheur s'affiche avec le flocon de neige d'Agrivoisin, répété 1, 2 ou 3 fois (à la place des étoiles).
+  // Le texte qui suit (« Très frais »…) dit la même chose : l'image seule est décorative.
+  function freshnessIconsHtml(count) {
     let html = '';
     for (let i = 0; i < count; i++) {
-      html += '⭐';
+      html += '<img src="flocon.png" alt="" class="freshness-icon">';
     }
     return html;
   }
@@ -291,7 +293,7 @@
 
       const freshness = freshnessInfo(item.harvest_date);
       const freshnessHtml = freshness
-        ? `<p class="freshness-badge" title="${freshness.label}">${starsHtml(freshness.stars)} ${freshness.label}</p>`
+        ? `<p class="freshness-badge" title="${freshness.label}">${freshnessIconsHtml(freshness.stars)} ${freshness.label}</p>`
         : '';
 
       const distance = getDistanceForListing(item);
@@ -439,6 +441,8 @@
 <style>
   .produce-card-body p.stock-badge { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
   .produce-card-body p.stock-badge.stock-out { color:#C8352F; }
+  .produce-card-body p.freshness-badge { display:flex; align-items:center; gap:3px; }
+  .freshness-icon { width:30px; height:30px; object-fit:contain; flex-shrink:0; }
   .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
 </style>
 </body>

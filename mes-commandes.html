@@ -426,9 +426,118 @@
     return icons;
   }
 
+  // Encadré d'explication affiché au survol des fraises (comme pour le flocon de neige)
+  const STRAWBERRY_LEVELS = [
+    { n: 1, title: 'Décevant.', text: 'Le produit ne correspondait pas à l\u2019annonce.' },
+    { n: 2, title: 'Moyen.', text: 'Le produit était correct, mais j\u2019attendais mieux.' },
+    { n: 3, title: 'Bien.', text: 'Le produit était conforme à l\u2019annonce.' },
+    { n: 4, title: 'Excellent.', text: 'Produit superbe, vendeur au top, je recommande.' }
+  ];
+  let strawberryTipCount = 0;
+
+  function strawberryTipHtml(tipId, current) {
+    let html = `<div class="strawberry-tip" id="${tipId}" role="tooltip">`;
+    STRAWBERRY_LEVELS.forEach((level) => {
+      let icons = '';
+      for (let j = 0; j < level.n; j++) {
+        icons += '<img src="fraise-mascotte.png" alt="">';
+      }
+      html += `<div class="strawberry-tip-row${level.n === current ? ' current' : ''}" data-level="${level.n}">
+        <span class="strawberry-tip-icons">${icons}</span>
+        <span class="strawberry-tip-text"><strong>${level.title}</strong> ${level.text}</span>
+      </div>`;
+    });
+    html += `</div>`;
+    return html;
+  }
+
+  function strawberryCheckedLevel(group) {
+    const checked = group.querySelector('input[type="radio"]:checked');
+    return checked ? Number(checked.value) : 0;
+  }
+
+  function setStrawberryTipLevel(group, level) {
+    group.querySelectorAll('.strawberry-tip-row').forEach((row) => {
+      row.classList.toggle('current', Number(row.dataset.level) === level);
+    });
+  }
+
+  // L'encadré est « fixe » (il flotte par-dessus la page) : la liste des commandes défile dans un cadre
+  // qui le couperait sinon. On le place au-dessus des fraises, ou en dessous s'il n'y a pas la place.
+  function placeStrawberryTip(group) {
+    const tip = group.querySelector('.strawberry-tip');
+    if (!tip) return;
+    const before = tip.style.cssText;
+    tip.style.visibility = 'hidden';
+    tip.style.display = 'block';
+    const g = group.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
+    tip.style.display = '';
+    tip.style.visibility = '';
+    let top = g.top - h - 8;
+    if (top < 8) top = g.bottom + 8;
+    let left = Math.min(g.left, window.innerWidth - w - 8);
+    if (left < 8) left = 8;
+    tip.style.left = Math.round(left) + 'px';
+    tip.style.top = Math.round(top) + 'px';
+  }
+  function placeVisibleStrawberryTips() {
+    document.querySelectorAll('.strawberry-group').forEach((g) => {
+      const tip = g.querySelector('.strawberry-tip');
+      if (tip && getComputedStyle(tip).display !== 'none') placeStrawberryTip(g);
+    });
+  }
+  document.addEventListener('mouseover', (e) => {
+    const hovered = e.target.closest('.strawberry-group');
+    if (hovered) placeStrawberryTip(hovered);
+  });
+  document.addEventListener('focusin', (e) => {
+    const focused = e.target.closest && e.target.closest('.strawberry-group');
+    if (focused) placeStrawberryTip(focused);
+  });
+  document.addEventListener('scroll', placeVisibleStrawberryTips, true);
+  window.addEventListener('resize', placeVisibleStrawberryTips);
+
+  document.addEventListener('mouseover', (e) => {
+    const option = e.target.closest('.strawberry-option');
+    if (!option) return;
+    const group = option.closest('.strawberry-group');
+    if (group) setStrawberryTipLevel(group, Number(option.querySelector('input').value));
+  });
+  document.addEventListener('mouseout', (e) => {
+    const option = e.target.closest('.strawberry-option');
+    if (!option) return;
+    const group = option.closest('.strawberry-group');
+    if (group) setStrawberryTipLevel(group, strawberryCheckedLevel(group));
+  });
+  document.addEventListener('change', (e) => {
+    const group = e.target.closest && e.target.closest('.strawberry-group');
+    if (group) setStrawberryTipLevel(group, strawberryCheckedLevel(group));
+  });
+  // Écran tactile : un toucher ouvre l'encadré, un toucher ailleurs le ferme
+  document.addEventListener('click', (e) => {
+    const touchOnly = !window.matchMedia('(hover: hover)').matches;
+    document.querySelectorAll('.strawberry-group.open').forEach((g) => {
+      if (!g.contains(e.target)) g.classList.remove('open');
+    });
+    if (!touchOnly) return;
+    const group = e.target.closest('.strawberry-group');
+    if (group) {
+      group.classList.add('open');
+      placeStrawberryTip(group);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.strawberry-group.open').forEach((g) => g.classList.remove('open'));
+    }
+  });
+
   function renderStrawberryPicker(orderId, sellerId) {
+    const tipId = 'strawberryTip' + (++strawberryTipCount);
     let html = `<form class="review-form" data-order-id="${orderId}" data-seller-id="${sellerId}">`;
-    html += `<div class="strawberry-picker">`;
+    html += `<div class="strawberry-picker strawberry-group" aria-describedby="${tipId}">`;
     for (let i = 1; i <= 4; i++) {
       html += `
         <label class="strawberry-option">
@@ -436,6 +545,7 @@
           <span class="strawberry-row">${strawberryIcons(i)}</span>
         </label>`;
     }
+    html += strawberryTipHtml(tipId, 0);
     html += `</div>`;
     html += `<textarea placeholder="Votre avis sur ce vendeur (optionnel)" class="review-comment"></textarea>`;
     html += `<button type="submit" class="btn btn-primary">Envoyer mon avis</button>`;
@@ -445,9 +555,10 @@
   }
 
   function renderExistingReview(review, justSubmitted) {
+    const tipId = 'strawberryTip' + (++strawberryTipCount);
     return `
       <div class="existing-review">
-        <span class="strawberry-row">${strawberryIcons(review.rating)}</span>
+        <span class="strawberry-group strawberry-group-fixed" tabindex="0" aria-describedby="${tipId}"><span class="strawberry-row">${strawberryIcons(review.rating)}</span>${strawberryTipHtml(tipId, Number(review.rating))}</span>
         ${review.comment ? `<p>"${review.comment}"</p>` : ''}
         <p style="font-size:0.9em;color:#888;">${justSubmitted ? 'Avis envoyé' : 'Avis déjà envoyé'}</p>
       </div>
@@ -569,7 +680,19 @@
   .order-item-line { font-size:0.9rem; line-height:1.6; }
   .order-fee-line { display:flex; justify-content:space-between; gap:12px; border-top:1px solid #eee; margin-top:14px; padding-top:10px; font-size:0.9rem; color:#6B5842; }
   .order-fee-amount { white-space:nowrap; }
-  .strawberry-picker { display:flex; flex-direction:row; flex-wrap:nowrap; gap:8px; margin:10px 0; }
+  .strawberry-picker { display:flex; flex-direction:row; flex-wrap:nowrap; gap:8px; margin:10px 0; width:fit-content; }
+  .strawberry-group { position:relative; cursor:default; outline-offset:4px; }
+  .strawberry-group-fixed { display:inline-block; }
+  .strawberry-tip { display:none; position:fixed; left:0; top:0; z-index:1000; pointer-events:none; width:min(340px, calc(100vw - 16px)); box-sizing:border-box; padding:10px; background:#fff; border:1px solid #e6e0d3; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.15); font-size:0.88rem; line-height:1.4; color:#3b3126; text-align:left; font-weight:400; }
+  .strawberry-group.open .strawberry-tip { display:block; }
+  @media (hover: hover) { .strawberry-group:hover .strawberry-tip { display:block; } }
+  .strawberry-group:has(input:focus-visible) .strawberry-tip, .strawberry-group:focus-visible .strawberry-tip { display:block; }
+  .strawberry-tip-row { display:flex; align-items:center; gap:10px; padding:7px 8px; border-left:3px solid transparent; border-radius:8px; }
+  .strawberry-tip-row + .strawberry-tip-row { margin-top:3px; }
+  .strawberry-tip-row.current { background:#EEF2FF; border-left-color:#4169E1; }
+  .strawberry-tip-icons { display:flex; width:76px; flex-shrink:0; }
+  .strawberry-tip-icons img { width:18px; height:18px; object-fit:contain; mix-blend-mode:multiply; }
+  .strawberry-tip-text strong { color:#4169E1; }
   .strawberry-option { cursor:pointer; display:inline-block; }
   .strawberry-row { display:inline-flex; flex-direction:row; flex-wrap:nowrap; align-items:center; gap:2px; }
   .strawberry-icon-wrap { width:26px; height:26px; display:inline-block; flex-shrink:0; }

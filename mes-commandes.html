@@ -644,7 +644,20 @@
         return;
       }
 
+      // Numéro d'une commande = son rang d'achat : la toute première commande passée est la n° 1,
+      // la suivante la n° 2, etc. Ce numéro ne change jamais, même quand une nouvelle commande arrive.
+      const purchaseRank = new Map();
+      data.orders
+        .map((order, index) => ({ order, index }))
+        .sort((a, b) => (new Date(a.order.createdAt) - new Date(b.order.createdAt)) || (b.index - a.index))
+        .forEach((entry, position) => purchaseRank.set(entry.order.orderId, position + 1));
+
       data.orders.forEach((order) => {
+        const banner = document.createElement('div');
+        banner.className = 'order-banner';
+        banner.textContent = 'Commande n° ' + purchaseRank.get(order.orderId);
+        ordersContainer.appendChild(banner);
+
         const orderDiv = document.createElement('div');
         orderDiv.className = 'order-card';
         const date = new Date(order.createdAt).toLocaleDateString('fr-FR');
@@ -684,6 +697,8 @@
 </script>
 
 <style>
+  .order-banner { background:var(--leaf-deep, #385C3B); color:#fff; font-weight:700; font-size:1rem; letter-spacing:0.02em; text-align:center; padding:10px 14px; border-radius:10px; margin:26px 0 10px; }
+  .order-banner:first-child { margin-top:0; }
   .order-card { background:#f9f7f2; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
   .order-card h3 { font-size:0.95rem; margin-bottom:8px; }
   .order-seller-block { border-top:1px solid #eee; padding-top:14px; margin-top:14px; }

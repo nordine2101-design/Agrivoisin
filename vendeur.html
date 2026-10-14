@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vendeur — Agrivoisin</title>
+<meta name="description" content="Le profil d'un vendeur Agrivoisin : sa note, les avis des acheteurs et ses annonces en ligne.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ PAGE VENDEUR ============ -->
+<section class="page-header">
+  <div class="container">
+    <div style="text-align:left;margin-bottom:12px;">
+      <a href="annonces.html" class="btn btn-ghost">Retour aux annonces</a>
+    </div>
+
+    <p id="loadingMessage" style="color:#C8352F;">Chargement du vendeur...</p>
+    <p id="errorMessage" style="display:none;color:#C8352F;"></p>
+
+    <div id="sellerProfile" style="display:none;text-align:center;">
+      <h1 id="sellerTitle" style="margin-bottom:8px;"></h1>
+      <p id="sellerSubtitle" style="display:none;font-size:1rem;margin:0 0 10px;"></p>
+      <p style="margin:0 0 14px;"><span id="sellerBadge" class="seller-badge"></span></p>
+      <p id="sellerRating" style="margin:0;"></p>
+    </div>
+  </div>
+</section>
+
+<section id="reviewsSection" class="listings-section" style="display:none;padding-top:0;">
+  <div class="container">
+    <h2 style="font-size:1.4rem;margin-bottom:16px;">Avis des acheteurs</h2>
+    <div id="reviewsList" class="reviews-list"></div>
+  </div>
+</section>
+
+<section id="listingsSection" class="listings-section" style="display:none;">
+  <div class="container">
+    <h2 style="font-size:1.4rem;margin-bottom:16px;">Annonces en ligne</h2>
+    <div id="sellerListings" class="produce-grid listings-grid"></div>
+    <p id="noListingsMessage" style="display:none;margin-top:8px;">Ce vendeur n'a pas d'annonce en ligne pour le moment.</p>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const loadingMessage = document.getElementById('loadingMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const listingId = new URLSearchParams(window.location.search).get('listing');
+
+  function showError(text) {
+    loadingMessage.style.display = 'none';
+    errorMessage.innerHTML = text;
+    errorMessage.style.display = 'block';
+  }
+
+  const BACK_LINK = ' <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>';
+
+  // Une quantité s'écrit toujours avec son unité : « 3 kg », « 1 botte », « 3 bottes »
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+  const LOW_STOCK_THRESHOLD = 5;
+
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'kg';
+    if (count <= 1) return u;
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u;
+    return pluralWord(u);
+  }
+
+  function formatAverage(value) {
+    return Number(value).toFixed(1).replace('.', ',');
+  }
+
+  // Note moyenne : « 3,5 × [fraise] · 12 avis ». Moins de 3 avis : « Nouveau vendeur ».
+  const MIN_REVIEWS_FOR_AVERAGE = 3;
+
+  function renderRating(rating) {
+    const el = document.getElementById('sellerRating');
+    el.textContent = '';
+    el.className = 'seller-rating';
+    const count = rating && Number(rating.count) ? Number(rating.count) : 0;
+
+    if (!rating || rating.average == null || count < MIN_REVIEWS_FOR_AVERAGE) {
+      el.classList.add('seller-rating-new');
+      el.textContent = 'Nouveau vendeur';
+      return;
+    }
+
+    const average = formatAverage(rating.average);
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', 'Note moyenne du vendeur : ' + average + ' fraises sur 4, ' + count + ' avis');
+
+    const value = document.createElement('span');
+    value.setAttribute('aria-hidden', 'true');
+    value.textContent = average + ' \u00D7';
+
+    const icon = document.createElement('img');
+    icon.src = 'fraise-mascotte.png';
+    icon.alt = '';
+    icon.className = 'seller-rating-icon';
+
+    const reviews = document.createElement('span');
+    reviews.className = 'seller-rating-count';
+    reviews.setAttribute('aria-hidden', 'true');
+    reviews.textContent = '\u00B7 ' + count + ' avis';
+
+    el.appendChild(value);
+    el.appendChild(icon);
+    el.appendChild(reviews);
+  }
+
+  // Commentaires : toujours signés « Acheteur vérifié », jamais de nom ni d'e-mail. Le texte n'est jamais interprété comme du code.
+  function renderReviews(reviews) {
+    const list = document.getElementById('reviewsList');
+    list.textContent = '';
+    if (!reviews || reviews.length === 0) return;
+
+    reviews.forEach((review) => {
+      const card = document.createElement('div');
+      card.className = 'review-card';
+
+      const head = document.createElement('div');
+      head.className = 'review-head';
+
+      const rating = Number(review.rating);
+      const stars = document.createElement('span');
+      stars.className = 'review-stars';
+      stars.setAttribute('role', 'img');
+      stars.setAttribute('aria-label', 'Note : ' + rating + ' fraise' + (rating > 1 ? 's' : '') + ' sur 4');
+      const starsValue = document.createElement('span');
+      starsValue.setAttribute('aria-hidden', 'true');
+      starsValue.textContent = rating + ' \u00D7';
+      const starsIcon = document.createElement('img');
+      starsIcon.src = 'fraise-mascotte.png';
+      starsIcon.alt = '';
+      starsIcon.className = 'review-icon';
+      stars.appendChild(starsValue);
+      stars.appendChild(starsIcon);
+
+      const who = document.createElement('span');
+      who.className = 'review-who';
+      let whoText = 'Acheteur vérifié';
+      const date = review.created_at ? new Date(review.created_at) : null;
+      if (date && !Number.isNaN(date.getTime())) {
+        whoText += ' \u00B7 ' + date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+      who.textContent = whoText;
+
+      head.appendChild(stars);
+      head.appendChild(who);
+
+      const text = document.createElement('p');
+      text.className = 'review-text';
+      text.textContent = review.comment;
+
+      card.appendChild(head);
+      card.appendChild(text);
+      list.appendChild(card);
+    });
+
+    document.getElementById('reviewsSection').style.display = 'block';
+  }
+
+  function renderListings(listings) {
+    const grid = document.getElementById('sellerListings');
+    grid.textContent = '';
+    document.getElementById('listingsSection').style.display = 'block';
+
+    if (!listings || listings.length === 0) {
+      document.getElementById('noListingsMessage').style.display = 'block';
+      return;
+    }
+
+    listings.forEach((item) => {
+      const href = 'produit.html?id=' + encodeURIComponent(item.id);
+
+      const card = document.createElement('div');
+      card.className = 'produce-card';
+
+      const imageLink = document.createElement('a');
+      imageLink.href = href;
+      imageLink.className = 'produce-card-image';
+      imageLink.style.display = 'block';
+      const image = document.createElement('img');
+      image.src = item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop';
+      image.alt = item.title || '';
+      imageLink.appendChild(image);
+
+      const body = document.createElement('div');
+      body.className = 'produce-card-body';
+
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = item.subcategory || item.category || 'Récolte';
+
+      const title = document.createElement('h4');
+      const titleLink = document.createElement('a');
+      titleLink.href = href;
+      titleLink.textContent = item.title;
+      title.appendChild(titleLink);
+
+      body.appendChild(tag);
+      body.appendChild(title);
+
+      const stock = item.quantity_available == null ? null : Number(item.quantity_available);
+      if (stock !== null && stock > 0 && stock <= LOW_STOCK_THRESHOLD) {
+        const badge = document.createElement('p');
+        badge.className = 'seller-listing-stock';
+        badge.textContent = 'Plus que ' + stock + ' ' + unitLabel(item.unit, stock);
+        body.appendChild(badge);
+      }
+
+      const footer = document.createElement('div');
+      footer.className = 'produce-card-footer';
+      const price = document.createElement('span');
+      price.className = 'price';
+      price.textContent = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + (item.unit || 'kg');
+      footer.appendChild(price);
+      body.appendChild(footer);
+
+      card.appendChild(imageLink);
+      card.appendChild(body);
+      grid.appendChild(card);
+    });
+  }
+
+  function renderSeller(seller) {
+    const hasPseudo = !!seller.pseudo;
+    document.title = (hasPseudo ? seller.pseudo : 'Vendeur de ' + seller.city) + ' — Agrivoisin';
+
+    document.getElementById('sellerTitle').textContent = hasPseudo ? seller.pseudo : 'Vendeur de ' + seller.city;
+    const subtitle = document.getElementById('sellerSubtitle');
+    if (hasPseudo) {
+      subtitle.textContent = 'Vendeur de ' + seller.city;
+      subtitle.style.display = 'block';
+    }
+
+    const badge = document.getElementById('sellerBadge');
+    const isPro = seller.seller_type === 'professionnel';
+    badge.textContent = isPro ? 'Professionnel' : 'Particulier';
+    badge.classList.add(isPro ? 'seller-badge-pro' : 'seller-badge-particulier');
+
+    renderRating(seller.rating);
+    renderReviews(seller.reviews);
+    renderListings(seller.listings);
+
+    loadingMessage.style.display = 'none';
+    document.getElementById('sellerProfile').style.display = 'block';
+  }
+
+  if (!listingId) {
+    showError('Ce vendeur est introuvable.' + BACK_LINK);
+  } else {
+    fetch('/api/get-listings?listing=' + encodeURIComponent(listingId))
+      .then((res) => res.json().then((data) => ({ ok: res.ok, status: res.status, data })))
+      .then(({ ok, status, data }) => {
+        if (!ok || !data.seller) {
+          showError(status === 404 ? 'Ce vendeur est introuvable.' + BACK_LINK : 'Impossible de charger ce vendeur pour le moment.');
+          return;
+        }
+        renderSeller(data.seller);
+      })
+      .catch((err) => {
+        console.error('Erreur chargement vendeur :', err);
+        showError('Impossible de charger ce vendeur pour le moment.');
+      });
+  }
+</script>
+<style>
+  .seller-badge { display:inline-block; padding:5px 16px; border-radius:999px; font-size:0.85rem; font-weight:700; border:1.5px solid #D97D45; }
+  .seller-badge-particulier { background:#fff; color:#C4590F; }
+  .seller-badge-pro { background:#D97D45; color:#fff; }
+  .seller-rating { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; font-weight:700; color:var(--leaf-deep); font-size:1.5rem; }
+  .seller-rating-icon { width:40px; height:40px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
+  .seller-rating-count { font-size:0.95rem; font-weight:400; color:#6B5842; }
+  .seller-rating-new { font-size:1rem; color:#6B5842; }
+  .reviews-list { display:grid; gap:12px; max-width:720px; }
+  .review-card { background:var(--white); border-radius:16px; box-shadow:var(--shadow-soft); padding:14px 18px; }
+  .review-head { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:6px; }
+  .review-stars { display:inline-flex; align-items:center; gap:3px; font-weight:700; color:var(--leaf-deep); }
+  .review-icon { width:24px; height:24px; object-fit:contain; mix-blend-mode:multiply; }
+  .review-who { font-size:0.85rem; color:#6B5842; }
+  .review-text { margin:0; line-height:1.6; overflow-wrap:anywhere; white-space:pre-line; }
+  .seller-listing-stock { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
+</style>
+</body>
+</html>

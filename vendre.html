@@ -72,6 +72,10 @@
         <input type="text" id="sellerSiret" placeholder="Ex : 123 456 789 00012" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
       </div>
 
+      <label for="sellerPseudo">Votre pseudo (affiché aux acheteurs)</label>
+      <input type="text" id="sellerPseudo" placeholder="Ex : Jardin de Marie" maxlength="20" autocomplete="off" required>
+      <p style="font-size:0.8rem;color:#6B5842;margin:4px 0 0;">3 à 20 caractères. Les acheteurs ne voient jamais votre nom ni votre e-mail.</p>
+
       <label for="sellerEmail">Votre adresse e-mail</label>
       <input type="email" id="sellerEmail" placeholder="vous@exemple.com" required>
 
@@ -165,6 +169,16 @@
 
   const siretBlock = document.getElementById('siretBlock');
   const siretInput = document.getElementById('sellerSiret');
+  const pseudoInput = document.getElementById('sellerPseudo');
+
+  // Pseudo : 3 à 20 caractères (lettres, chiffres, espaces, tirets), ni espace ni tiret au début ou à la fin
+  const PSEUDO_ERROR = 'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.';
+  function cleanPseudo(value) {
+    return String(value || '').trim().replace(/\s+/g, ' ');
+  }
+  function isValidPseudo(pseudo) {
+    return /^[A-Za-z0-9\u00C0-\u00FF][A-Za-z0-9\u00C0-\u00FF -]{1,18}[A-Za-z0-9\u00C0-\u00FF]$/.test(pseudo);
+  }
 
   function selectedSellerType() {
     return sellerForm.querySelector('input[name="sellerType"]:checked').value;
@@ -199,6 +213,14 @@
       return;
     }
 
+    const pseudo = cleanPseudo(pseudoInput.value);
+    if (!isValidPseudo(pseudo)) {
+      errorEl.textContent = 'Erreur : ' + PSEUDO_ERROR;
+      errorEl.style.display = 'block';
+      pseudoInput.focus();
+      return;
+    }
+
     btn.textContent = 'Création en cours...';
     btn.disabled = true;
     errorEl.style.display = 'none';
@@ -215,7 +237,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ email, city, postalCode, address, sellerType, siret }),
+        body: JSON.stringify({ email, city, postalCode, address, sellerType, siret, pseudo }),
       });
 
       const data = await response.json();

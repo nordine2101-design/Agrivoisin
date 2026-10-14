@@ -334,7 +334,14 @@
       const d = haversineDistance(buyerLocation.lat, buyerLocation.lng, item.sellers.latitude, item.sellers.longitude);
       sellerText += ' · à ' + (d < 1 ? Math.round(d * 1000) + ' m' : d.toFixed(1).replace('.', ',') + ' km');
     }
-    document.getElementById('listingSeller').textContent = sellerText;
+    // Le vendeur est cliquable : sa page montre sa note, ses avis et ses annonces en ligne
+    const sellerEl = document.getElementById('listingSeller');
+    sellerEl.textContent = '';
+    const sellerLink = document.createElement('a');
+    sellerLink.href = 'vendeur.html?listing=' + encodeURIComponent(item.id);
+    sellerLink.className = 'seller-link';
+    sellerLink.textContent = sellerText;
+    sellerEl.appendChild(sellerLink);
 
     renderSellerRating(item.seller_rating);
 
@@ -482,6 +489,8 @@
   .seller-rating { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; font-weight:700; color:var(--leaf-deep); font-size:1.25rem; }
   .seller-rating-icon { width:34px; height:34px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
   .seller-rating-count { font-size:0.85rem; font-weight:400; color:#6B5842; }
+  .seller-link { color:var(--leaf-deep); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+  .seller-link:hover { color:var(--carrot-deep); }
   .seller-rating-new { font-size:0.95rem; font-weight:700; color:#6B5842; }
   #listingFreshness { flex-direction:column; align-items:center; }
   .freshness-icons { display:flex; flex-wrap:wrap; justify-content:center; gap:3px; }

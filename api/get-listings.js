@@ -53,7 +53,7 @@ export default async function handler(req, res) {
   try {
     const { data: listings, error } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type)')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
       .order('created_at', { ascending: false });
 
     if (error) {

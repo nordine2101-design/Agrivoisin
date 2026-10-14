@@ -116,6 +116,8 @@ export default async function handler(req, res) {
 
   try {
     const { email, city, postalCode, address } = req.body;
+    const sellerTypeRaw = req.body.sellerType;
+    const siretRaw = req.body.siret;
 
     // 0. Vérifier que la personne est bien connectée
     const authHeader = req.headers.authorization || '';
@@ -132,6 +134,19 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
+
+    // 0 bis. Particulier ou professionnel ? (sans réponse : particulier, comme avant)
+    const sellerType = sellerTypeRaw == null || sellerTypeRaw === '' ? 'particulier' : sellerTypeRaw;
+    if (sellerType !== 'particulier' && sellerType !== 'professionnel') {
+      return res.status(400).json({ error: 'Indiquez si vous êtes particulier ou professionnel.' });
+    }
+    let siret = null;
+    if (sellerType === 'professionnel') {
+      siret = String(siretRaw == null ? '' : siretRaw).replace(/[\s.]/g, '');
+      if (!/^\d{14}$/.test(siret)) {
+        return res.status(400).json({ error: 'Le numéro SIRET doit comporter 14 chiffres.' });
+      }
+    }
 
     // 1. Vérifier la ville et le code postal AVANT de créer quoi que ce soit chez Stripe.
     //    La position enregistrée est celle de la commune (jamais l'adresse exacte).
@@ -188,6 +203,8 @@ export default async function handler(req, res) {
         address: address,
         latitude: latitude,
         longitude: longitude,
+        seller_type: sellerType,
+        siret: siret,
       };
       if (createdStripeAccount) {
         changes.stripe_account_id = stripeAccountId;
@@ -205,6 +222,8 @@ export default async function handler(req, res) {
           latitude: latitude,
           longitude: longitude,
           user_id: userId,
+          seller_type: sellerType,
+          siret: siret,
         });
       dbError = result.error;
     }

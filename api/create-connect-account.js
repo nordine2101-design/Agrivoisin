@@ -118,6 +118,7 @@ export default async function handler(req, res) {
     const { email, city, postalCode, address } = req.body;
     const sellerTypeRaw = req.body.sellerType;
     const siretRaw = req.body.siret;
+    const pseudoRaw = req.body.pseudo;
 
     // 0. Vérifier que la personne est bien connectée
     const authHeader = req.headers.authorization || '';
@@ -148,6 +149,18 @@ export default async function handler(req, res) {
       }
     }
 
+    // 0 ter. Pseudo affiché aux acheteurs (facultatif ici : les anciennes pages n'en envoient pas)
+    //        3 à 20 caractères : lettres, chiffres, espaces et tirets ; ni espace ni tiret au début ou à la fin.
+    let pseudo = null;
+    if (pseudoRaw != null && String(pseudoRaw).trim() !== '') {
+      pseudo = String(pseudoRaw).trim().replace(/\s+/g, ' ');
+      if (!/^[A-Za-z0-9\u00C0-\u00FF][A-Za-z0-9\u00C0-\u00FF -]{1,18}[A-Za-z0-9\u00C0-\u00FF]$/.test(pseudo)) {
+        return res.status(400).json({
+          error: 'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.',
+        });
+      }
+    }
+
     // 1. Vérifier la ville et le code postal AVANT de créer quoi que ce soit chez Stripe.
     //    La position enregistrée est celle de la commune (jamais l'adresse exacte).
     const commune = await lookupCommune(city, postalCode);
@@ -170,6 +183,25 @@ export default async function handler(req, res) {
       return res.status(500).json({
         error: 'Impossible de vérifier votre compte vendeur pour le moment. Réessayez dans quelques instants.',
       });
+    }
+
+    // 2 bis. Ce pseudo est-il déjà pris par quelqu'un d'autre ? (majuscules et minuscules comptent pareil)
+    if (pseudo) {
+      const { data: taken, error: pseudoError } = await supabase
+        .from('sellers')
+        .select('id')
+        .ilike('pseudo', pseudo)
+        .limit(1);
+
+      if (pseudoError) {
+        console.error('Erreur Supabase (vérification du pseudo) :', pseudoError);
+        return res.status(500).json({
+          error: 'Impossible de vérifier le pseudo pour le moment. Réessayez dans quelques instants.',
+        });
+      }
+      if (taken && taken.length > 0 && (!existingSeller || taken[0].id !== existingSeller.id)) {
+        return res.status(409).json({ error: 'Ce pseudo est déjà pris. Choisissez-en un autre.' });
+      }
     }
 
     // 3. Compte Stripe Connect Express : on réutilise celui qui existe, sinon on en crée un
@@ -206,6 +238,9 @@ export default async function handler(req, res) {
         seller_type: sellerType,
         siret: siret,
       };
+      if (pseudo) {
+        changes.pseudo = pseudo;
+      }
       if (createdStripeAccount) {
         changes.stripe_account_id = stripeAccountId;
       }
@@ -224,6 +259,7 @@ export default async function handler(req, res) {
           user_id: userId,
           seller_type: sellerType,
           siret: siret,
+          pseudo: pseudo,
         });
       dbError = result.error;
     }
@@ -238,6 +274,11 @@ export default async function handler(req, res) {
         } catch (deleteError) {
           console.error('Impossible de supprimer le compte Stripe créé :', deleteError);
         }
+      }
+
+      // Deux personnes ont choisi le même pseudo au même instant : la base de données refuse la seconde
+      if (dbError.code === '23505') {
+        return res.status(409).json({ error: 'Ce pseudo est déjà pris. Choisissez-en un autre.' });
       }
 
       return res.status(500).json({
@@ -257,6 +298,7 @@ export default async function handler(req, res) {
       accountId: stripeAccountId,
       onboardingUrl: accountLink.url,
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });

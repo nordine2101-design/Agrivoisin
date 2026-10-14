@@ -92,15 +92,60 @@ async function lookupCommune(city, postalCode) {
   return { ok: true, city: match.nom, latitude: coords[1], longitude: coords[0] };
 }
 
+// --- Pseudo affiché aux acheteurs ---
+// 3 à 20 caractères : lettres, chiffres, espaces et tirets ; ni espace ni tiret au début ou à la fin.
+// Vide = pas de pseudo (les anciennes pages n'en envoient pas).
+const PSEUDO_ERROR =
+  'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.';
+
+function cleanPseudo(raw) {
+  if (raw == null || String(raw).trim() === '') {
+    return { ok: true, pseudo: null };
+  }
+  const pseudo = String(raw).trim().replace(/\s+/g, ' ');
+  if (!/^[A-Za-z0-9\u00C0-\u00FF][A-Za-z0-9\u00C0-\u00FF -]{1,18}[A-Za-z0-9\u00C0-\u00FF]$/.test(pseudo)) {
+    return { ok: false, status: 400, error: PSEUDO_ERROR };
+  }
+  return { ok: true, pseudo };
+}
+
+// Ce pseudo est-il déjà pris par un autre vendeur ? (majuscules et minuscules comptent pareil)
+async function isPseudoTaken(pseudo, ownSellerId) {
+  const { data, error } = await supabase.from('sellers').select('id').ilike('pseudo', pseudo).limit(1);
+  if (error) {
+    console.error('Erreur Supabase (vérification du pseudo) :', error);
+    return { error: true };
+  }
+  return { taken: !!(data && data.length > 0 && (!ownSellerId || data[0].id !== ownSellerId)) };
+}
+
+const PSEUDO_TAKEN_ERROR = 'Ce pseudo est déjà pris. Choisissez-en un autre.';
+const PSEUDO_CHECK_ERROR = 'Impossible de vérifier le pseudo pour le moment. Réessayez dans quelques instants.';
+
 export default async function handler(req, res) {
   // Simple vérification "cette ville va-t-elle avec ce code postal ?"
   // (utilisée par le formulaire d'inscription, avant de créer le compte)
   if (req.method === 'GET') {
-    const { city, postalCode } = req.query;
+    const { city, postalCode, pseudo: pseudoQuery } = req.query;
     const result = await lookupCommune(city, postalCode);
 
     if (!result.ok) {
       return res.status(result.status).json({ error: result.error });
+    }
+
+    // Si un pseudo est proposé, on vérifie aussi qu'il est valide et libre (avant de créer le compte)
+    const cleaned = cleanPseudo(pseudoQuery);
+    if (!cleaned.ok) {
+      return res.status(cleaned.status).json({ error: cleaned.error });
+    }
+    if (cleaned.pseudo) {
+      const check = await isPseudoTaken(cleaned.pseudo, null);
+      if (check.error) {
+        return res.status(500).json({ error: PSEUDO_CHECK_ERROR });
+      }
+      if (check.taken) {
+        return res.status(409).json({ error: PSEUDO_TAKEN_ERROR });
+      }
     }
 
     return res.status(200).json({
@@ -150,16 +195,11 @@ export default async function handler(req, res) {
     }
 
     // 0 ter. Pseudo affiché aux acheteurs (facultatif ici : les anciennes pages n'en envoient pas)
-    //        3 à 20 caractères : lettres, chiffres, espaces et tirets ; ni espace ni tiret au début ou à la fin.
-    let pseudo = null;
-    if (pseudoRaw != null && String(pseudoRaw).trim() !== '') {
-      pseudo = String(pseudoRaw).trim().replace(/\s+/g, ' ');
-      if (!/^[A-Za-z0-9\u00C0-\u00FF][A-Za-z0-9\u00C0-\u00FF -]{1,18}[A-Za-z0-9\u00C0-\u00FF]$/.test(pseudo)) {
-        return res.status(400).json({
-          error: 'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.',
-        });
-      }
+    const cleanedPseudo = cleanPseudo(pseudoRaw);
+    if (!cleanedPseudo.ok) {
+      return res.status(cleanedPseudo.status).json({ error: cleanedPseudo.error });
     }
+    const pseudo = cleanedPseudo.pseudo;
 
     // 1. Vérifier la ville et le code postal AVANT de créer quoi que ce soit chez Stripe.
     //    La position enregistrée est celle de la commune (jamais l'adresse exacte).
@@ -185,22 +225,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2 bis. Ce pseudo est-il déjà pris par quelqu'un d'autre ? (majuscules et minuscules comptent pareil)
+    // 2 bis. Ce pseudo est-il déjà pris par quelqu'un d'autre ?
     if (pseudo) {
-      const { data: taken, error: pseudoError } = await supabase
-        .from('sellers')
-        .select('id')
-        .ilike('pseudo', pseudo)
-        .limit(1);
-
-      if (pseudoError) {
-        console.error('Erreur Supabase (vérification du pseudo) :', pseudoError);
-        return res.status(500).json({
-          error: 'Impossible de vérifier le pseudo pour le moment. Réessayez dans quelques instants.',
-        });
+      const check = await isPseudoTaken(pseudo, existingSeller ? existingSeller.id : null);
+      if (check.error) {
+        return res.status(500).json({ error: PSEUDO_CHECK_ERROR });
       }
-      if (taken && taken.length > 0 && (!existingSeller || taken[0].id !== existingSeller.id)) {
-        return res.status(409).json({ error: 'Ce pseudo est déjà pris. Choisissez-en un autre.' });
+      if (check.taken) {
+        return res.status(409).json({ error: PSEUDO_TAKEN_ERROR });
       }
     }
 
@@ -278,7 +310,7 @@ export default async function handler(req, res) {
 
       // Deux personnes ont choisi le même pseudo au même instant : la base de données refuse la seconde
       if (dbError.code === '23505') {
-        return res.status(409).json({ error: 'Ce pseudo est déjà pris. Choisissez-en un autre.' });
+        return res.status(409).json({ error: PSEUDO_TAKEN_ERROR });
       }
 
       return res.status(500).json({
@@ -298,7 +330,6 @@ export default async function handler(req, res) {
       accountId: stripeAccountId,
       onboardingUrl: accountLink.url,
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });

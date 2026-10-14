@@ -37,8 +37,8 @@
       
       <button class="btn btn-primary" id="buyerCityBtn" type="button">Valider</button>
       <div class="seller-type-filter" role="group" aria-label="Type de vendeur">
-        <label class="type-check"><input type="checkbox" id="typeParticulier" checked><span>Particuliers</span></label>
-        <label class="type-check"><input type="checkbox" id="typeProfessionnel" checked><span>Professionnels</span></label>
+        <label class="type-check"><input type="checkbox" id="typeParticulier"><span>Particuliers</span></label>
+        <label class="type-check"><input type="checkbox" id="typeProfessionnel"><span>Professionnels</span></label>
       </div>
     </div>
     <p id="buyerCityDisplay" style="display:none;font-size:0.8rem;color:#4C7A50;margin-top:6px;"></p>
@@ -271,11 +271,14 @@
 
     filtered = filtered.filter((item) => matchesSearch(item, currentSearch));
 
-    // Particuliers et/ou professionnels (un vendeur sans type connu est un particulier)
-    filtered = filtered.filter((item) => {
-      const isPro = item.sellers && item.sellers.seller_type === 'professionnel';
-      return isPro ? typeProfessionnel.checked : typeParticulier.checked;
-    });
+    // Particuliers et/ou professionnels (un vendeur sans type connu est un particulier).
+    // Aucun bouton sélectionné : on voit tout. Sinon : seulement les types sélectionnés.
+    if (typeParticulier.checked || typeProfessionnel.checked) {
+      filtered = filtered.filter((item) => {
+        const isPro = item.sellers && item.sellers.seller_type === 'professionnel';
+        return isPro ? typeProfessionnel.checked : typeParticulier.checked;
+      });
+    }
 
     if (currentSort === 'price-asc') {
       filtered.sort((a, b) => a.price - b.price);
@@ -383,14 +386,9 @@
     renderListings();
   });
 
-  // Au moins une des deux cases reste toujours cochée
+  // Un clic sélectionne le type (bouton orange), un deuxième clic le désélectionne
   [typeParticulier, typeProfessionnel].forEach((box) => {
-    box.addEventListener('change', () => {
-      if (!typeParticulier.checked && !typeProfessionnel.checked) {
-        box.checked = true;
-      }
-      renderListings();
-    });
+    box.addEventListener('change', renderListings);
   });
 
   sortSelect.addEventListener('change', () => {

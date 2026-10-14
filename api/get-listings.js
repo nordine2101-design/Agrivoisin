@@ -72,7 +72,120 @@ async function loadSellerComments(sellerId) {
     }));
 }
 
+// ---------------------------------------------------------------------------
+// Administration : les commentaires des acheteurs (masquer un commentaire abusif).
+// Réservé aux adresses e-mail de la variable ADMIN_EMAILS (séparées par des virgules), avec e-mail confirmé.
+// Un commentaire masqué n'apparaît plus sur la page du vendeur ; la note reste comptée dans la moyenne.
+// ---------------------------------------------------------------------------
+const MAX_REVIEWS_LISTED = 100;
+
+function isAdminEmail(email) {
+  const list = String(process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return !!email && list.includes(String(email).trim().toLowerCase());
+}
+
+// Renvoie l'administrateur connecté, ou répond (401 / 403) et renvoie null
+async function requireAdmin(req, res) {
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!token) {
+    res.status(401).json({ error: 'Vous devez être connecté.' });
+    return null;
+  }
+  const { data: userData, error: userError } = await supabase.auth.getUser(token);
+  if (userError || !userData || !userData.user) {
+    res.status(401).json({ error: 'Session invalide, reconnectez-vous.' });
+    return null;
+  }
+  const user = userData.user;
+  if (!isAdminEmail(user.email) || !user.email_confirmed_at) {
+    res.status(403).json({ error: 'Accès réservé.' });
+    return null;
+  }
+  return user;
+}
+
+async function adminListReviews() {
+  const { data: reviews, error } = await supabase
+    .from('reviews')
+    .select('order_id, seller_id, rating, comment, created_at, hidden')
+    .not('comment', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(MAX_REVIEWS_LISTED);
+  if (error) throw new Error('Lecture des commentaires impossible : ' + error.message);
+
+  const rows = (reviews || []).filter((r) => typeof r.comment === 'string' && r.comment.trim() !== '');
+  const sellerIds = [...new Set(rows.map((r) => r.seller_id).filter(Boolean))];
+
+  let sellers = [];
+  if (sellerIds.length > 0) {
+    const sellersResult = await supabase.from('sellers').select('id, city, pseudo').in('id', sellerIds);
+    if (sellersResult.error) throw new Error('Lecture des vendeurs impossible : ' + sellersResult.error.message);
+    sellers = sellersResult.data || [];
+  }
+
+  return {
+    reviews: rows.map((r) => {
+      const seller = sellers.find((x) => x.id === r.seller_id);
+      return {
+        orderId: r.order_id,
+        sellerId: r.seller_id,
+        rating: Number(r.rating),
+        comment: r.comment,
+        createdAt: r.created_at,
+        hidden: r.hidden === true,
+        sellerPseudo: seller ? seller.pseudo || null : null,
+        sellerCity: seller ? seller.city || null : null,
+      };
+    }),
+  };
+}
+
+async function handleAdminAction(req, res) {
+  try {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    const { action, orderId, sellerId, hidden } = req.body || {};
+
+    if (action === 'admin_list_reviews') {
+      return res.status(200).json(await adminListReviews());
+    }
+
+    if (action === 'admin_set_review_hidden') {
+      const validId = (value) => (typeof value === 'string' && value.trim() !== '') || typeof value === 'number';
+      if (!validId(orderId) || !validId(sellerId) || typeof hidden !== 'boolean') {
+        return res.status(400).json({ error: 'Demande invalide.' });
+      }
+
+      const { data, error } = await supabase
+        .from('reviews')
+        .update({ hidden })
+        .eq('order_id', typeof orderId === 'string' ? orderId.trim() : orderId)
+        .eq('seller_id', typeof sellerId === 'string' ? sellerId.trim() : sellerId)
+        .select('order_id');
+      if (error) {
+        console.error('Erreur Supabase (masquer un commentaire) :', error);
+        return res.status(500).json({ error: 'Impossible de modifier ce commentaire pour le moment. Réessayez.' });
+      }
+      if (!data || data.length === 0) {
+        return res.status(404).json({ error: 'Commentaire introuvable.' });
+      }
+      return res.status(200).json({ hidden });
+    }
+
+    return res.status(400).json({ error: 'Action inconnue.' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
 export default async function handler(req, res) {
+  // POST : actions de l'administrateur (modération des commentaires)
+  if (req.method === 'POST') {
+    return handleAdminAction(req, res);
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }

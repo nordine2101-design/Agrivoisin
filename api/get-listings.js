@@ -45,6 +45,33 @@ async function loadSellerRatings(sellerIds) {
   return ratings;
 }
 
+// Les 5 derniers commentaires visibles d'un vendeur (jamais le nom ni l'identifiant de l'acheteur).
+// Un commentaire masqué (hidden = true) ou vide n'est jamais envoyé.
+const MIN_REVIEWS_FOR_COMMENTS = 3;
+const MAX_COMMENTS = 5;
+
+async function loadSellerComments(sellerId) {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('rating, comment, created_at')
+    .eq('seller_id', sellerId)
+    .eq('hidden', false)
+    .not('comment', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) throw error;
+
+  return (data || [])
+    .filter((row) => typeof row.comment === 'string' && row.comment.trim() !== '')
+    .slice(0, MAX_COMMENTS)
+    .map((row) => ({
+      rating: Number(row.rating),
+      comment: row.comment.trim().slice(0, 600),
+      created_at: row.created_at,
+    }));
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -72,6 +99,51 @@ export default async function handler(req, res) {
         item.sellers.longitude != null &&
         (item.quantity_available == null || Number(item.quantity_available) > 0)
     );
+
+    // Page vendeur : ?listing=<id d'une annonce> renvoie le profil public de son vendeur.
+    // L'identifiant du vendeur n'est jamais envoyé : on le retrouve ici à partir de l'annonce.
+    const wantedListing = typeof req.query?.listing === 'string' ? req.query.listing : null;
+    if (wantedListing) {
+      const target = (listings || []).find(
+        (item) => String(item.id) === wantedListing && item.sellers && item.sellers.city && item.seller_id
+      );
+      if (!target) {
+        return res.status(404).json({ error: 'Vendeur introuvable' });
+      }
+
+      const sellerId = target.seller_id;
+      let rating = { average: null, count: 0 };
+      try {
+        const sellerRatings = await loadSellerRatings([sellerId]);
+        if (sellerRatings.get(sellerId)) rating = sellerRatings.get(sellerId);
+      } catch (ratingError) {
+        console.error('Lecture des avis impossible :', ratingError);
+      }
+
+      let reviews = [];
+      if (rating.count >= MIN_REVIEWS_FOR_COMMENTS) {
+        try {
+          reviews = await loadSellerComments(sellerId);
+        } catch (commentError) {
+          console.error('Lecture des commentaires impossible :', commentError);
+        }
+      }
+
+      const sellerListings = visibleListings
+        .filter((item) => item.seller_id === sellerId)
+        .map(({ seller_id, ...item }) => item);
+
+      return res.status(200).json({
+        seller: {
+          pseudo: target.sellers.pseudo || null,
+          city: target.sellers.city,
+          seller_type: target.sellers.seller_type === 'professionnel' ? 'professionnel' : 'particulier',
+          rating: { average: rating.count ? rating.average : null, count: rating.count },
+          reviews,
+          listings: sellerListings,
+        },
+      });
+    }
 
     // La note moyenne du vendeur accompagne chaque annonce (jamais son identifiant)
     // Une panne de lecture des avis ne doit pas empêcher d'afficher les annonces.

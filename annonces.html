@@ -36,6 +36,10 @@
       <input type="text" id="buyerCityInput" placeholder="Votre ville" aria-label="Votre ville" style="flex:1;min-width:140px;padding:10px 20px;border-radius:999px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:0.95rem;">
       
       <button class="btn btn-primary" id="buyerCityBtn" type="button">Valider</button>
+      <div class="seller-type-filter" role="group" aria-label="Type de vendeur">
+        <label class="type-check"><input type="checkbox" id="typeParticulier" checked><span>Particuliers</span></label>
+        <label class="type-check"><input type="checkbox" id="typeProfessionnel" checked><span>Professionnels</span></label>
+      </div>
     </div>
     <p id="buyerCityDisplay" style="display:none;font-size:0.8rem;color:#4C7A50;margin-top:6px;"></p>
   </div>
@@ -93,6 +97,8 @@
   const buyerCityInput = document.getElementById('buyerCityInput');
   const buyerCityBtn = document.getElementById('buyerCityBtn');
   const buyerCityDisplay = document.getElementById('buyerCityDisplay');
+  const typeParticulier = document.getElementById('typeParticulier');
+  const typeProfessionnel = document.getElementById('typeProfessionnel');
 
   CATEGORIES.forEach((cat) => {
     const btn = document.createElement('button');
@@ -265,6 +271,12 @@
 
     filtered = filtered.filter((item) => matchesSearch(item, currentSearch));
 
+    // Particuliers et/ou professionnels (un vendeur sans type connu est un particulier)
+    filtered = filtered.filter((item) => {
+      const isPro = item.sellers && item.sellers.seller_type === 'professionnel';
+      return isPro ? typeProfessionnel.checked : typeParticulier.checked;
+    });
+
     if (currentSort === 'price-asc') {
       filtered.sort((a, b) => a.price - b.price);
     } else if (currentSort === 'price-desc') {
@@ -371,6 +383,16 @@
     renderListings();
   });
 
+  // Au moins une des deux cases reste toujours cochée
+  [typeParticulier, typeProfessionnel].forEach((box) => {
+    box.addEventListener('change', () => {
+      if (!typeParticulier.checked && !typeProfessionnel.checked) {
+        box.checked = true;
+      }
+      renderListings();
+    });
+  });
+
   sortSelect.addEventListener('change', () => {
     currentSort = sortSelect.value;
     renderListings();
@@ -446,6 +468,11 @@
   .freshness-label { color:#4169E1; }
   .freshness-icon { width:56px; height:56px; object-fit:contain; flex-shrink:0; }
   .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; }
+  .type-check { display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px; border:1.5px solid rgba(107,88,66,0.2); background:#fff; font-size:0.95rem; font-weight:600; color:var(--leaf-deep); cursor:pointer; user-select:none; }
+  .type-check input { width:18px; height:18px; margin:0; accent-color:var(--leaf-deep); cursor:pointer; }
+  .type-check:has(input:checked) { border-color:var(--leaf-deep); background:var(--cream-soft); }
+  .type-check:has(input:focus-visible) { outline:2px solid var(--leaf-deep); outline-offset:2px; }
 </style>
 </body>
 </html>

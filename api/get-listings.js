@@ -8,6 +8,43 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
   },
 });
 
+// Moyenne des notes (1 à 4 fraises) de chaque vendeur : { average, count }.
+// Les avis sont lus par paquets de 1000 (limite de la base) pour que la moyenne soit toujours exacte.
+async function loadSellerRatings(sellerIds) {
+  const totals = new Map();
+  if (sellerIds.length === 0) return totals;
+
+  const PAGE_SIZE = 1000;
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('seller_id, rating')
+      .in('seller_id', sellerIds)
+      .order('seller_id', { ascending: true })
+      .order('order_id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    (data || []).forEach((row) => {
+      const rating = Number(row.rating);
+      if (!Number.isFinite(rating) || rating < 1 || rating > 4) return;
+      const total = totals.get(row.seller_id) || { sum: 0, count: 0 };
+      total.sum += rating;
+      total.count += 1;
+      totals.set(row.seller_id, total);
+    });
+
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+
+  const ratings = new Map();
+  totals.forEach((total, sellerId) => {
+    ratings.set(sellerId, { average: total.sum / total.count, count: total.count });
+  });
+  return ratings;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -16,7 +53,7 @@ export default async function handler(req, res) {
   try {
     const { data: listings, error } = await supabase
       .from('listings')
-      .select('id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id)')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -36,7 +73,21 @@ export default async function handler(req, res) {
         (item.quantity_available == null || Number(item.quantity_available) > 0)
     );
 
-    res.status(200).json({ listings: visibleListings });
+    // La note moyenne du vendeur accompagne chaque annonce (jamais son identifiant)
+    // Une panne de lecture des avis ne doit pas empêcher d'afficher les annonces.
+    let ratings = new Map();
+    try {
+      ratings = await loadSellerRatings([...new Set(visibleListings.map((item) => item.seller_id).filter(Boolean))]);
+    } catch (ratingError) {
+      console.error('Lecture des avis impossible :', ratingError);
+    }
+
+    const listingsWithRating = visibleListings.map(({ seller_id, ...item }) => {
+      const rating = ratings.get(seller_id);
+      return { ...item, seller_rating: rating ? { average: rating.average, count: rating.count } : { average: null, count: 0 } };
+    });
+
+    res.status(200).json({ listings: listingsWithRating });
 
   } catch (error) {
     console.error(error);

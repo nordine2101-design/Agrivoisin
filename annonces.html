@@ -317,6 +317,13 @@
         locationText += ' · à ' + (distance < 1 ? Math.round(distance * 1000) + ' m' : distance.toFixed(1).replace('.', ',') + ' km');
       }
 
+      // Note moyenne du vendeur : « 3,5 × [fraise] · 12 avis ». Moins de 3 avis : « Nouveau vendeur ».
+      const rating = item.seller_rating;
+      const ratingCount = rating && Number(rating.count) ? Number(rating.count) : 0;
+      const ratingHtml = (!rating || rating.average == null || ratingCount < 3)
+        ? '<p class="card-rating card-rating-new">Nouveau vendeur</p>'
+        : `<p class="card-rating" role="img" aria-label="Note moyenne du vendeur : ${Number(rating.average).toFixed(1).replace('.', ',')} fraises sur 4, ${ratingCount} avis"><span aria-hidden="true">${Number(rating.average).toFixed(1).replace('.', ',')} ×</span><img src="fraise-mascotte.png" alt="" class="card-rating-icon"><span class="card-rating-count" aria-hidden="true">· ${ratingCount} avis</span></p>`;
+
       // Stock : le bouton « + » est grisé si l'annonce est épuisée ou si le panier contient déjà tout ce qui reste
       const stock = stockOf(item);
       const noMore = stock !== null && unitsInCart(item.id) >= stock;
@@ -332,6 +339,7 @@
           ${freshnessHtml}
           ${stockBadge(item)}
           <p class="seller">${escapeHtml(locationText)}</p>
+          ${ratingHtml}
           <div class="produce-card-footer">
             <span class="price">${Number(item.price).toFixed(2).replace('.', ',')} €/${escapeHtml(item.unit || 'kg')}</span>
             <button class="icon-btn" aria-label="${noMore ? buttonNote : 'Ajouter au panier'}" ${noMore ? 'disabled title="' + buttonNote + '"' : ''} data-stock="${stock === null ? '' : stock}" data-stripe-account="${escapeHtml(item.sellers ? item.sellers.stripe_account_id : '')}" data-listing-id="${escapeHtml(item.id)}">
@@ -465,6 +473,10 @@
   .freshness-icons { display:flex; gap:2px; }
   .freshness-label { color:#4169E1; }
   .freshness-icon { width:56px; height:56px; object-fit:contain; flex-shrink:0; }
+  .card-rating { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin:2px 0 8px; font-size:0.9rem; font-weight:700; color:var(--leaf-deep); }
+  .card-rating-icon { width:22px; height:22px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
+  .card-rating-count { font-size:0.8rem; font-weight:400; color:#6B5842; }
+  .card-rating-new { font-size:0.8rem; color:#6B5842; }
   .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
   .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; }
   .type-check { position:relative; display:inline-flex; align-items:center; padding:9px 18px; border-radius:999px; border:1.5px solid #D97D45; background:#fff; font-size:0.95rem; font-weight:700; color:#C4590F; cursor:pointer; user-select:none; }

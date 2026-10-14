@@ -23,7 +23,8 @@
       <span id="listingTag" class="tag" style="font-size:0.72rem;font-weight:700;color:var(--leaf);text-transform:uppercase;letter-spacing:0.05em;"></span>
       <h1 id="listingTitle" style="margin:6px 0 10px;font-size:1.7rem;"></h1>
       <p id="listingFreshness" style="display:none;font-weight:600;color:var(--leaf-deep);margin-bottom:8px;"></p>
-      <p id="listingSeller" style="font-size:0.95rem;margin-bottom:16px;"></p>
+      <p id="listingSeller" style="font-size:0.95rem;margin-bottom:6px;"></p>
+      <p id="listingRating" style="margin:0 0 16px;"></p>
       <div id="listingPickup" style="display:none;margin-bottom:18px;padding:12px 14px;border-radius:12px;background:var(--cream-soft);text-align:left;">
         <p style="font-size:0.75rem;font-weight:700;color:var(--leaf-deep);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.05em;">Horaires de retrait</p>
         <div id="listingPickupLines" style="font-size:0.9rem;line-height:1.7;"></div>
@@ -250,6 +251,45 @@
     return tip;
   }
 
+  // Note moyenne du vendeur : « 3,5 × [fraise] · 12 avis ». Moins de 3 avis : « Nouveau vendeur ».
+  const MIN_REVIEWS_FOR_AVERAGE = 3;
+
+  function renderSellerRating(rating) {
+    const el = document.getElementById('listingRating');
+    el.textContent = '';
+    el.className = 'seller-rating';
+    const count = rating && Number(rating.count) ? Number(rating.count) : 0;
+
+    if (!rating || rating.average == null || count < MIN_REVIEWS_FOR_AVERAGE) {
+      el.classList.add('seller-rating-new');
+      el.textContent = 'Nouveau vendeur';
+      return;
+    }
+
+    const average = Number(rating.average).toFixed(1).replace('.', ',');
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', 'Note moyenne du vendeur : ' + average + ' fraises sur 4, ' + count + ' avis');
+
+    const value = document.createElement('span');
+    value.className = 'seller-rating-value';
+    value.setAttribute('aria-hidden', 'true');
+    value.textContent = average + ' \u00D7';
+
+    const icon = document.createElement('img');
+    icon.src = 'fraise-mascotte.png';
+    icon.alt = '';
+    icon.className = 'seller-rating-icon';
+
+    const reviews = document.createElement('span');
+    reviews.className = 'seller-rating-count';
+    reviews.setAttribute('aria-hidden', 'true');
+    reviews.textContent = '\u00B7 ' + count + ' avis';
+
+    el.appendChild(value);
+    el.appendChild(icon);
+    el.appendChild(reviews);
+  }
+
   function renderListing(item) {
     document.title = item.title + ' — Agrivoisin';
 
@@ -292,6 +332,8 @@
       sellerText += ' · à ' + (d < 1 ? Math.round(d * 1000) + ' m' : d.toFixed(1).replace('.', ',') + ' km');
     }
     document.getElementById('listingSeller').textContent = sellerText;
+
+    renderSellerRating(item.seller_rating);
 
     const pickupLines = pickupGroups(item.listing_pickup_hours);
     if (pickupLines.length > 0) {
@@ -434,6 +476,10 @@
   }
 </script>
 <style>
+  .seller-rating { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; font-weight:700; color:var(--leaf-deep); font-size:1.25rem; }
+  .seller-rating-icon { width:34px; height:34px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
+  .seller-rating-count { font-size:0.85rem; font-weight:400; color:#6B5842; }
+  .seller-rating-new { font-size:0.95rem; font-weight:700; color:#6B5842; }
   #listingFreshness { flex-direction:column; align-items:center; }
   .freshness-icons { display:flex; flex-wrap:wrap; justify-content:center; gap:3px; }
   #listingFreshness .freshness-label { color:#4169E1; }

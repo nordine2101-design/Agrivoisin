@@ -94,7 +94,8 @@ async function lookupCommune(city, postalCode) {
 
 // --- Pseudo affiché aux acheteurs ---
 // 3 à 20 caractères : lettres, chiffres, espaces et tirets ; ni espace ni tiret au début ou à la fin.
-// Vide = pas de pseudo (les anciennes pages n'en envoient pas).
+// Vide = pas de pseudo : cleanPseudo l'accepte (la vérification GET s'en sert), mais un vendeur doit toujours en avoir un
+// (voir PSEUDO_REQUIRED_ERROR plus bas).
 const PSEUDO_ERROR =
   'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.';
 
@@ -119,6 +120,7 @@ async function isPseudoTaken(pseudo, ownSellerId) {
   return { taken: !!(data && data.length > 0 && (!ownSellerId || data[0].id !== ownSellerId)) };
 }
 
+const PSEUDO_REQUIRED_ERROR = 'Choisissez un pseudo : il est obligatoire pour vendre sur Agrivoisin.';
 const PSEUDO_TAKEN_ERROR = 'Ce pseudo est déjà pris. Choisissez-en un autre.';
 const PSEUDO_CHECK_ERROR = 'Impossible de vérifier le pseudo pour le moment. Réessayez dans quelques instants.';
 
@@ -194,7 +196,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 0 ter. Pseudo affiché aux acheteurs (facultatif ici : les anciennes pages n'en envoient pas)
+    // 0 ter. Pseudo affiché aux acheteurs (obligatoire : voir l'étape 2 bis)
     const cleanedPseudo = cleanPseudo(pseudoRaw);
     if (!cleanedPseudo.ok) {
       return res.status(cleanedPseudo.status).json({ error: cleanedPseudo.error });
@@ -212,7 +214,7 @@ export default async function handler(req, res) {
     // 2. Cette personne est-elle déjà vendeuse ? (évite de créer des comptes en double)
     const { data: existingSeller, error: lookupError } = await supabase
       .from('sellers')
-      .select('id, stripe_account_id')
+      .select('id, stripe_account_id, pseudo')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -225,7 +227,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2 bis. Ce pseudo est-il déjà pris par quelqu'un d'autre ?
+    // 2 bis. Pas de vendeur sans pseudo : il faut en envoyer un, sauf si ce vendeur en a déjà un
+    if (!pseudo && !(existingSeller && existingSeller.pseudo)) {
+      return res.status(400).json({ error: PSEUDO_REQUIRED_ERROR });
+    }
+
+    // 2 ter. Ce pseudo est-il déjà pris par quelqu'un d'autre ?
     if (pseudo) {
       const check = await isPseudoTaken(pseudo, existingSeller ? existingSeller.id : null);
       if (check.error) {

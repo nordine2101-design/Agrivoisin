@@ -30,6 +30,25 @@
     </div>
 
     <form class="auth-form" id="signupForm">
+      <div id="sellerTypeBlock" style="display:none;">
+        <fieldset class="seller-type">
+          <legend>Vous vendez en tant que</legend>
+          <label class="seller-type-option">
+            <input type="radio" name="sellerType" value="particulier" checked>
+            <span><strong>Particulier</strong><br>Je vends le surplus de mon jardin</span>
+          </label>
+          <label class="seller-type-option">
+            <input type="radio" name="sellerType" value="professionnel">
+            <span><strong>Professionnel</strong><br>J'ai une entreprise (numéro SIRET)</span>
+          </label>
+        </fieldset>
+
+        <div id="siretBlock" style="display:none;">
+          <label for="sellerSiret">Votre numéro SIRET (14 chiffres)</label>
+          <input type="text" id="sellerSiret" placeholder="Ex : 123 456 789 00012" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
+        </div>
+      </div>
+
       <label for="name">Nom complet</label>
       <input type="text" id="name" placeholder="Votre nom" required>
 
@@ -62,6 +81,15 @@
 </section>
 
 <script src="script.js"></script>
+<style>
+  .seller-type { border:none; margin:0 0 6px; padding:0; display:flex; flex-direction:column; gap:10px; }
+  .seller-type legend { font-size:0.85rem; font-weight:600; color:var(--leaf-deep); padding:0; margin-bottom:8px; }
+  .auth-form .seller-type-option { display:flex; align-items:flex-start; gap:12px; margin:0; padding:12px 14px; border:1.5px solid rgba(107, 88, 66, 0.2); border-radius:var(--radius-sm); cursor:pointer; font-weight:400; font-size:0.95rem; color:var(--ink); line-height:1.4; }
+  .auth-form .seller-type-option strong { color:var(--leaf-deep); }
+  .auth-form .seller-type-option input { width:auto; margin:3px 0 0; padding:0; border:none; flex-shrink:0; accent-color:var(--leaf-deep); }
+  .auth-form .seller-type-option:has(input:checked) { border-color:var(--leaf-deep); background:var(--cream-soft); }
+  .auth-form .seller-type-option:has(input:focus-visible) { outline:2px solid var(--leaf-deep); outline-offset:2px; }
+</style>
 <script>
   const supabaseClient = window.supabase.createClient(
     'https://eipksfszadhratfvavvs.supabase.co',
@@ -73,6 +101,24 @@
   const sellerAddressInput = document.getElementById('sellerAddress');
   const postalCodeLabel = document.getElementById('postalCodeLabel');
   const postalCodeInput = document.getElementById('postalCode');
+  const signupForm = document.getElementById('signupForm');
+  const sellerTypeBlock = document.getElementById('sellerTypeBlock');
+  const siretBlock = document.getElementById('siretBlock');
+  const siretInput = document.getElementById('sellerSiret');
+
+  function selectedSellerType() {
+    return signupForm.querySelector('input[name="sellerType"]:checked').value;
+  }
+
+  // Le champ SIRET n'apparaît que pour un vendeur professionnel
+  function refreshSellerType() {
+    const isPro = selectedType === 'jardinier' && selectedSellerType() === 'professionnel';
+    siretBlock.style.display = isPro ? 'block' : 'none';
+    siretInput.required = isPro;
+  }
+  signupForm.querySelectorAll('input[name="sellerType"]').forEach((radio) => {
+    radio.addEventListener('change', refreshSellerType);
+  });
 
   document.querySelectorAll('.account-type-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -87,6 +133,7 @@
         postalCodeLabel.style.display = '';
         postalCodeInput.style.display = '';
         postalCodeInput.required = true;
+        sellerTypeBlock.style.display = 'block';
       } else {
         sellerAddressLabel.style.display = 'none';
         sellerAddressInput.style.display = 'none';
@@ -95,7 +142,11 @@
         postalCodeInput.style.display = 'none';
         postalCodeInput.required = false;
         postalCodeInput.value = '';
+        sellerTypeBlock.style.display = 'none';
+        signupForm.querySelector('input[name="sellerType"][value="particulier"]').checked = true;
+        siretInput.value = '';
       }
+      refreshSellerType();
     });
   });
 
@@ -116,6 +167,17 @@
     let city = document.getElementById('city').value;
     const postalCode = postalCodeInput.value.trim();
     const sellerAddress = sellerAddressInput.value;
+
+    const sellerType = selectedType === 'jardinier' ? selectedSellerType() : 'particulier';
+    const siret = sellerType === 'professionnel' ? siretInput.value.replace(/[\s.]/g, '') : '';
+    if (sellerType === 'professionnel' && !/^\d{14}$/.test(siret)) {
+      errorEl.textContent = 'Erreur : le numéro SIRET doit comporter 14 chiffres.';
+      errorEl.style.display = 'block';
+      btn.textContent = 'Créer mon compte';
+      btn.disabled = false;
+      siretInput.focus();
+      return;
+    }
 
     if (selectedType === 'jardinier') {
       btn.textContent = 'Vérification de la ville...';
@@ -182,7 +244,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + accessToken,
         },
-        body: JSON.stringify({ email, city, postalCode, address: sellerAddress }),
+        body: JSON.stringify({ email, city, postalCode, address: sellerAddress, sellerType, siret }),
       });
 
       const stripeData = await response.json();

@@ -47,6 +47,10 @@
           <label for="sellerSiret">Votre numéro SIRET (14 chiffres)</label>
           <input type="text" id="sellerSiret" placeholder="Ex : 123 456 789 00012" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
         </div>
+
+        <label for="sellerPseudo">Votre pseudo (affiché aux acheteurs)</label>
+        <input type="text" id="sellerPseudo" placeholder="Ex : Jardin de Marie" maxlength="20" autocomplete="off" style="width:100%;box-sizing:border-box;">
+        <p style="font-size:0.8rem;color:#6B5842;margin:4px 0 0;">3 à 20 caractères. Les acheteurs ne voient jamais votre nom ni votre e-mail.</p>
       </div>
 
       <label for="name">Nom complet</label>
@@ -105,6 +109,16 @@
   const sellerTypeBlock = document.getElementById('sellerTypeBlock');
   const siretBlock = document.getElementById('siretBlock');
   const siretInput = document.getElementById('sellerSiret');
+  const pseudoInput = document.getElementById('sellerPseudo');
+
+  // Pseudo : 3 à 20 caractères (lettres, chiffres, espaces, tirets), ni espace ni tiret au début ou à la fin
+  const PSEUDO_ERROR = 'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.';
+  function cleanPseudo(value) {
+    return String(value || '').trim().replace(/\s+/g, ' ');
+  }
+  function isValidPseudo(pseudo) {
+    return /^[A-Za-z0-9\u00C0-\u00FF][A-Za-z0-9\u00C0-\u00FF -]{1,18}[A-Za-z0-9\u00C0-\u00FF]$/.test(pseudo);
+  }
 
   function selectedSellerType() {
     return signupForm.querySelector('input[name="sellerType"]:checked').value;
@@ -134,6 +148,7 @@
         postalCodeInput.style.display = '';
         postalCodeInput.required = true;
         sellerTypeBlock.style.display = 'block';
+        pseudoInput.required = true;
       } else {
         sellerAddressLabel.style.display = 'none';
         sellerAddressInput.style.display = 'none';
@@ -145,6 +160,8 @@
         sellerTypeBlock.style.display = 'none';
         signupForm.querySelector('input[name="sellerType"][value="particulier"]').checked = true;
         siretInput.value = '';
+        pseudoInput.required = false;
+        pseudoInput.value = '';
       }
       refreshSellerType();
     });
@@ -179,12 +196,22 @@
       return;
     }
 
+    const pseudo = selectedType === 'jardinier' ? cleanPseudo(pseudoInput.value) : '';
+    if (selectedType === 'jardinier' && !isValidPseudo(pseudo)) {
+      errorEl.textContent = 'Erreur : ' + PSEUDO_ERROR;
+      errorEl.style.display = 'block';
+      btn.textContent = 'Créer mon compte';
+      btn.disabled = false;
+      pseudoInput.focus();
+      return;
+    }
+
     if (selectedType === 'jardinier') {
-      btn.textContent = 'Vérification de la ville...';
+      btn.textContent = 'Vérification de la ville et du pseudo...';
 
       let verification;
       try {
-        const r = await fetch('/api/create-connect-account?city=' + encodeURIComponent(city) + '&postalCode=' + encodeURIComponent(postalCode));
+        const r = await fetch('/api/create-connect-account?city=' + encodeURIComponent(city) + '&postalCode=' + encodeURIComponent(postalCode) + '&pseudo=' + encodeURIComponent(pseudo));
         const d = await r.json();
         verification = r.ok ? { ok: true, city: d.city } : { ok: false, error: d.error };
       } catch (err) {
@@ -244,7 +271,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + accessToken,
         },
-        body: JSON.stringify({ email, city, postalCode, address: sellerAddress, sellerType, siret }),
+        body: JSON.stringify({ email, city, postalCode, address: sellerAddress, sellerType, siret, pseudo }),
       });
 
       const stripeData = await response.json();

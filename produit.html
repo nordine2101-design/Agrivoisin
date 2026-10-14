@@ -327,6 +327,9 @@
     }
 
     let sellerText = item.sellers && item.sellers.city ? item.sellers.city : 'Vendeur Agrivoisin';
+    if (item.sellers && item.sellers.pseudo && item.sellers.city) {
+      sellerText = item.sellers.pseudo + ' · ' + item.sellers.city;
+    }
     if (buyerLocation && item.sellers && item.sellers.latitude != null && item.sellers.longitude != null) {
       const d = haversineDistance(buyerLocation.lat, buyerLocation.lng, item.sellers.latitude, item.sellers.longitude);
       sellerText += ' · à ' + (d < 1 ? Math.round(d * 1000) + ' m' : d.toFixed(1).replace('.', ',') + ' km');

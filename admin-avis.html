@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Commentaires des acheteurs — Agrivoisin</title>
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ COMMENTAIRES DES ACHETEURS (page réservée à l'administrateur) ============ -->
+<section class="page-header">
+  <div class="container admin-wrap">
+    <div style="text-align:left;margin-bottom:12px;">
+      <a href="index.html" class="btn btn-ghost">Retour au site</a>
+      <a href="admin-problemes.html" class="btn btn-ghost">Problèmes signalés</a>
+    </div>
+    <h1>Commentaires des acheteurs</h1>
+    <p id="pageSubtitle">Page réservée à l'administrateur d'Agrivoisin. Un commentaire masqué n'apparaît plus sur la page du vendeur ; sa note reste comptée dans la moyenne.</p>
+
+    <p id="loadingMessage" class="admin-state">Chargement...</p>
+    <p id="notLoggedMessage" class="admin-state" style="display:none;">Vous devez être connecté. <a href="connexion.html?retour=admin-avis.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
+    <p id="forbiddenMessage" class="admin-state" style="display:none;">Cette page est réservée à l'administrateur d'Agrivoisin.</p>
+    <p id="errorMessage" class="admin-state" style="display:none;"></p>
+    <button type="button" id="retryBtn" class="btn btn-primary" style="display:none;margin:0 auto 16px;">Réessayer</button>
+
+    <div id="content" style="display:none;">
+      <div class="admin-toolbar">
+        <h2 id="reviewsTitle">Commentaires</h2>
+        <button type="button" id="refreshBtn" class="btn btn-ghost">Actualiser</button>
+      </div>
+      <p id="noReviews" class="admin-empty" style="display:none;">Aucun commentaire pour le moment.</p>
+      <div id="reviewsList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="#">Conditions générales</a></li>
+          <li><a href="#">Confidentialité</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+      <span>Fait avec 🌱 entre voisins</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const loadingMessage = document.getElementById('loadingMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const forbiddenMessage = document.getElementById('forbiddenMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const retryBtn = document.getElementById('retryBtn');
+  const content = document.getElementById('content');
+  const reviewsList = document.getElementById('reviewsList');
+  const noReviews = document.getElementById('noReviews');
+  const reviewsTitle = document.getElementById('reviewsTitle');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  // « 06/10/2026 à 12 h 00 » (heure de Paris)
+  function formatDateTime(iso) {
+    if (!iso) return '—';
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    return parts.day + '/' + parts.month + '/' + parts.year + ' à ' + parseInt(parts.hour, 10) + '\u00A0h\u00A0' + parts.minute;
+  }
+
+  function ratingText(rating) {
+    const n = Math.max(0, Math.min(4, Math.round(Number(rating)) || 0));
+    return '🍓'.repeat(n) + ' ' + n + ' / 4';
+  }
+
+  // Tout ce qu'a écrit un acheteur est mis dans la page avec textContent : jamais interprété comme du code
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function reviewCard(r) {
+    const card = el('div', 'admin-card' + (r.hidden ? ' review-hidden' : ''));
+    card.dataset.orderId = String(r.orderId);
+    card.dataset.sellerId = String(r.sellerId);
+    card.dataset.hidden = r.hidden ? 'true' : 'false';
+
+    const head = el('div', 'admin-card-head');
+    const seller = (r.sellerPseudo || 'Sans pseudo') + (r.sellerCity ? ' · ' + r.sellerCity : '');
+    head.appendChild(el('span', 'admin-card-title', seller));
+    head.appendChild(el('span', 'admin-card-amount', ratingText(r.rating)));
+    card.appendChild(head);
+
+    card.appendChild(el('div', 'admin-meta', 'Acheteur vérifié · ' + formatDateTime(r.createdAt)));
+    card.appendChild(el('div', 'review-text', r.comment));
+
+    const status = el('div', 'review-status', r.hidden ? 'Masqué : les visiteurs ne le voient pas.' : 'Visible sur la page du vendeur.');
+    card.appendChild(status);
+
+    const actions = el('div', 'admin-actions');
+    const btn = el('button', r.hidden ? 'btn btn-primary review-toggle-btn' : 'btn btn-ghost review-toggle-btn', r.hidden ? 'Réafficher ce commentaire' : 'Masquer ce commentaire');
+    btn.type = 'button';
+    actions.appendChild(btn);
+    card.appendChild(actions);
+
+    const err = el('p', 'admin-error');
+    err.style.display = 'none';
+    card.appendChild(err);
+    return card;
+  }
+
+  function showOnly(which) {
+    [loadingMessage, notLoggedMessage, forbiddenMessage, errorMessage, content].forEach((e) => { e.style.display = 'none'; });
+    retryBtn.style.display = 'none';
+    if (which) which.style.display = 'block';
+  }
+
+  async function getToken() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    return session ? session.access_token : null;
+  }
+
+  async function callAdmin(token, body) {
+    const response = await fetch('/api/get-listings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    return { ok: response.ok, status: response.status, data };
+  }
+
+  async function load() {
+    showOnly(loadingMessage);
+    const token = await getToken();
+    if (!token) {
+      showOnly(notLoggedMessage);
+      return;
+    }
+
+    try {
+      const result = await callAdmin(token, { action: 'admin_list_reviews' });
+
+      if (result.status === 401) { showOnly(notLoggedMessage); return; }
+      if (result.status === 403) { showOnly(forbiddenMessage); return; }
+      if (!result.ok) throw new Error(result.data.error || 'Erreur');
+
+      const reviews = result.data.reviews || [];
+      const hiddenCount = reviews.filter((r) => r.hidden).length;
+      reviewsTitle.textContent = 'Commentaires (' + reviews.length + (hiddenCount ? ', dont ' + hiddenCount + ' masqué' + (hiddenCount > 1 ? 's' : '') : '') + ')';
+      reviewsList.replaceChildren(...reviews.map(reviewCard));
+      noReviews.style.display = reviews.length === 0 ? 'block' : 'none';
+      showOnly(content);
+    } catch (err) {
+      console.error(err);
+      errorMessage.textContent = 'Impossible de charger les commentaires pour le moment.';
+      showOnly(errorMessage);
+      retryBtn.style.display = 'block';
+    }
+  }
+
+  let busy = false;
+
+  async function toggle(card) {
+    if (busy) return;
+    const wantHidden = card.dataset.hidden !== 'true';
+    const errorEl = card.querySelector('.admin-error');
+    const btn = card.querySelector('.review-toggle-btn');
+    errorEl.style.display = 'none';
+    busy = true;
+    btn.disabled = true;
+
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Session expirée, reconnectez-vous.');
+
+      const result = await callAdmin(token, {
+        action: 'admin_set_review_hidden',
+        orderId: card.dataset.orderId,
+        sellerId: card.dataset.sellerId,
+        hidden: wantHidden,
+      });
+      if (!result.ok) throw new Error(result.data.error || 'Une erreur est survenue');
+
+      card.dataset.hidden = wantHidden ? 'true' : 'false';
+      card.classList.toggle('review-hidden', wantHidden);
+      card.querySelector('.review-status').textContent = wantHidden ? 'Masqué : les visiteurs ne le voient pas.' : 'Visible sur la page du vendeur.';
+      btn.textContent = wantHidden ? 'Réafficher ce commentaire' : 'Masquer ce commentaire';
+      btn.className = (wantHidden ? 'btn btn-primary' : 'btn btn-ghost') + ' review-toggle-btn';
+      const hiddenCount = reviewsList.querySelectorAll('.admin-card[data-hidden="true"]').length;
+      const total = reviewsList.querySelectorAll('.admin-card').length;
+      reviewsTitle.textContent = 'Commentaires (' + total + (hiddenCount ? ', dont ' + hiddenCount + ' masqué' + (hiddenCount > 1 ? 's' : '') : '') + ')';
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+    } finally {
+      busy = false;
+      btn.disabled = false;
+    }
+  }
+
+  reviewsList.addEventListener('click', (e) => {
+    const btn = e.target.closest('.review-toggle-btn');
+    if (!btn) return;
+    const card = btn.closest('.admin-card');
+    if (card) toggle(card);
+  });
+
+  refreshBtn.addEventListener('click', load);
+  retryBtn.addEventListener('click', load);
+
+  load();
+</script>
+
+<style>
+  .admin-wrap { max-width:860px; }
+  .admin-state { margin:16px 0; color:#C8352F; text-align:center; }
+  .admin-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+  .admin-toolbar h2 { font-size:1.2rem; margin:0; text-align:left; }
+  .admin-empty { color:#6B5842; text-align:left; margin:8px 0; }
+  .admin-card { background:#fff; border:1px solid #e6e0d3; border-radius:16px; padding:16px; margin-bottom:16px; text-align:left; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+  .admin-card.review-hidden { background:#f9f7f2; border-left:4px solid #C8352F; }
+  .admin-card-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:10px; }
+  .admin-card-title { font-weight:700; color:var(--leaf-deep); }
+  .admin-card-amount { font-weight:700; white-space:nowrap; }
+  .admin-meta { font-size:0.85rem; color:#6B5842; margin:4px 0; }
+  .review-text { white-space:pre-wrap; word-break:break-word; font-size:0.95rem; line-height:1.5; margin:10px 0; }
+  .review-status { font-size:0.85rem; font-weight:700; color:#4C7A50; margin:8px 0 12px; }
+  .review-hidden .review-status { color:#C8352F; }
+  .admin-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .admin-actions .btn { font-size:0.9rem; padding:10px 16px; }
+  .admin-actions .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  p.admin-error { color:#C8352F; margin:10px 0 0; font-size:0.9rem; }
+  @media (max-width: 540px) {
+    .admin-actions .btn { width:100%; }
+    .admin-card-head { flex-direction:column; gap:4px; }
+  }
+</style>
+
+</body>
+</html>

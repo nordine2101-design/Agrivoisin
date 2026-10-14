@@ -55,6 +55,23 @@
     <p id="notLoggedMessage" style="display:none;text-align:center;">Vous devez être connecté pour devenir vendeur. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
 
     <form class="auth-form" id="sellerForm" style="display:none;">
+      <fieldset class="seller-type">
+        <legend>Vous vendez en tant que</legend>
+        <label class="seller-type-option">
+          <input type="radio" name="sellerType" value="particulier" checked>
+          <span><strong>Particulier</strong><br>Je vends le surplus de mon jardin</span>
+        </label>
+        <label class="seller-type-option">
+          <input type="radio" name="sellerType" value="professionnel">
+          <span><strong>Professionnel</strong><br>J'ai une entreprise (numéro SIRET)</span>
+        </label>
+      </fieldset>
+
+      <div id="siretBlock" style="display:none;">
+        <label for="sellerSiret">Votre numéro SIRET (14 chiffres)</label>
+        <input type="text" id="sellerSiret" placeholder="Ex : 123 456 789 00012" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
+      </div>
+
       <label for="sellerEmail">Votre adresse e-mail</label>
       <input type="email" id="sellerEmail" placeholder="vous@exemple.com" required>
 
@@ -120,6 +137,15 @@
 </footer>
 
 <script src="script.js"></script>
+<style>
+  .seller-type { border:none; margin:0 0 6px; padding:0; display:flex; flex-direction:column; gap:10px; }
+  .seller-type legend { font-size:0.85rem; font-weight:600; color:var(--leaf-deep); padding:0; margin-bottom:8px; }
+  .auth-form .seller-type-option { display:flex; align-items:flex-start; gap:12px; margin:0; padding:12px 14px; border:1.5px solid rgba(107, 88, 66, 0.2); border-radius:var(--radius-sm); cursor:pointer; font-weight:400; font-size:0.95rem; color:var(--ink); line-height:1.4; }
+  .auth-form .seller-type-option strong { color:var(--leaf-deep); }
+  .auth-form .seller-type-option input { width:auto; margin:3px 0 0; padding:0; border:none; flex-shrink:0; accent-color:var(--leaf-deep); }
+  .auth-form .seller-type-option:has(input:checked) { border-color:var(--leaf-deep); background:var(--cream-soft); }
+  .auth-form .seller-type-option:has(input:focus-visible) { outline:2px solid var(--leaf-deep); outline-offset:2px; }
+</style>
 <script>
   const supabaseClient = window.supabase.createClient(
     'https://eipksfszadhratfvavvs.supabase.co',
@@ -137,6 +163,24 @@
     }
   });
 
+  const siretBlock = document.getElementById('siretBlock');
+  const siretInput = document.getElementById('sellerSiret');
+
+  function selectedSellerType() {
+    return sellerForm.querySelector('input[name="sellerType"]:checked').value;
+  }
+
+  // Le champ SIRET n'apparaît que pour un professionnel
+  function refreshSellerType() {
+    const isPro = selectedSellerType() === 'professionnel';
+    siretBlock.style.display = isPro ? 'block' : 'none';
+    siretInput.required = isPro;
+  }
+  sellerForm.querySelectorAll('input[name="sellerType"]').forEach((radio) => {
+    radio.addEventListener('change', refreshSellerType);
+  });
+  refreshSellerType();
+
   sellerForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     const email = document.getElementById('sellerEmail').value;
@@ -145,6 +189,15 @@
     const address = document.getElementById('sellerAddress').value;
     const btn = document.getElementById('sellerSubmitBtn');
     const errorEl = document.getElementById('sellerError');
+
+    const sellerType = selectedSellerType();
+    const siret = sellerType === 'professionnel' ? siretInput.value.replace(/[\s.]/g, '') : '';
+    if (sellerType === 'professionnel' && !/^\d{14}$/.test(siret)) {
+      errorEl.textContent = 'Erreur : le numéro SIRET doit comporter 14 chiffres.';
+      errorEl.style.display = 'block';
+      siretInput.focus();
+      return;
+    }
 
     btn.textContent = 'Création en cours...';
     btn.disabled = true;
@@ -162,7 +215,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ email, city, postalCode, address }),
+        body: JSON.stringify({ email, city, postalCode, address, sellerType, siret }),
       });
 
       const data = await response.json();

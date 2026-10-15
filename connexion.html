@@ -7,37 +7,49 @@
 <meta name="description" content="Connectez-vous à votre compte Agrivoisin.">
 <link rel="stylesheet" href="style.css">
 <script src="supabase.js"></script>
+<style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-form-box { max-width:420px; margin:0 auto; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
+</style>
 </head>
 <body>
 
 <!-- ============ FORMULAIRE CONNEXION ============ -->
-<section class="auth-section" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
-  <div class="auth-card">
-    <div style="text-align:left;margin:-24px 0 12px -20px;">
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
+      <h1>Content de vous revoir</h1>
     </div>
-    <h1>Content de vous revoir</h1>
     <p class="auth-subtitle">Connectez-vous pour retrouver vos annonces et vos commandes.</p>
 
-    <form class="auth-form" id="loginForm">
-      <label for="email">Adresse e-mail</label>
-      <input type="email" id="email" placeholder="vous@exemple.com" required>
+    <div class="my-form-box">
+      <form class="auth-form" id="loginForm">
+        <label for="email">Adresse e-mail</label>
+        <input type="email" id="email" placeholder="vous@exemple.com" required>
 
-      <label for="password">Mot de passe</label>
-      <input type="password" id="password" placeholder="••••••••" required>
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" placeholder="••••••••" required>
 
-      <a href="#" class="auth-link-inline">Mot de passe oublié ?</a>
+        <a href="#" class="auth-link-inline">Mot de passe oublié ?</a>
 
-      <button type="submit" class="btn btn-primary auth-submit" id="loginBtn">Se connecter</button>
-    </form>
+        <button type="submit" class="btn btn-primary auth-submit" id="loginBtn">Se connecter</button>
+      </form>
 
-    <p class="auth-switch" id="loginError" style="color:#C8352F;display:none;"></p>
-    <p class="auth-switch" id="loginSuccess" style="color:#4C7A50;display:none;"></p>
+      <p class="auth-switch" id="loginError" style="color:#C8352F;display:none;"></p>
+      <p class="auth-switch" id="loginSuccess" style="color:#4C7A50;display:none;"></p>
 
-    <p class="auth-switch">Pas encore de compte ? <a href="inscription.html">Créer un compte</a></p>
+      <p class="auth-switch">Pas encore de compte ? <a href="inscription.html">Créer un compte</a></p>
+    </div>
   </div>
-  <div style="width:440px;align-self:center;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;">
-    <video src="taupe-video.mp4" autoplay muted playsinline style="width:100%;height:auto;display:block;border-radius:28px;"></video>
+
+  <div class="my-video">
+    <video src="taupe-video.mp4" autoplay muted playsinline></video>
   </div>
 </section>
 

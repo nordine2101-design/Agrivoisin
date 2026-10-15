@@ -15,8 +15,8 @@
   <div class="my-panel">
     <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
+      <h1 id="cartTitle">Mon panier</h1>
     </div>
-    <h1 id="cartTitle">Mon panier</h1>
     <p id="cartSubtitle">Vérifiez votre commande avant de passer au paiement sécurisé.</p>
 
     <div id="cartEmpty" style="display:none;text-align:center;margin-top:30px;">
@@ -104,7 +104,8 @@
 <style>
   .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
-  .my-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; text-align:left; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; text-align:left; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
   .my-video img { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
   .cart-item-row.cart-line { flex-direction:column; align-items:stretch; gap:8px; }
@@ -252,18 +253,15 @@
     const emptyEl = document.getElementById('cartEmpty');
     const contentEl = document.getElementById('cartContent');
     const itemsEl = document.getElementById('cartItems');
-    const titleEl = document.getElementById('cartTitle');
     const subtitleEl = document.getElementById('cartSubtitle');
 
     if (cart.length === 0) {
-      titleEl.style.display = '';
       subtitleEl.style.display = '';
       emptyEl.style.display = 'block';
       contentEl.style.display = 'none';
       return;
     }
 
-    titleEl.style.display = 'none';
     subtitleEl.style.display = 'none';
     emptyEl.style.display = 'none';
     contentEl.style.display = 'block';

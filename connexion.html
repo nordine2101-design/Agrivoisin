@@ -13,8 +13,8 @@
   .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-form-box { max-width:420px; margin:0 auto; text-align:left; }
-  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
-  .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
+  .my-video { width:500px; flex-shrink:0; position:sticky; top:20px; box-sizing:border-box; padding:10px; background:var(--cream-soft); border-radius:28px; }
+  .my-video video { width:480px; height:auto; aspect-ratio:1082 / 720; display:block; border-radius:20px; }
 </style>
 </head>
 <body>

@@ -11,14 +11,15 @@
 <body>
 
 <!-- ============ FORMULAIRE INSCRIPTION ============ -->
-<section style="display:flex;align-items:stretch;justify-content:center;gap:0;">
-  <div class="auth-card auth-card-wide">
-    <div style="text-align:left;margin:-24px 0 12px -20px;">
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
+      <h1>Rejoindre Agrivoisin</h1>
     </div>
-    <h1>Rejoindre Agrivoisin</h1>
     <p class="auth-subtitle">Créez votre compte pour vendre vos récoltes ou dénicher celles de vos voisins.</p>
 
+    <div class="my-form-box">
     <div class="account-type-toggle">
       <button type="button" class="account-type-btn account-type-active" data-type="acheteur" style="background-image:url('panier-agrivoisin.png');background-size:cover;background-position:center;position:relative;color:#fff;justify-content:flex-start;">
          <span style="background:#fff;color:#C8352F;padding:6px 14px;border-radius:999px;">Je veux acheter</span>
@@ -89,14 +90,23 @@
     <p class="auth-switch" id="signupSuccess" style="color:#4C7A50;display:none;"></p>
 
     <p class="auth-switch">Déjà un compte ? <a href="connexion.html">Se connecter</a></p>
+    </div>
   </div>
-  <div style="width:480px;align-self:stretch;background:var(--cream-soft);border-radius:28px;display:flex;align-items:flex-start;justify-content:center;">
-    <video src="famille-herisson.mp4" autoplay muted playsinline style="width:auto;height:auto;max-width:95%;max-height:95%;border-radius:20px;"></video>
+
+  <div class="my-video">
+    <video src="famille-herisson.mp4" autoplay muted playsinline></video>
   </div>
 </section>
 
 <script src="script.js"></script>
 <style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-form-box { max-width:480px; margin:0 auto; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
   .seller-type { border:none; margin:0 0 6px; padding:0; display:flex; flex-direction:column; gap:10px; }
   .seller-type legend { font-size:0.85rem; font-weight:600; color:var(--leaf-deep); padding:0; margin-bottom:8px; }
   .auth-form .seller-type-option { display:flex; align-items:flex-start; gap:12px; margin:0; padding:12px 14px; border:1.5px solid rgba(107, 88, 66, 0.2); border-radius:var(--radius-sm); cursor:pointer; font-weight:400; font-size:0.95rem; color:var(--ink); line-height:1.4; }

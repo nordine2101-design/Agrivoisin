@@ -10,15 +10,15 @@
 </head>
 <body>
 
-<!-- ============ EN-TÊTE DE PAGE ============ -->
-<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:500px;width:100%;text-align:center;height:600px;box-sizing:border-box;display:flex;flex-direction:column;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:-24px -20px 12px -20px;">
+<!-- ============ MES ANNONCES ============ -->
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
       <a href="mes-ventes.html" id="salesLink" class="btn btn-primary" style="display:none;">Mes ventes</a>
     </div>
-    <h1 style="font-size:1.2rem;">Mes annonces</h1>
-    <p class="auth-subtitle" id="pageSubtitle" style="font-size:0.85rem;">Retrouvez et gérez les annonces que vous avez publiées.</p>
+
+    <h1>Mes annonces</h1>
 
     <div id="notLoggedSection" style="display:none;">
       <p style="text-align:center;">Vous devez être connecté pour voir vos annonces. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
@@ -26,31 +26,57 @@
 
     <div id="notSellerSection" style="display:none;">
       <p style="text-align:center;margin-bottom:14px;">Vous n'avez pas encore de compte vendeur.</p>
-      <a href="vendre.html" class="btn btn-primary">Devenir vendeur</a>
+      <div style="text-align:center;"><a href="vendre.html" class="btn btn-primary">Devenir vendeur</a></div>
     </div>
 
-    <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;"></p>
+    <p id="loadingMessage" class="my-muted" style="text-align:center;">Chargement de vos annonces...</p>
+    <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;text-align:center;"></p>
 
-    <div id="listingsNavWrap" style="display:none;overflow-y:auto;flex:1;min-height:0;">
-      <button type="button" id="prevListingBtn" class="btn btn-ghost" aria-label="Annonce précédente" style="width:100%;margin-top:10px;font-size:0.7rem;padding:4px;">▲</button>
-      <div id="myListingsContainer" style="text-align:left;"></div>
-      <button type="button" id="nextListingBtn" class="btn btn-ghost" aria-label="Annonce suivante" style="width:100%;margin-top:10px;font-size:0.7rem;padding:4px;">▼</button>
+    <div id="sellerSection" style="display:none;">
+      <p class="my-intro">Voici les récoltes que vous avez mises en vente. Vous suivez le stock de chacune et vous retirez celles dont vous ne voulez plus.</p>
+      <div class="my-summary-row">
+        <p id="listingsSummary" class="my-summary"></p>
+        <a href="publier-annonce.html" class="btn btn-primary">Publier une annonce</a>
+      </div>
+      <div id="myListingsContainer"></div>
     </div>
   </div>
-  <div style="width:500px;height:600px;display:flex;align-items:center;justify-content:center;background:var(--cream-soft);border-radius:28px;">
-      <video src="papy-video2.mp4" autoplay muted playsinline style="width:480px;height:580px;object-fit:contain;display:block;border-radius:20px;"></video>
+
+  <div class="my-video">
+    <video src="papy-video2.mp4" autoplay muted playsinline></video>
   </div>
 </section>
 
 <style>
-  .order-card { background:#f9f7f2; border-radius:12px; padding:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
-  .order-card h3 { margin-bottom:6px; font-size:1rem; }
-  .listing-photo { display:block; max-width:160px; max-height:120px; border-radius:10px; margin-bottom:10px; object-fit:cover; }
-  .order-card p.listing-desc { font-size:0.85rem; color:#6B5842; margin:0 0 6px; }
-  .order-card p.listing-price { font-size:0.9rem; font-weight:700; color:#4C7A50; margin:0; }
-  .order-card p.listing-stock { font-size:0.85rem; color:#6B5842; margin:4px 0 0; }
-  .order-card p.listing-stock.stock-out { color:#C8352F; font-weight:700; }
-  .order-card .btn { font-size:0.75rem; padding:6px 14px; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
+  .my-panel h1 { font-size:1.6rem; text-align:left; margin:0 0 8px; }
+  .my-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .my-muted { color:#6B5842; }
+  .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
+  .my-summary-row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; margin-bottom:18px; }
+  .my-summary { font-weight:700; color:var(--leaf-deep); margin:0; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
+
+  .listing-card { display:flex; gap:18px; background:#f9f7f2; border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .listing-card.is-soldout { background:#faf3f2; }
+  .listing-photo-box { width:200px; height:160px; flex-shrink:0; border-radius:12px; overflow:hidden; background:#ece6d8; display:flex; align-items:center; justify-content:center; color:#8a7a62; font-size:0.85rem; text-align:center; }
+  .listing-photo-box img { width:100%; height:100%; object-fit:cover; display:block; }
+  .listing-body { flex:1; min-width:0; }
+  .listing-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  .listing-body h3 { margin:0; font-size:1.15rem; word-break:break-word; text-align:left; }
+  .listing-price { font-size:1.05rem; font-weight:700; color:#4C7A50; white-space:nowrap; margin:0; }
+  .listing-cat { font-size:0.85rem; color:#6B5842; margin:4px 0 0; }
+  .listing-desc { font-size:0.92rem; color:#3b3126; margin:10px 0 0; white-space:pre-wrap; word-break:break-word; line-height:1.45; }
+  .listing-dates { font-size:0.82rem; color:#6B5842; margin:10px 0 0; }
+  .stock-badge { display:inline-block; margin-top:10px; padding:4px 12px; border-radius:999px; font-size:0.85rem; font-weight:700; background:#e8f1e6; color:#3f6b43; }
+  .stock-badge.stock-out { background:#fbe3e1; color:#C8352F; }
+  .stock-badge.stock-free { background:#eee8da; color:#6B5842; }
+  .listing-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .listing-actions .btn { font-size:0.85rem; padding:8px 16px; }
+  .listing-actions .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .my-empty { text-align:center; color:#6B5842; padding:24px 0; }
 </style>
 
 <script src="script.js"></script>
@@ -64,13 +90,11 @@
   const container = document.getElementById('myListingsContainer');
   const notLoggedSection = document.getElementById('notLoggedSection');
   const notSellerSection = document.getElementById('notSellerSection');
-  const pageSubtitle = document.getElementById('pageSubtitle');
-  const listingsNavWrap = document.getElementById('listingsNavWrap');
-  const prevBtn = document.getElementById('prevListingBtn');
-  const nextBtn = document.getElementById('nextListingBtn');
+  const loadingMessage = document.getElementById('loadingMessage');
+  const sellerSection = document.getElementById('sellerSection');
+  const summaryEl = document.getElementById('listingsSummary');
 
   let allListings = [];
-  let currentIndex = 0;
 
   // Protège l'affichage : un titre ou une description n'est jamais interprété comme du code
   function escapeHtml(value) {
@@ -101,93 +125,123 @@
     return pluralWord(u);
   }
 
+  function isSoldOut(item) {
+    return item.quantity_available != null && Number(item.quantity_available) <= 0;
+  }
+
   // Ce que voit le vendeur : « Il reste 1 kg », « Épuisé » (en rouge) ou « Stock non limité » (anciennes annonces)
-  function stockLineHtml(item) {
+  function stockBadgeHtml(item) {
     if (item.quantity_available == null) {
-      return '<p class="listing-stock">Stock non limité</p>';
+      return '<span class="stock-badge stock-free">Stock non limité</span>';
+    }
+    if (isSoldOut(item)) {
+      return '<span class="stock-badge stock-out">Épuisé</span>';
     }
     const stock = Number(item.quantity_available);
-    if (stock <= 0) {
-      return '<p class="listing-stock stock-out">Épuisé</p>';
-    }
-    return '<p class="listing-stock">Il reste ' + stock + ' ' + escapeHtml(unitLabel(item.unit, stock)) + '</p>';
+    return '<span class="stock-badge">Il reste ' + escapeHtml(stock) + ' ' + escapeHtml(unitLabel(item.unit, stock)) + '</span>';
+  }
+
+  // « 12/10/2026 » à partir de « 2026-10-12 » (sans décalage d'heure)
+  function formatDateOnly(value) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+    return m ? m[3] + '/' + m[2] + '/' + m[1] : '';
+  }
+
+  function formatPublished(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
   }
 
   function buildListingCardHtml(item) {
     const price = Number(item.price).toFixed(2).replace('.', ',');
     const unit = item.unit ? '/' + escapeHtml(item.unit) : '';
+    const category = [item.category, item.subcategory].filter(Boolean).map(escapeHtml).join(' · ');
+    const harvest = formatDateOnly(item.harvest_date);
+    const published = formatPublished(item.created_at);
+    const dates = [
+      harvest ? 'Récolte du ' + harvest : '',
+      published ? 'Publiée le ' + published : '',
+    ].filter(Boolean).join(' · ');
+
     return (
-      '<div class="order-card">' +
-      (item.image_url ? '<img class="listing-photo" src="' + escapeHtml(item.image_url) + '" alt="">' : '') +
-      '<h3>' + escapeHtml(item.title) + '</h3>' +
+      '<div class="listing-card' + (isSoldOut(item) ? ' is-soldout' : '') + '" data-id="' + escapeHtml(item.id) + '">' +
+      '<div class="listing-photo-box">' +
+      (item.image_url ? '<img src="' + escapeHtml(item.image_url) + '" alt="">' : 'Pas de photo') +
+      '</div>' +
+      '<div class="listing-body">' +
+      '<div class="listing-head"><h3>' + escapeHtml(item.title) + '</h3><p class="listing-price">' + escapeHtml(price) + ' €' + unit + '</p></div>' +
+      (category ? '<p class="listing-cat">' + category + '</p>' : '') +
       (item.description ? '<p class="listing-desc">' + escapeHtml(item.description) + '</p>' : '') +
-      '<p class="listing-price">' + price + ' €' + unit + '</p>' +
-      stockLineHtml(item) +
-      '<div style="margin-top:12px;">' +
-      '<button type="button" class="btn btn-ghost delete-btn" data-id="' + escapeHtml(item.id) + '">Supprimer</button>' +
+      stockBadgeHtml(item) +
+      (dates ? '<p class="listing-dates">' + escapeHtml(dates) + '</p>' : '') +
+      '<div class="listing-actions">' +
+      '<a class="btn btn-primary" href="produit.html?id=' + encodeURIComponent(item.id) + '">Voir l\'annonce</a>' +
+      '<button type="button" class="btn btn-ghost delete-btn">Supprimer</button>' +
+      '</div>' +
       '</div>' +
       '</div>'
     );
   }
 
-  function attachDeleteHandler() {
-    const deleteBtn = container.querySelector('.delete-btn');
-    if (!deleteBtn) return;
-
-    deleteBtn.addEventListener('click', async function () {
-      if (!confirm('Supprimer definitivement cette annonce ?')) return;
-
-      const listingId = deleteBtn.getAttribute('data-id');
-      const { data: { session } } = await supabaseClient.auth.getSession();
-
-      try {
-        const r = await fetch('/api/delete-listing', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + session.access_token,
-          },
-          body: JSON.stringify({ listingId: listingId }),
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'Erreur');
-
-        allListings.splice(currentIndex, 1);
-
-        if (allListings.length === 0) {
-          listingsNavWrap.style.display = 'none';
-          container.innerHTML = "<p>Vous n'avez pas encore publié d'annonce.</p>";
-          return;
-        }
-
-        if (currentIndex >= allListings.length) {
-          currentIndex = allListings.length - 1;
-        }
-        renderCurrentListing();
-      } catch (err) {
-        alert('Erreur : ' + err.message);
-      }
-    });
+  // « 3 annonces : 2 en vente, 1 épuisée »
+  function summaryText() {
+    const total = allListings.length;
+    if (total === 0) return 'Aucune annonce pour le moment';
+    const soldOut = allListings.filter(isSoldOut).length;
+    const onSale = total - soldOut;
+    const noun = total > 1 ? 'annonces' : 'annonce';
+    if (soldOut === 0) return total + ' ' + noun + ' en vente';
+    return total + ' ' + noun + ' : ' + onSale + ' en vente, ' + soldOut + ' épuisée' + (soldOut > 1 ? 's' : '');
   }
 
-  function renderCurrentListing() {
-    container.innerHTML = buildListingCardHtml(allListings[currentIndex]);
-    prevBtn.disabled = currentIndex === 0;
-    nextBtn.disabled = currentIndex === allListings.length - 1;
-    attachDeleteHandler();
-  }
-
-  prevBtn.addEventListener('click', () => {
-    if (currentIndex > 0) {
-      currentIndex--;
-      renderCurrentListing();
+  function renderAll() {
+    summaryEl.textContent = summaryText();
+    if (allListings.length === 0) {
+      container.innerHTML = '<p class="my-empty">Vous n\'avez pas encore publié d\'annonce. Cliquez sur « Publier une annonce » pour mettre votre première récolte en vente.</p>';
+      return;
     }
-  });
+    container.innerHTML = allListings.map(buildListingCardHtml).join('');
+  }
 
-  nextBtn.addEventListener('click', () => {
-    if (currentIndex < allListings.length - 1) {
-      currentIndex++;
-      renderCurrentListing();
+  let deleting = false;
+
+  container.addEventListener('click', async function (e) {
+    const deleteBtn = e.target.closest('.delete-btn');
+    if (!deleteBtn || deleting) return;
+    const card = deleteBtn.closest('.listing-card');
+    if (!card) return;
+
+    if (!confirm('Supprimer définitivement cette annonce ?')) return;
+
+    const listingId = card.getAttribute('data-id');
+    deleting = true;
+    deleteBtn.disabled = true;
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) throw new Error('Session expirée, reconnectez-vous.');
+
+      const r = await fetch('/api/delete-listing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + session.access_token,
+        },
+        body: JSON.stringify({ listingId: listingId }),
+      });
+      let d = {};
+      try { d = await r.json(); } catch (parseError) { d = {}; }
+      if (!r.ok) throw new Error(d.error || 'Erreur');
+
+      allListings = allListings.filter((item) => String(item.id) !== String(listingId));
+      renderAll();
+    } catch (err) {
+      deleteBtn.disabled = false;
+      alert('Erreur : ' + err.message);
+    } finally {
+      deleting = false;
     }
   });
 
@@ -195,8 +249,8 @@
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     if (!session) {
+      loadingMessage.style.display = 'none';
       notLoggedSection.style.display = 'block';
-      pageSubtitle.style.display = 'none';
       return;
     }
 
@@ -205,32 +259,23 @@
         headers: { Authorization: 'Bearer ' + session.access_token },
       });
       const data = await response.json();
+      loadingMessage.style.display = 'none';
 
       if (!response.ok) {
         if (data.error && data.error.includes('vendeur')) {
-          pageSubtitle.style.display = 'none';
           notSellerSection.style.display = 'block';
           return;
         }
         throw new Error(data.error || 'Erreur');
       }
 
-      pageSubtitle.style.display = 'none';
       document.getElementById('salesLink').style.display = 'inline-block';
       allListings = data.listings || [];
-
-      if (allListings.length === 0) {
-        container.innerHTML = "<p>Vous n'avez pas encore publié d'annonce.</p>";
-        listingsNavWrap.style.display = 'block';
-        prevBtn.style.display = 'none';
-        nextBtn.style.display = 'none';
-        return;
-      }
-
-      listingsNavWrap.style.display = 'block';
-      renderCurrentListing();
+      sellerSection.style.display = 'block';
+      renderAll();
 
     } catch (err) {
+      loadingMessage.style.display = 'none';
       errorEl.textContent = 'Erreur : ' + err.message;
       errorEl.style.display = 'block';
     }

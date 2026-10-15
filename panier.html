@@ -220,7 +220,8 @@
       btn.disabled = true;
       btn.textContent = FIX_LABEL;
     } else if (belowMinimum) {
-      btn.disabled = true;
+      // Sous le minimum : le bouton ne paie pas, il ramène vers les annonces pour ajouter des articles
+      btn.disabled = false;
       btn.textContent = MIN_LABEL;
     } else {
       btn.disabled = false;
@@ -422,7 +423,14 @@
   });
 
   checkoutBtn.addEventListener('click', async () => {
-    if (cartHasProblem || belowMinimum) return;
+    if (cartHasProblem) return;
+
+    // Sous le minimum : aucun paiement, on va ajouter des articles (le panier est conservé)
+    if (belowMinimum) {
+      window.location.href = 'annonces.html';
+      return;
+    }
+
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     // Pas connecté : on envoie vers la connexion, le panier est conservé et on revient ici ensuite

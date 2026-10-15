@@ -11,9 +11,9 @@
 <body>
 
 <!-- ============ EN-TÊTE DE PAGE ============ -->
-<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;min-height:533px;box-sizing:border-box;text-align:center;">
-    <div style="text-align:left;margin:-24px 0 12px -20px;">
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
     </div>
     <h1 id="cartTitle">Mon panier</h1>
@@ -51,8 +51,8 @@
       </div>
     </div>
   </div>
-  <div style="width:440px;min-height:533px;align-self:stretch;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;">
-    <img src="panier-agrivoisin.png" alt="Panier de fruits et légumes Agrivoisin" style="width:auto;height:auto;max-width:92%;max-height:92%;">
+  <div class="my-video">
+    <img src="panier-agrivoisin.png" alt="Panier de fruits et légumes Agrivoisin">
   </div>
 </section>
 
@@ -102,6 +102,11 @@
 
 <script src="script.js"></script>
 <style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  .my-video img { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
   .cart-item-row.cart-line { flex-direction:column; align-items:stretch; gap:8px; }
   .cart-line-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .cart-line-calc { font-size:0.95rem; color:var(--ink); }

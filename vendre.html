@@ -68,6 +68,17 @@
       </fieldset>
 
       <div id="siretBlock" style="display:none;">
+        <div class="pro-offer" id="proOffer">
+          <strong>Offre de lancement pour les professionnels</strong>
+          <ul>
+            <li><strong>Première année : aucun abonnement et aucun engagement.</strong></li>
+            <li>Commission d'Agrivoisin : 17&nbsp;% de chaque vente.</li>
+            <li>2&nbsp;€ de frais de service les mois où vous avez au moins une vente.</li>
+            <li>Ensuite, pour rester référencé : abonnement de 19,95&nbsp;€ par mois, et la commission passe à 15&nbsp;%.</li>
+            <li>Un seul virement par mois sur votre compte.</li>
+          </ul>
+        </div>
+
         <label for="sellerSiret">Votre numéro SIRET (14 chiffres)</label>
         <input type="text" id="sellerSiret" placeholder="Ex : 123 456 789 00012" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
       </div>
@@ -148,6 +159,10 @@
   .auth-form .seller-type-option strong { color:var(--leaf-deep); }
   .auth-form .seller-type-option input { width:auto; margin:3px 0 0; padding:0; border:none; flex-shrink:0; accent-color:var(--leaf-deep); }
   .auth-form .seller-type-option:has(input:checked) { border-color:var(--leaf-deep); background:var(--cream-soft); }
+  .pro-offer { margin:4px 0 14px; padding:12px 14px; border:1.5px solid var(--leaf-deep); border-radius:var(--radius-sm); background:var(--cream-soft); font-size:0.9rem; line-height:1.45; color:var(--ink); text-align:left; }
+  .pro-offer > strong { display:block; color:var(--leaf-deep); margin-bottom:6px; }
+  .pro-offer ul { margin:0; padding-left:20px; list-style:disc; }
+  .pro-offer li { margin:3px 0; }
   .auth-form .seller-type-option:has(input:focus-visible) { outline:2px solid var(--leaf-deep); outline-offset:2px; }
 </style>
 <script>

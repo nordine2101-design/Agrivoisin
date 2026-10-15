@@ -5,7 +5,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
 // --- Réglages de l'argent retenu ---
-const COMMISSION_RATE = 0.15; // commission d'Agrivoisin : 15 % du prix, par vendeur et par commande
+// Commission d'Agrivoisin, par vendeur et par commande (en pourcentage entier, pour des calculs exacts) :
+// 15 % pour un particulier, 17 % pour un professionnel (première année, sans abonnement).
+const COMMISSION_PERCENT_PARTICULIER = 15;
+const COMMISSION_PERCENT_PROFESSIONNEL = 17;
+
+function commissionPercentFor(sellerType) {
+  return sellerType === 'professionnel' ? COMMISSION_PERCENT_PROFESSIONNEL : COMMISSION_PERCENT_PARTICULIER;
+}
+
+// Commission en centimes : le même arrondi qu'avant, mais calculé sur des entiers
+function commissionCents(amountCents, sellerType) {
+  return Math.round((amountCents * commissionPercentFor(sellerType)) / 100);
+}
+
 const AUTO_RELEASE_DAYS = 3;  // délai avant le versement automatique au vendeur (annonces sans horaires de retrait)
 const PICKUP_RELEASE_DELAY_MS = 48 * 60 * 60 * 1000; // avec horaires : libération 48 h après la fin du créneau de retrait
 
@@ -341,6 +354,20 @@ export default async function handler(req, res) {
 
       const legacyReleaseAt = new Date(Date.now() + AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+      // Particulier ou professionnel ? La commission en dépend. Si la lecture échoue, on n'invente rien :
+      // la commande est retirée et Stripe réessaiera (le vendeur n'est jamais facturé au mauvais taux).
+      const sellerTypes = {};
+      if (Object.keys(amountBySeller).length > 0) {
+        const { data: sellerRows, error: sellerTypesError } = await supabase
+          .from('sellers')
+          .select('id, seller_type')
+          .in('id', Object.keys(amountBySeller));
+        if (sellerTypesError) {
+          throw new Error('type de vendeur : ' + sellerTypesError.message);
+        }
+        (sellerRows || []).forEach((r) => { sellerTypes[r.id] = r.seller_type; });
+      }
+
       const payouts = Object.entries(amountBySeller).map(([sellerId, amount]) => {
         const sellerListingIds = [...new Set(servedLines.filter((l) => l.seller_id === sellerId).map((l) => l.listing_id))];
         const pickupWindow = computePickupWindow(sellerListingIds, slotsByListing, purchaseMs);
@@ -348,7 +375,7 @@ export default async function handler(req, res) {
           order_id: order.id,
           seller_id: sellerId,
           amount_cents: amount,
-          commission_cents: Math.round(amount * COMMISSION_RATE),
+          commission_cents: commissionCents(amount, sellerTypes[sellerId]),
           stripe_fee_cents: totalCardFee !== null && chargedTotalCents > 0 ? Math.floor((totalCardFee * amount) / chargedTotalCents) : null,
           stripe_charge_id: chargeId,
           status: 'en_attente',

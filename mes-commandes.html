@@ -10,22 +10,25 @@
 </head>
 <body>
 
-<!-- ============ EN-TÊTE DE PAGE ============ -->
-<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;height:533px;box-sizing:border-box;text-align:center;display:flex;flex-direction:column;">
-    <div style="text-align:left;margin:-24px 0 12px -20px;">
+<!-- ============ MES COMMANDES ============ -->
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
     </div>
     <h1>Mes commandes</h1>
-    <p>Retrouvez vos achats et laissez un avis aux vendeurs.</p>
+    <p class="my-intro">Retrouvez vos achats et laissez un avis aux vendeurs.</p>
 
-    <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de vos commandes...</p>
-    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous devez être connecté pour voir vos commandes. <a href="connexion.html">Se connecter</a></p>
-    <p id="noOrdersMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous n'avez pas encore passé de commande.</p>
+    <p id="loadingMessage" style="margin-top:16px;color:#C8352F;text-align:center;">Chargement de vos commandes...</p>
+    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;">Vous devez être connecté pour voir vos commandes. <a href="connexion.html">Se connecter</a></p>
+    <p id="noOrdersMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;">Vous n'avez pas encore passé de commande.</p>
 
-    <div id="ordersContainer" style="flex:1;min-height:0;overflow-y:auto;text-align:left;margin-top:16px;"></div>
+    <div id="ordersContainer" style="text-align:left;margin-top:16px;"></div>
   </div>
-   <video src="mamie-video3.mp4" autoplay muted playsinline style="width:440px;object-fit:cover;align-self:stretch;display:block;margin:0;border-radius:28px;"></video>
+
+  <div class="my-video">
+    <video src="mamie-video3.mp4" autoplay muted playsinline></video>
+  </div>
 </section>
 
 <!-- ============ FOOTER ============ -->
@@ -698,6 +701,13 @@
 </script>
 
 <style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
+  .my-panel h1 { font-size:1.6rem; text-align:left; margin:0 0 8px; }
+  .my-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
   .order-banner { background:var(--leaf-deep, #385C3B); color:#fff; font-weight:700; font-size:1rem; letter-spacing:0.02em; text-align:center; padding:10px 14px; border-radius:10px; margin:26px 0 10px; }
   .order-banner:first-child { margin-top:0; }
   .order-card { background:#f9f7f2; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
@@ -745,6 +755,8 @@
   .pickup-box-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
   .pickup-set { font-size:0.85rem; line-height:1.6; margin-top:3px; }
   .pickup-names { font-style:italic; color:#6B5842; }
+  .payout-actions, .payout-report-buttons { flex-direction:row; flex-wrap:wrap; }
+  .payout-actions .btn, .payout-report-buttons .btn { width:auto; }
 </style>
 
 </body>

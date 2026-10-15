@@ -15,10 +15,9 @@
   <div class="my-panel">
     <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
+      <h1>Mes annonces</h1>
       <a href="mes-ventes.html" id="salesLink" class="btn btn-primary" style="display:none;">Mes ventes</a>
     </div>
-
-    <h1>Mes annonces</h1>
 
     <div id="notLoggedSection" style="display:none;">
       <p style="text-align:center;">Vous devez être connecté pour voir vos annonces. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
@@ -50,8 +49,8 @@
 <style>
   .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
-  .my-panel h1 { font-size:1.6rem; text-align:left; margin:0 0 8px; }
-  .my-topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-muted { color:#6B5842; }
   .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
   .my-summary-row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; margin-bottom:18px; }

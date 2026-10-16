@@ -8,6 +8,40 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
   },
 });
 
+// Date d'aujourd'hui à Paris, « AAAA-MM-JJ »
+function todayInParis() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+}
+
+// Applique la promotion en cours (réservée aux vendeurs professionnels, début et fin inclus).
+// Les champs de promotion ne sont jamais envoyés tels quels au navigateur.
+function withCurrentPrice(item) {
+  const { promo_percent, promo_price, promo_starts_at, promo_ends_at, ...rest } = item;
+  const seller = Array.isArray(item.sellers) ? item.sellers[0] : item.sellers;
+  if (!seller || seller.seller_type !== 'professionnel') return rest;
+  if (!promo_starts_at || !promo_ends_at) return rest;
+
+  const today = todayInParis();
+  if (today < promo_starts_at || today > promo_ends_at) return rest;
+
+  const normal = Number(item.price);
+  let promo = null;
+  if (promo_percent != null) {
+    promo = Math.round(normal * (100 - Number(promo_percent))) / 100;
+  } else if (promo_price != null) {
+    promo = Number(promo_price);
+  }
+  if (promo == null || !Number.isFinite(promo) || promo <= 0 || promo >= normal) return rest;
+
+  return {
+    ...rest,
+    price: promo,
+    original_price: normal,
+    promo_label: promo_percent != null ? '-' + Number(promo_percent) + ' %' : 'Prix spécial',
+    promo_ends_at: promo_ends_at,
+  };
+}
+
 // Moyenne des notes (1 à 4 fraises) de chaque vendeur : { average, count }.
 // Les avis sont lus par paquets de 1000 (limite de la base) pour que la moyenne soit toujours exacte.
 async function loadSellerRatings(sellerIds) {
@@ -191,14 +225,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data: listings, error } = await supabase
+    const { data: rawListings, error } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
       .order('created_at', { ascending: false });
 
     if (error) {
       throw error;
     }
+
+    // Pendant une promotion, « price » devient le prix promotionnel (c'est lui que les acheteurs voient,
+    // trient et paient) et « original_price » garde le prix normal pour l'afficher barré.
+    const listings = (rawListings || []).map(withCurrentPrice);
 
     // Une annonce n'apparaît sur le site que si la ville de son vendeur est connue
     // et reconnue sur la carte (la distance doit toujours pouvoir être calculée)

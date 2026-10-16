@@ -13,7 +13,7 @@
 <section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;">
   <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;min-height:533px;box-sizing:border-box;text-align:center;">
     <div style="text-align:left;margin:-24px 0 12px -20px;">
-      <a href="annonces.html" class="btn btn-ghost">Retour</a>
+      <a href="annonces.html" id="backLink" class="btn btn-ghost">Retour</a>
     </div>
 
     <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de l'annonce...</p>
@@ -93,6 +93,17 @@
 </footer>
 
 <script src="script.js"></script>
+<script>
+  // Si on vient de « Mes annonces », le bouton Retour y ramène
+  (function () {
+    try {
+      var ref = document.referrer ? new URL(document.referrer) : null;
+      if (ref && ref.origin === window.location.origin && /\/mes-annonces(\.html)?$/.test(ref.pathname)) {
+        document.getElementById('backLink').href = 'mes-annonces.html';
+      }
+    } catch (e) {}
+  })();
+</script>
 <script>
   const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=900&q=80&auto=format&fit=crop';
 

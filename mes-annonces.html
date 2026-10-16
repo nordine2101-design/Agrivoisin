@@ -58,8 +58,9 @@
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
   .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
 
-  .listing-card { display:flex; gap:18px; background:#f9f7f2; border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
-  .listing-card.is-soldout { background:#faf3f2; }
+  .listing-card { display:flex; gap:18px; background:#f9f7f2; border:2px solid #D9CFB8; border-radius:16px; padding:18px; margin-bottom:30px; box-shadow:0 6px 16px rgba(60,45,20,0.12); }
+  .listing-card:last-child { margin-bottom:0; }
+  .listing-card.is-soldout { background:#faf3f2; border-color:#E8C9C5; }
   .listing-photo-box { width:200px; height:160px; flex-shrink:0; border-radius:12px; overflow:hidden; background:#ece6d8; display:flex; align-items:center; justify-content:center; color:#8a7a62; font-size:0.85rem; text-align:center; }
   .listing-photo-box img { width:100%; height:100%; object-fit:cover; display:block; }
   .listing-body { flex:1; min-width:0; }

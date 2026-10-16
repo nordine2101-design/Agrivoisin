@@ -31,6 +31,31 @@ function unitLabel(unit, count) {
   return pluralWord(u);
 }
 
+// Date d'aujourd'hui à Paris, « AAAA-MM-JJ »
+function todayInParis() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+}
+
+// Le prix à payer aujourd'hui pour une annonce : le prix promotionnel si une promotion
+// d'un vendeur professionnel est en cours (début et fin inclus), sinon le prix normal.
+function currentPrice(listing, seller) {
+  const normal = Number(listing.price);
+  if (!seller || seller.seller_type !== 'professionnel') return normal;
+  if (!listing.promo_starts_at || !listing.promo_ends_at) return normal;
+
+  const today = todayInParis();
+  if (today < listing.promo_starts_at || today > listing.promo_ends_at) return normal;
+
+  let promo = null;
+  if (listing.promo_percent != null) {
+    promo = Math.round(normal * (100 - Number(listing.promo_percent))) / 100;
+  } else if (listing.promo_price != null) {
+    promo = Number(listing.promo_price);
+  }
+  if (promo == null || !Number.isFinite(promo) || promo <= 0 || promo >= normal) return normal;
+  return promo;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -77,7 +102,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, sellers(id, city, latitude, longitude, stripe_account_id)')
+      .select('id, title, price, unit, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
       .in('id', listingIds);
 
     if (listingsError) {
@@ -114,7 +139,8 @@ export default async function handler(req, res) {
         });
       }
 
-      const cents = Math.round(Number(listing.price) * 100);
+      // Le prix payé est celui d'aujourd'hui : le prix promotionnel pendant une promotion, sinon le prix normal
+      const cents = Math.round(currentPrice(listing, seller) * 100);
       if (!Number.isFinite(cents) || cents <= 0) {
         return res.status(400).json({
           error: `Le prix de l'annonce « ${label} » est invalide. Retirez-la de votre panier.`,

@@ -1,5 +1,4 @@
-
-    import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
   realtime: {
@@ -32,7 +31,7 @@ export default async function handler(req, res) {
 
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
-      .select('id')
+      .select('id, seller_type')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -44,13 +43,13 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at')
+      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at, promo_percent, promo_price, promo_starts_at, promo_ends_at')
       .eq('seller_id', seller.id)
       .order('created_at', { ascending: false });
 
     if (listingsError) throw listingsError;
 
-    res.status(200).json({ listings });
+    res.status(200).json({ listings, sellerType: seller.seller_type === 'professionnel' ? 'professionnel' : 'particulier' });
 
   } catch (error) {
     console.error(error);

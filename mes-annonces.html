@@ -398,7 +398,7 @@
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (!session) throw new Error('Session expirée, reconnectez-vous.');
 
-      const r = await fetch('/api/set-listing-promotion', {
+      const r = await fetch('/api/get-seller-listings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -75,6 +75,22 @@
   .listing-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
   .listing-actions .btn { font-size:0.85rem; padding:8px 16px; }
   .listing-actions .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .promo-badge { display:inline-block; margin-top:10px; padding:4px 12px; border-radius:999px; font-size:0.85rem; font-weight:700; background:#FFE27A; color:#B45A00; }
+  .promo-badge.promo-soon { background:#eee8da; color:#6B5842; }
+  .promo-badge.promo-over { background:#eee8da; color:#8a7a62; }
+  .listing-price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; margin-right:6px; }
+  .listing-price.is-promo { color:#C8352F; }
+  .promo-form { margin-top:14px; padding:14px; border-radius:12px; background:#fff; border:1.5px solid #FFE27A; }
+  .promo-form label { display:block; font-size:0.85rem; font-weight:700; color:#B45A00; margin:10px 0 4px; }
+  .promo-form label:first-child { margin-top:0; }
+  .promo-form select, .promo-form input { width:100%; box-sizing:border-box; padding:9px 12px; border:1.5px solid #e2dccd; border-radius:10px; font-family:inherit; font-size:0.95rem; }
+  .promo-dates { display:flex; gap:12px; }
+  .promo-dates > div { flex:1; min-width:0; }
+  .promo-preview { margin:12px 0 0; padding:10px 12px; border-radius:10px; background:var(--cream-soft); font-size:0.9rem; color:#6B5842; }
+  .promo-error { color:#C8352F; font-size:0.88rem; margin:10px 0 0; }
+  .promo-buttons { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .promo-buttons .btn { font-size:0.85rem; padding:8px 16px; }
+  .promo-buttons .btn:disabled { opacity:0.5; cursor:not-allowed; }
   .my-empty { text-align:center; color:#6B5842; padding:24px 0; }
 </style>
 
@@ -153,9 +169,105 @@
     return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
   }
 
+  // ---------- Promotions (réservées aux professionnels) ----------
+
+  const PROMO_PERCENTS = [5, 10, 15, 20, 30];
+  let isPro = false;
+
+  function euros(value) {
+    return Number(value).toFixed(2).replace('.', ',') + ' €';
+  }
+
+  // Date du jour à Paris, « AAAA-MM-JJ »
+  function todayParis() {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+  }
+
+  // Ajoute des jours à une date « AAAA-MM-JJ »
+  function addDays(dateStr, days) {
+    const d = new Date(dateStr + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // Prix promotionnel d'une annonce (ou null s'il n'y a pas de promotion)
+  function promoPriceOf(item) {
+    if (item.promo_percent != null) {
+      return Math.round(Number(item.price) * (100 - Number(item.promo_percent))) / 100;
+    }
+    if (item.promo_price != null) return Number(item.promo_price);
+    return null;
+  }
+
+  // 'none', 'soon' (pas encore commencée), 'active' (en cours) ou 'over' (terminée)
+  function promoStatus(item) {
+    if (promoPriceOf(item) == null || !item.promo_starts_at || !item.promo_ends_at) return 'none';
+    const today = todayParis();
+    if (today < item.promo_starts_at) return 'soon';
+    if (today > item.promo_ends_at) return 'over';
+    return 'active';
+  }
+
+  function promoBadgeHtml(item, unitText) {
+    const status = promoStatus(item);
+    if (status === 'none') return '';
+    const label = item.promo_percent != null ? '-' + item.promo_percent + ' %' : 'Prix spécial';
+    const period = 'du ' + formatDateOnly(item.promo_starts_at) + ' au ' + formatDateOnly(item.promo_ends_at);
+    const detail = euros(promoPriceOf(item)) + unitText + ' au lieu de ' + euros(item.price) + unitText;
+    if (status === 'active') {
+      return '<span class="promo-badge">Promotion en cours : ' + escapeHtml(label) + ' · ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
+    }
+    if (status === 'soon') {
+      return '<span class="promo-badge promo-soon">Promotion à venir : ' + escapeHtml(label) + ' · ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
+    }
+    return '<span class="promo-badge promo-over">Promotion terminée (' + escapeHtml(period) + ')</span>';
+  }
+
+  function buildPromoFormHtml(item) {
+    const hasPromo = promoPriceOf(item) != null;
+    const status = promoStatus(item);
+    const today = todayParis();
+    const start = hasPromo && status !== 'over' ? item.promo_starts_at : today;
+    const end = hasPromo && status !== 'over' ? item.promo_ends_at : addDays(today, 7);
+    const isPrice = hasPromo && item.promo_percent == null;
+    const options = PROMO_PERCENTS.map(function (p) {
+      const selected = !isPrice && Number(item.promo_percent) === p ? ' selected' : '';
+      return '<option value="' + p + '"' + selected + '>-' + p + ' %</option>';
+    }).join('') + '<option value="price"' + (isPrice ? ' selected' : '') + '>Prix personnalisé</option>';
+    const unit = item.unit ? ' par ' + escapeHtml(item.unit) : '';
+
+    return (
+      '<div class="promo-form">' +
+      '<label>Offre</label>' +
+      '<select class="promo-offer">' + options + '</select>' +
+      '<div class="promo-price-row" style="display:' + (isPrice ? 'block' : 'none') + ';">' +
+      '<label>Prix promotionnel (€' + unit + ')</label>' +
+      '<input type="number" class="promo-price-input" step="0.01" min="0.01" placeholder="Ex : 2.50" value="' + (isPrice ? escapeHtml(Number(item.promo_price).toFixed(2)) : '') + '">' +
+      '</div>' +
+      '<div class="promo-dates">' +
+      '<div><label>Début</label><input type="date" class="promo-start" min="' + today + '" value="' + escapeHtml(start) + '"></div>' +
+      '<div><label>Fin</label><input type="date" class="promo-end" min="' + today + '" value="' + escapeHtml(end) + '"></div>' +
+      '</div>' +
+      '<p class="promo-preview"></p>' +
+      '<p class="promo-error" style="display:none;"></p>' +
+      '<div class="promo-buttons">' +
+      '<button type="button" class="btn btn-primary promo-save">Enregistrer la promotion</button>' +
+      '<button type="button" class="btn btn-ghost promo-cancel">Annuler</button>' +
+      (hasPromo ? '<button type="button" class="btn btn-ghost promo-remove">Retirer la promotion</button>' : '') +
+      '</div>' +
+      '</div>'
+    );
+  }
+
   function buildListingCardHtml(item) {
-    const price = Number(item.price).toFixed(2).replace('.', ',');
+    const status = promoStatus(item);
+    const isActivePromo = status === 'active';
     const unit = item.unit ? '/' + escapeHtml(item.unit) : '';
+    const rawUnit = item.unit ? '/' + item.unit : '';
+    const price = isActivePromo ? '' : Number(item.price).toFixed(2).replace('.', ',');
+    const priceHtml = isActivePromo
+      ? '<p class="listing-price is-promo"><span class="listing-price-old">' + escapeHtml(euros(item.price)) + unit + '</span>' + escapeHtml(euros(promoPriceOf(item))) + unit + '</p>'
+      : '<p class="listing-price">' + escapeHtml(price) + ' €' + unit + '</p>';
     const category = [item.category, item.subcategory].filter(Boolean).map(escapeHtml).join(' · ');
     const harvest = formatDateOnly(item.harvest_date);
     const published = formatPublished(item.created_at);
@@ -170,13 +282,15 @@
       (item.image_url ? '<img src="' + escapeHtml(item.image_url) + '" alt="">' : 'Pas de photo') +
       '</div>' +
       '<div class="listing-body">' +
-      '<div class="listing-head"><h3>' + escapeHtml(item.title) + '</h3><p class="listing-price">' + escapeHtml(price) + ' €' + unit + '</p></div>' +
+      '<div class="listing-head"><h3>' + escapeHtml(item.title) + '</h3>' + priceHtml + '</div>' +
       (category ? '<p class="listing-cat">' + category + '</p>' : '') +
       (item.description ? '<p class="listing-desc">' + escapeHtml(item.description) + '</p>' : '') +
       stockBadgeHtml(item) +
+      (promoBadgeHtml(item, rawUnit) ? '<br>' + promoBadgeHtml(item, rawUnit) : '') +
       (dates ? '<p class="listing-dates">' + escapeHtml(dates) + '</p>' : '') +
       '<div class="listing-actions">' +
       '<a class="btn btn-primary" href="produit.html?id=' + encodeURIComponent(item.id) + '">Voir l\'annonce</a>' +
+      (isPro ? '<button type="button" class="btn btn-ghost promo-btn">Promotions</button>' : '') +
       '<button type="button" class="btn btn-ghost delete-btn">Supprimer</button>' +
       '</div>' +
       '</div>' +
@@ -203,6 +317,117 @@
     }
     container.innerHTML = allListings.map(buildListingCardHtml).join('');
   }
+
+  // ---------- Formulaire de promotion (un seul ouvert à la fois, dans la carte de l'annonce) ----------
+
+  function findItem(card) {
+    const id = card.getAttribute('data-id');
+    return allListings.find((it) => String(it.id) === String(id));
+  }
+
+  function updatePromoPreview(form, item) {
+    const offer = form.querySelector('.promo-offer').value;
+    const priceRow = form.querySelector('.promo-price-row');
+    const preview = form.querySelector('.promo-preview');
+    const unit = item.unit ? '/' + item.unit : '';
+    priceRow.style.display = offer === 'price' ? 'block' : 'none';
+
+    let newPrice = null;
+    if (offer === 'price') {
+      const v = parseFloat(form.querySelector('.promo-price-input').value);
+      if (isFinite(v) && v > 0) newPrice = Math.round(v * 100) / 100;
+    } else {
+      newPrice = Math.round(Number(item.price) * (100 - Number(offer))) / 100;
+    }
+    preview.textContent = newPrice == null
+      ? 'Indiquez un prix pour voir le résultat.'
+      : 'Vos acheteurs verront : ' + euros(newPrice) + unit + ' au lieu de ' + euros(item.price) + unit;
+  }
+
+  container.addEventListener('click', async function (e) {
+    const promoBtn = e.target.closest('.promo-btn');
+    const cancelBtn = e.target.closest('.promo-cancel');
+    const saveBtn = e.target.closest('.promo-save');
+    const removeBtn = e.target.closest('.promo-remove');
+    if (!promoBtn && !cancelBtn && !saveBtn && !removeBtn) return;
+
+    const card = e.target.closest('.listing-card');
+    if (!card) return;
+    const item = findItem(card);
+    if (!item) return;
+
+    if (promoBtn) {
+      const existing = card.querySelector('.promo-form');
+      document.querySelectorAll('.promo-form').forEach((f) => f.remove());
+      if (existing) return; // un second clic referme le formulaire
+      card.querySelector('.listing-body').insertAdjacentHTML('beforeend', buildPromoFormHtml(item));
+      updatePromoPreview(card.querySelector('.promo-form'), item);
+      return;
+    }
+
+    if (cancelBtn) {
+      card.querySelector('.promo-form').remove();
+      return;
+    }
+
+    const form = card.querySelector('.promo-form');
+    const errBox = form.querySelector('.promo-error');
+    errBox.style.display = 'none';
+
+    const payload = { listingId: item.id };
+    if (removeBtn) {
+      if (!confirm('Retirer la promotion de cette annonce ?')) return;
+      payload.mode = 'none';
+    } else {
+      const offer = form.querySelector('.promo-offer').value;
+      payload.startsAt = form.querySelector('.promo-start').value;
+      payload.endsAt = form.querySelector('.promo-end').value;
+      if (offer === 'price') {
+        payload.mode = 'price';
+        payload.promoPrice = parseFloat(form.querySelector('.promo-price-input').value);
+      } else {
+        payload.mode = 'percent';
+        payload.percent = Number(offer);
+      }
+    }
+
+    const buttons = form.querySelectorAll('button');
+    buttons.forEach((b) => { b.disabled = true; });
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) throw new Error('Session expirée, reconnectez-vous.');
+
+      const r = await fetch('/api/set-listing-promotion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + session.access_token,
+        },
+        body: JSON.stringify(payload),
+      });
+      let d = {};
+      try { d = await r.json(); } catch (parseError) { d = {}; }
+      if (!r.ok) throw new Error(d.error || 'Erreur');
+
+      item.promo_percent = d.promotion.promo_percent;
+      item.promo_price = d.promotion.promo_price;
+      item.promo_starts_at = d.promotion.promo_starts_at;
+      item.promo_ends_at = d.promotion.promo_ends_at;
+      renderAll();
+    } catch (err) {
+      buttons.forEach((b) => { b.disabled = false; });
+      errBox.textContent = 'Erreur : ' + err.message;
+      errBox.style.display = 'block';
+    }
+  });
+
+  container.addEventListener('input', function (e) {
+    const form = e.target.closest('.promo-form');
+    if (!form) return;
+    const item = findItem(form.closest('.listing-card'));
+    if (item) updatePromoPreview(form, item);
+  });
 
   let deleting = false;
 
@@ -269,6 +494,7 @@
       }
 
       document.getElementById('salesLink').style.display = 'inline-block';
+      isPro = data.sellerType === 'professionnel';
       allListings = data.listings || [];
       sellerSection.style.display = 'block';
       renderAll();

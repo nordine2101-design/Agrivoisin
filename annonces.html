@@ -329,19 +329,31 @@
       const noMore = stock !== null && unitsInCart(item.id) >= stock;
       const buttonNote = stock !== null && stock <= 0 ? 'Épuisé' : 'Vous avez déjà pris tout le stock disponible';
 
+      // Promotion en cours : l'ancien prix est barré, le prix promotionnel est le prix payé
+      const unitText = escapeHtml(item.unit || 'kg');
+      const priceNow = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + unitText;
+      const hasPromo = item.original_price != null;
+      const priceHtml = hasPromo
+        ? `<span class="price-wrap"><span class="price-old">${Number(item.original_price).toFixed(2).replace('.', ',')} €/${unitText}</span><span class="price">${priceNow}</span></span>`
+        : `<span class="price">${priceNow}</span>`;
+      const promoEnd = hasPromo && item.promo_ends_at ? String(item.promo_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
+      const promoPill = hasPromo
+        ? `<span class="promo-pill">Promo ${escapeHtml(item.promo_label || '')}${promoEnd ? ' · jusqu\'au ' + promoEnd : ''}</span>`
+        : '';
+
       card.innerHTML = `
         <a href="produit.html?id=${escapeHtml(item.id)}" class="produce-card-image" style="display:block;">
           <img src="${escapeHtml(item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop')}" alt="${escapeHtml(item.title)}">
         </a>
         <div class="produce-card-body">
-          <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>
+          <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${promoPill}
           <h4><a href="produit.html?id=${escapeHtml(item.id)}">${escapeHtml(item.title)}</a></h4>
           ${freshnessHtml}
           ${stockBadge(item)}
           <p class="seller">${escapeHtml(locationText)}</p>
           ${ratingHtml}
           <div class="produce-card-footer">
-            <span class="price">${Number(item.price).toFixed(2).replace('.', ',')} €/${escapeHtml(item.unit || 'kg')}</span>
+            ${priceHtml}
             <button class="icon-btn" aria-label="${noMore ? buttonNote : 'Ajouter au panier'}" ${noMore ? 'disabled title="' + buttonNote + '"' : ''} data-stock="${stock === null ? '' : stock}" data-stripe-account="${escapeHtml(item.sellers ? item.sellers.stripe_account_id : '')}" data-listing-id="${escapeHtml(item.id)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
@@ -483,6 +495,11 @@
   .type-check input { position:absolute; opacity:0; width:1px; height:1px; margin:0; pointer-events:none; }
   .type-check:has(input:checked) { background:#D97D45; border-color:#D97D45; color:#fff; }
   .type-check:has(input:focus-visible) { outline:2px solid #D97D45; outline-offset:2px; }
+
+  .price-wrap { display:inline-flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }
+  .price-wrap .price { color:#C8352F; }
+  .promo-pill { display:inline-block; margin:6px 0 0 0; padding:3px 10px; border-radius:999px; background:#FFE27A; color:#B45A00; font-size:0.75rem; font-weight:700; }
 </style>
 </body>
 </html>

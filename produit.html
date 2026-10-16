@@ -30,7 +30,7 @@
         <div id="listingPickupLines" style="font-size:0.9rem;line-height:1.7;"></div>
       </div>
       <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
-      <p style="margin-bottom:22px;"><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span></p>
+      <p style="margin-bottom:22px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
       <p id="listingStock" style="display:none;margin:-10px 0 18px;font-weight:700;"></p>
 
       <button type="button" id="addToCartBtn" class="btn btn-primary" style="width:100%;">Ajouter au panier</button>
@@ -373,6 +373,18 @@
     const priceText = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + (item.unit || 'kg');
     document.getElementById('listingPrice').textContent = priceText;
 
+    // Promotion en cours : l'ancien prix est barré, le prix promotionnel est le prix payé
+    if (item.original_price != null) {
+      const oldPriceEl = document.getElementById('listingOldPrice');
+      oldPriceEl.textContent = Number(item.original_price).toFixed(2).replace('.', ',') + ' €/' + (item.unit || 'kg');
+      oldPriceEl.style.display = 'inline';
+      document.getElementById('listingPrice').style.color = '#C8352F';
+      const promoEnd = item.promo_ends_at ? String(item.promo_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
+      const promoEl = document.getElementById('listingPromo');
+      promoEl.textContent = 'Promo ' + (item.promo_label || '') + (promoEnd ? ' · jusqu\'au ' + promoEnd : '');
+      promoEl.style.display = 'inline-block';
+    }
+
     imageEl.src = item.image_url || FALLBACK_IMAGE;
     imageEl.alt = item.title;
     imageEl.style.maxWidth = '100%';
@@ -519,6 +531,11 @@
     .freshness-tip-icons { width:70px; }
     .tip-icon { width:22px; height:22px; }
   }
+
+  .price-wrap { display:inline-flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }
+  .price-wrap .price { color:#C8352F; }
+  .promo-pill { display:inline-block; margin:6px 0 0 0; padding:3px 10px; border-radius:999px; background:#FFE27A; color:#B45A00; font-size:0.75rem; font-weight:700; }
 </style>
 </body>
 </html>

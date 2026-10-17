@@ -16,9 +16,23 @@ function todayInParis() {
 // Applique la promotion en cours (réservée aux vendeurs professionnels, début et fin inclus).
 // Les champs de promotion ne sont jamais envoyés tels quels au navigateur.
 function withCurrentPrice(item) {
-  const { promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, ...rest } = item;
+  const { promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, ...rest } = item;
   const seller = Array.isArray(item.sellers) ? item.sellers[0] : item.sellers;
   if (!seller || seller.seller_type !== 'professionnel') return rest;
+
+  // Un lot (par exemple 3 kg pour 7 €) : le prix à l'unité ne change pas, le navigateur reçoit la quantité et le prix du lot.
+  // Il suit les mêmes dates qu'une promotion, et une annonce n'a qu'une seule offre à la fois.
+  if (lot_quantity != null && lot_price != null) {
+    if (!promo_starts_at || !promo_ends_at) return rest;
+    const lotToday = todayInParis();
+    if (lotToday < promo_starts_at || lotToday > promo_ends_at) return rest;
+    const quantity = Number(lot_quantity);
+    const price = Number(lot_price);
+    if (!Number.isInteger(quantity) || quantity < 2 || !Number.isFinite(price) || price <= 0) return rest;
+    if (price >= Number(item.price) * quantity) return rest;
+    return { ...rest, lot_quantity: quantity, lot_price: price, lot_ends_at: promo_ends_at };
+  }
+
   // Un déstockage n'a pas de date de fin : il dure tant qu'il reste du stock
   const clearance = promo_clearance === true;
   if (!promo_starts_at || (!promo_ends_at && !clearance)) return rest;
@@ -233,7 +247,7 @@ export default async function handler(req, res) {
   try {
     const { data: rawListings, error } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
       .order('created_at', { ascending: false });
 
     if (error) {

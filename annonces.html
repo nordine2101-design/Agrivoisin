@@ -345,12 +345,18 @@
           : `<span class="promo-pill">Promo ${escapeHtml(item.promo_label || '')}${promoEnd ? ' · jusqu\'au ' + promoEnd : ''}</span>`)
         : '';
 
+      // Lot en cours (par exemple 3 kg pour 7,00 €) : le prix à l'unité reste le prix normal
+      const lotEnd = item.lot_quantity != null && item.lot_ends_at ? String(item.lot_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
+      const lotPill = item.lot_quantity != null && item.lot_price != null
+        ? `<span class="promo-pill">Lot : ${escapeHtml(item.lot_quantity)} ${escapeHtml(unitLabel(item.unit, Number(item.lot_quantity)))} pour ${Number(item.lot_price).toFixed(2).replace('.', ',')} €${lotEnd ? ' · jusqu\'au ' + lotEnd : ''}</span>`
+        : '';
+
       card.innerHTML = `
         <a href="produit.html?id=${escapeHtml(item.id)}" class="produce-card-image" style="display:block;">
           <img src="${escapeHtml(item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop')}" alt="${escapeHtml(item.title)}">
         </a>
         <div class="produce-card-body">
-          <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${promoPill}
+          <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${promoPill}${lotPill}
           <h4><a href="produit.html?id=${escapeHtml(item.id)}">${escapeHtml(item.title)}</a></h4>
           ${freshnessHtml}
           ${stockBadge(item)}

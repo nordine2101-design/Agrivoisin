@@ -338,7 +338,9 @@
         : `<span class="price">${priceNow}</span>`;
       const promoEnd = hasPromo && item.promo_ends_at ? String(item.promo_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
       const promoPill = hasPromo
-        ? (item.promo_day
+        ? (item.promo_clearance
+          ? `<span class="promo-pill">Déstockage ${escapeHtml(item.promo_label || '')} · jusqu\'à épuisement du stock</span>`
+          : item.promo_day
           ? `<span class="promo-pill">Offre du jour ${escapeHtml(item.promo_label || '')} · aujourd\'hui seulement</span>`
           : `<span class="promo-pill">Promo ${escapeHtml(item.promo_label || '')}${promoEnd ? ' · jusqu\'au ' + promoEnd : ''}</span>`)
         : '';

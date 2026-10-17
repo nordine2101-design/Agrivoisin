@@ -58,6 +58,23 @@ function currentPrice(listing, seller) {
   return promo;
 }
 
+// Le lot en cours d'une annonce (par exemple 3 kg pour 7 €), ou null.
+// Réservé aux vendeurs professionnels, aux mêmes dates qu'une promotion (début et fin inclus).
+function activeLot(listing, seller) {
+  if (!seller || seller.seller_type !== 'professionnel') return null;
+  if (listing.lot_quantity == null || listing.lot_price == null) return null;
+  if (!listing.promo_starts_at || !listing.promo_ends_at) return null;
+
+  const today = todayInParis();
+  if (today < listing.promo_starts_at || today > listing.promo_ends_at) return null;
+
+  const quantity = Number(listing.lot_quantity);
+  const cents = Math.round(Number(listing.lot_price) * 100);
+  if (!Number.isInteger(quantity) || quantity < 2 || !Number.isFinite(cents) || cents <= 0) return null;
+  if (cents >= Math.round(Number(listing.price) * 100) * quantity) return null;
+  return { quantity, cents };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -104,7 +121,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
+      .select('id, title, price, unit, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
       .in('id', listingIds);
 
     if (listingsError) {
@@ -179,6 +196,36 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: stockProblems.join(' ') });
     }
 
+    // Les lots : pour chaque annonce, autant de lots complets que possible (3 kg pour 7 €, 6 kg = 2 lots),
+    // le reste au prix normal. Le prix du lot est réparti sur ses unités, centime par centime,
+    // pour que le total des lignes soit exactement le prix du lot.
+    const linesByListing = {};
+    lines.forEach((line) => {
+      const key = String(line.listing.id);
+      (linesByListing[key] = linesByListing[key] || []).push(line);
+    });
+
+    const lotsByListing = {};
+    Object.keys(linesByListing).forEach((key) => {
+      const group = linesByListing[key];
+      const lot = activeLot(group[0].listing, group[0].seller);
+      if (!lot) return;
+      const lotCount = Math.floor(group.length / lot.quantity);
+      if (lotCount < 1) return;
+
+      lotsByListing[key] = { quantity: lot.quantity, cents: lot.cents, count: lotCount, unitCents: group[0].cents };
+
+      const base = Math.floor(lot.cents / lot.quantity);
+      const extra = lot.cents - base * lot.quantity;
+      let index = 0;
+      for (let i = 0; i < lotCount; i++) {
+        for (let j = 0; j < lot.quantity; j++) {
+          group[index].cents = base + (j < extra ? 1 : 0);
+          index += 1;
+        }
+      }
+    });
+
     // Commande minimum : 5 € d'articles, sans compter les frais de service
     const itemsTotalCents = lines.reduce((sum, line) => sum + line.cents, 0);
     if (itemsTotalCents < MIN_ORDER_CENTS) {
@@ -201,20 +248,44 @@ export default async function handler(req, res) {
       groupedByListing[key].quantity += 1;
     });
 
-    const lineItems = grouped.map(({ listing, cents, quantity }) => {
+    const lineItems = [];
+    grouped.forEach(({ listing, cents, quantity }) => {
       const unit = String(listing.unit == null ? '' : listing.unit).trim() || 'kg';
-      return {
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: listing.title || 'Récolte Agrivoisin',
-            // Sous le nom, Stripe affiche le détail avec l'unité : « 2 × 1 kg = 2 kg »
-            description: `${quantity} × 1 ${unit} = ${quantity} ${unitLabel(unit, quantity)}`,
+      const lot = lotsByListing[String(listing.id)];
+      let singleQuantity = quantity;
+      let singleCents = cents;
+
+      if (lot) {
+        // Une ligne pour les lots : « Tomates, lot de 3 kg », puis le reste au prix normal
+        lineItems.push({
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: `${listing.title || 'Récolte Agrivoisin'} — lot de ${lot.quantity} ${unitLabel(unit, lot.quantity)}`,
+              description: `${lot.count} × lot de ${lot.quantity} ${unitLabel(unit, lot.quantity)} = ${lot.count * lot.quantity} ${unitLabel(unit, lot.count * lot.quantity)}`,
+            },
+            unit_amount: lot.cents,
           },
-          unit_amount: cents,
-        },
-        quantity,
-      };
+          quantity: lot.count,
+        });
+        singleQuantity = quantity - lot.count * lot.quantity;
+        singleCents = lot.unitCents;
+      }
+
+      if (singleQuantity > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: listing.title || 'Récolte Agrivoisin',
+              // Sous le nom, Stripe affiche le détail avec l'unité : « 2 × 1 kg = 2 kg »
+              description: `${singleQuantity} × 1 ${unit} = ${singleQuantity} ${unitLabel(unit, singleQuantity)}`,
+            },
+            unit_amount: singleCents,
+          },
+          quantity: singleQuantity,
+        });
+      }
     });
 
     // Les frais de service de l'acheteur : une seule ligne par commande, même avec plusieurs vendeurs

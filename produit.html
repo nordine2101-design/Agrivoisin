@@ -30,7 +30,7 @@
         <div id="listingPickupLines" style="font-size:0.9rem;line-height:1.7;"></div>
       </div>
       <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
-      <p style="margin-bottom:22px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
+      <p style="margin-bottom:22px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span><span id="listingLot" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
       <p id="listingStock" style="display:none;margin:-10px 0 18px;font-weight:700;"></p>
 
       <button type="button" id="addToCartBtn" class="btn btn-primary" style="width:100%;">Ajouter au panier</button>
@@ -398,6 +398,14 @@
         ? 'Offre du jour ' + (item.promo_label || '') + ' · aujourd\'hui seulement'
         : 'Promo ' + (item.promo_label || '') + (promoEnd ? ' · jusqu\'au ' + promoEnd : '');
       promoEl.style.display = 'inline-block';
+    }
+
+    // Lot en cours (par exemple 3 kg pour 7,00 €) : le prix à l'unité reste le prix normal
+    if (item.lot_quantity != null && item.lot_price != null) {
+      const lotEnd = item.lot_ends_at ? String(item.lot_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
+      const lotEl = document.getElementById('listingLot');
+      lotEl.textContent = 'Lot : ' + item.lot_quantity + ' ' + unitLabel(item.unit, Number(item.lot_quantity)) + ' pour ' + Number(item.lot_price).toFixed(2).replace('.', ',') + ' €' + (lotEnd ? ' · jusqu\'au ' + lotEnd : '');
+      lotEl.style.display = 'inline-block';
     }
 
     imageEl.src = item.image_url || FALLBACK_IMAGE;

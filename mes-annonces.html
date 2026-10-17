@@ -216,15 +216,19 @@
     const status = promoStatus(item);
     if (status === 'none') return '';
     const label = item.promo_percent != null ? '-' + item.promo_percent + ' %' : 'Prix spécial';
-    const period = 'du ' + formatDateOnly(item.promo_starts_at) + ' au ' + formatDateOnly(item.promo_ends_at);
+    const isDay = item.promo_starts_at === item.promo_ends_at;
+    const name = isDay ? 'Offre du jour' : 'Promotion';
+    const period = isDay
+      ? 'le ' + formatDateOnly(item.promo_starts_at)
+      : 'du ' + formatDateOnly(item.promo_starts_at) + ' au ' + formatDateOnly(item.promo_ends_at);
     const detail = euros(promoPriceOf(item)) + unitText + ' au lieu de ' + euros(item.price) + unitText;
     if (status === 'active') {
-      return '<span class="promo-badge">Promotion en cours : ' + escapeHtml(label) + ' · ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
+      return '<span class="promo-badge">' + name + ' en cours : ' + escapeHtml(label) + ' · ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
     }
     if (status === 'soon') {
-      return '<span class="promo-badge promo-soon">Promotion à venir : ' + escapeHtml(label) + ' · ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
+      return '<span class="promo-badge promo-soon">' + name + ' à venir : ' + escapeHtml(label) + ' · ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
     }
-    return '<span class="promo-badge promo-over">Promotion terminée (' + escapeHtml(period) + ')</span>';
+    return '<span class="promo-badge promo-over">' + name + ' terminée (' + escapeHtml(period) + ')</span>';
   }
 
   function buildPromoFormHtml(item) {
@@ -239,18 +243,25 @@
       return '<option value="' + p + '"' + selected + '>-' + p + ' %</option>';
     }).join('') + '<option value="price"' + (isPrice ? ' selected' : '') + '>Prix personnalisé</option>';
     const unit = item.unit ? ' par ' + escapeHtml(item.unit) : '';
+    // Une promotion d'un seul jour est une « Offre du jour »
+    const isDay = hasPromo && status !== 'over' && item.promo_starts_at === item.promo_ends_at;
 
     return (
       '<div class="promo-form">' +
-      '<label>Offre</label>' +
+      '<label>Type d\'offre</label>' +
+      '<select class="promo-kind">' +
+      '<option value="promo"' + (isDay ? '' : ' selected') + '>Promotion (plusieurs jours)</option>' +
+      '<option value="day"' + (isDay ? ' selected' : '') + '>Offre du jour (un seul jour)</option>' +
+      '</select>' +
+      '<label>Réduction</label>' +
       '<select class="promo-offer">' + options + '</select>' +
       '<div class="promo-price-row" style="display:' + (isPrice ? 'block' : 'none') + ';">' +
       '<label>Prix promotionnel (€' + unit + ')</label>' +
       '<input type="number" class="promo-price-input" step="0.01" min="0.01" placeholder="Ex : 2.50" value="' + (isPrice ? escapeHtml(Number(item.promo_price).toFixed(2)) : '') + '">' +
       '</div>' +
       '<div class="promo-dates">' +
-      '<div><label>Début</label><input type="date" class="promo-start" min="' + today + '" value="' + escapeHtml(start) + '"></div>' +
-      '<div><label>Fin</label><input type="date" class="promo-end" min="' + today + '" value="' + escapeHtml(end) + '"></div>' +
+      '<div><label class="promo-start-label">Début</label><input type="date" class="promo-start" min="' + today + '" value="' + escapeHtml(start) + '"></div>' +
+      '<div class="promo-end-wrap"><label>Fin</label><input type="date" class="promo-end" min="' + today + '" value="' + escapeHtml(end) + '"></div>' +
       '</div>' +
       '<p class="promo-preview"></p>' +
       '<p class="promo-error" style="display:none;"></p>' +
@@ -336,6 +347,11 @@
     const unit = item.unit ? '/' + item.unit : '';
     priceRow.style.display = offer === 'price' ? 'block' : 'none';
 
+    // Offre du jour : une seule date (« Jour de l'offre »), pas de date de fin
+    const isDay = form.querySelector('.promo-kind').value === 'day';
+    form.querySelector('.promo-end-wrap').style.display = isDay ? 'none' : 'block';
+    form.querySelector('.promo-start-label').textContent = isDay ? 'Jour de l\'offre' : 'Début';
+
     let newPrice = null;
     if (offer === 'price') {
       const v = parseFloat(form.querySelector('.promo-price-input').value);
@@ -345,7 +361,7 @@
     }
     preview.textContent = newPrice == null
       ? 'Indiquez un prix pour voir le résultat.'
-      : 'Vos acheteurs verront : ' + euros(newPrice) + unit + ' au lieu de ' + euros(item.price) + unit;
+      : (isDay ? 'Offre du jour : vos acheteurs verront ' : 'Vos acheteurs verront : ') + euros(newPrice) + unit + ' au lieu de ' + euros(item.price) + unit;
   }
 
   container.addEventListener('click', async function (e) {
@@ -385,7 +401,9 @@
     } else {
       const offer = form.querySelector('.promo-offer').value;
       payload.startsAt = form.querySelector('.promo-start').value;
-      payload.endsAt = form.querySelector('.promo-end').value;
+      payload.endsAt = form.querySelector('.promo-kind').value === 'day'
+        ? payload.startsAt
+        : form.querySelector('.promo-end').value;
       if (offer === 'price') {
         payload.mode = 'price';
         payload.promoPrice = parseFloat(form.querySelector('.promo-price-input').value);

@@ -11,6 +11,9 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 // Les réductions en pourcentage proposées aux professionnels
 const ALLOWED_PERCENTS = [5, 10, 15, 20, 30];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Un lot : de 2 à 50 unités (50 = le maximum d'articles par paiement)
+const MIN_LOT_QUANTITY = 2;
+const MAX_LOT_QUANTITY = 50;
 
 // La date d'aujourd'hui à Paris, au format AAAA-MM-JJ
 function todayInParis() {
@@ -39,7 +42,7 @@ async function setPromotion(req, res, seller) {
 
   const { data: listing, error: listingError } = await supabase
     .from('listings')
-    .select('id, seller_id, price')
+    .select('id, seller_id, price, quantity_available')
     .eq('id', listingId)
     .single();
 
@@ -55,10 +58,10 @@ async function setPromotion(req, res, seller) {
 
   if (mode === 'none') {
     // Retirer la promotion
-    update = { promo_percent: null, promo_price: null, promo_starts_at: null, promo_ends_at: null, promo_clearance: false };
-  } else if (mode === 'percent' || mode === 'price') {
+    update = { promo_percent: null, promo_price: null, promo_starts_at: null, promo_ends_at: null, promo_clearance: false, lot_quantity: null, lot_price: null };
+  } else if (mode === 'percent' || mode === 'price' || mode === 'lot') {
     // Déstockage : la réduction commence aujourd'hui et n'a pas de date de fin (elle s'arrête quand le stock est vendu)
-    const clearance = body.clearance === true;
+    const clearance = mode !== 'lot' && body.clearance === true;
     let startsAt;
     let endsAt;
 
@@ -80,12 +83,39 @@ async function setPromotion(req, res, seller) {
       }
     }
 
-    if (mode === 'percent') {
+    if (mode === 'lot') {
+      // Un lot : un prix pour une quantité (par exemple 3 kg pour 7 €). Une annonce n'a qu'une seule offre à la fois.
+      const lotQuantity = Number(body.lotQuantity);
+      const lotPrice = Math.round(Number(body.lotPrice) * 100) / 100;
+      const normalPrice = Number(listing.price);
+      if (!Number.isInteger(lotQuantity) || lotQuantity < MIN_LOT_QUANTITY || lotQuantity > MAX_LOT_QUANTITY) {
+        return res.status(400).json({ error: 'La quantité du lot doit être un nombre entier entre ' + MIN_LOT_QUANTITY + ' et ' + MAX_LOT_QUANTITY + '.' });
+      }
+      if (listing.quantity_available != null && lotQuantity > Number(listing.quantity_available)) {
+        return res.status(400).json({ error: 'Le lot (' + lotQuantity + ') dépasse le stock disponible (' + Number(listing.quantity_available) + ').' });
+      }
+      if (!Number.isFinite(lotPrice) || lotPrice <= 0) {
+        return res.status(400).json({ error: 'Indiquez un prix du lot supérieur à 0 €.' });
+      }
+      const fullPrice = Math.round(normalPrice * lotQuantity * 100) / 100;
+      if (lotPrice >= fullPrice) {
+        return res.status(400).json({ error: 'Le prix du lot doit être inférieur au prix normal de ' + lotQuantity + ' unités (' + fullPrice.toFixed(2).replace('.', ',') + ' €).' });
+      }
+      update = {
+        promo_percent: null,
+        promo_price: null,
+        promo_clearance: false,
+        promo_starts_at: startsAt,
+        promo_ends_at: endsAt,
+        lot_quantity: lotQuantity,
+        lot_price: lotPrice,
+      };
+    } else if (mode === 'percent') {
       const percent = Number(body.percent);
       if (!ALLOWED_PERCENTS.includes(percent)) {
         return res.status(400).json({ error: 'Réduction non proposée. Choisissez parmi : ' + ALLOWED_PERCENTS.map((p) => '-' + p + ' %').join(', ') + '.' });
       }
-      update = { promo_percent: percent, promo_price: null, promo_starts_at: startsAt, promo_ends_at: endsAt, promo_clearance: clearance };
+      update = { promo_percent: percent, promo_price: null, promo_starts_at: startsAt, promo_ends_at: endsAt, promo_clearance: clearance, lot_quantity: null, lot_price: null };
     } else {
       const promoPrice = Math.round(Number(body.promoPrice) * 100) / 100;
       const normalPrice = Number(listing.price);
@@ -95,7 +125,7 @@ async function setPromotion(req, res, seller) {
       if (promoPrice >= normalPrice) {
         return res.status(400).json({ error: 'Le prix promotionnel doit être inférieur au prix normal (' + normalPrice.toFixed(2).replace('.', ',') + ' €).' });
       }
-      update = { promo_percent: null, promo_price: promoPrice, promo_starts_at: startsAt, promo_ends_at: endsAt, promo_clearance: clearance };
+      update = { promo_percent: null, promo_price: promoPrice, promo_starts_at: startsAt, promo_ends_at: endsAt, promo_clearance: clearance, lot_quantity: null, lot_price: null };
     }
   } else {
     return res.status(400).json({ error: 'Type de promotion inconnu.' });
@@ -151,7 +181,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance')
+      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price')
       .eq('seller_id', seller.id)
       .order('created_at', { ascending: false });
 

@@ -392,7 +392,9 @@
       document.getElementById('listingPrice').style.color = '#C8352F';
       const promoEnd = item.promo_ends_at ? String(item.promo_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
       const promoEl = document.getElementById('listingPromo');
-      promoEl.textContent = item.promo_day
+      promoEl.textContent = item.promo_clearance
+        ? 'Déstockage ' + (item.promo_label || '') + ' · jusqu\'à épuisement du stock'
+        : item.promo_day
         ? 'Offre du jour ' + (item.promo_label || '') + ' · aujourd\'hui seulement'
         : 'Promo ' + (item.promo_label || '') + (promoEnd ? ' · jusqu\'au ' + promoEnd : '');
       promoEl.style.display = 'inline-block';

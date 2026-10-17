@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -188,7 +189,8 @@
           name: item.name,
           price: item.price,
           unit: (info && info.unit) || unitFromPrice(item.price),
-          unitCents: Math.round(parsePrice(item.price) * 100),
+          // Le prix d'aujourd'hui (promotion comprise) relu dans la base ; à défaut, celui noté dans le panier
+          unitCents: info && info.price != null ? Math.round(Number(info.price) * 100) : Math.round(parsePrice(item.price) * 100),
           qty: 0,
           stock: info && info.quantity_available != null ? Number(info.quantity_available) : null,
           sample: item,
@@ -406,7 +408,7 @@
         throw new Error('liste des annonces indisponible');
       }
       data.listings.forEach((l) => {
-        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available };
+        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price };
       });
       listingInfoLoaded = true;
       renderCart();

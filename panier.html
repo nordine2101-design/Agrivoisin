@@ -111,6 +111,8 @@
   .cart-item-row.cart-line { flex-direction:column; align-items:stretch; gap:8px; }
   .cart-line-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .cart-line-calc { font-size:0.95rem; color:var(--ink); }
+  .cart-line-lot { font-size:0.85rem; font-weight:700; color:#4C7A50; }
+  .cart-line-lot-hint { font-size:0.82rem; font-weight:600; color:#B45A00; }
   .cart-line-note { font-size:0.85rem; font-weight:600; color:#C8352F; }
   .cart-fee-hint { font-size:0.75rem; color:#888; }
   .cart-summary p.cart-min-note { font-size:0.85rem; font-weight:600; color:#C8352F; margin:0 0 10px; text-align:left; }
@@ -190,6 +192,9 @@
           unit: (info && info.unit) || unitFromPrice(item.price),
           // Le prix d'aujourd'hui (promotion comprise) relu dans la base ; à défaut, celui noté dans le panier
           unitCents: info && info.price != null ? Math.round(Number(info.price) * 100) : Math.round(parsePrice(item.price) * 100),
+          // Le lot en cours (par exemple 3 kg pour 7 €), relu dans la base
+          lotQuantity: info && info.lot_quantity != null ? Number(info.lot_quantity) : null,
+          lotCents: info && info.lot_price != null ? Math.round(Number(info.lot_price) * 100) : null,
           qty: 0,
           stock: info && info.quantity_available != null ? Number(info.quantity_available) : null,
           sample: item,
@@ -273,7 +278,10 @@
     let problem = false;
 
     groupCart(cart).forEach((g) => {
-      const lineCents = g.unitCents * g.qty;
+      // Les lots : autant de lots complets que possible, le reste au prix normal
+      const hasLot = g.lotQuantity != null && g.lotQuantity >= 2 && g.lotCents != null && g.lotCents > 0;
+      const lotCount = hasLot ? Math.floor(g.qty / g.lotQuantity) : 0;
+      const lineCents = lotCount * (hasLot ? g.lotCents : 0) + (g.qty - lotCount * (hasLot ? g.lotQuantity : 0)) * g.unitCents;
       totalCents += lineCents;
 
       const row = document.createElement('div');
@@ -307,6 +315,30 @@
         g.qty + ' × 1 ' + g.unit + ' = ' + g.qty + ' ' + unitLabel(g.unit, g.qty) + ', soit '
       ));
       calc.appendChild(priceEl);
+
+      // Le lot : ce qui est appliqué, ou ce qu'il manque pour en profiter
+      let lotNote = null;
+      if (hasLot) {
+        const lotLabel = g.lotQuantity + ' ' + unitLabel(g.unit, g.lotQuantity);
+        lotNote = document.createElement('div');
+        lotNote.className = 'cart-line-lot';
+        if (lotCount > 0) {
+          lotNote.textContent = lotCount === 1
+            ? 'Lot de ' + lotLabel + ' à ' + formatEuros(g.lotCents) + ' appliqué'
+            : lotCount + ' lots de ' + lotLabel + ' à ' + formatEuros(g.lotCents) + ' chacun appliqués';
+        }
+        const missing = g.lotQuantity - (g.qty % g.lotQuantity);
+        if (g.qty % g.lotQuantity !== 0) {
+          const hint = document.createElement('div');
+          hint.className = 'cart-line-lot-hint';
+          hint.textContent = 'Plus que ' + missing + ' ' + unitLabel(g.unit, missing) + ' pour profiter du lot : ' + lotLabel + ' pour ' + formatEuros(g.lotCents);
+          if (lotCount > 0) {
+            lotNote.appendChild(hint);
+          } else {
+            lotNote = hint;
+          }
+        }
+      }
 
       // Deuxième ligne : le prix à l'unité, et la quantité avec son unité
       const bottom = document.createElement('div');
@@ -361,6 +393,7 @@
 
       row.appendChild(top);
       row.appendChild(calc);
+      if (lotNote) row.appendChild(lotNote);
       row.appendChild(bottom);
 
       // Le problème est dit en rouge sous la ligne, avec l'unité
@@ -407,7 +440,7 @@
         throw new Error('liste des annonces indisponible');
       }
       data.listings.forEach((l) => {
-        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price };
+        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price, lot_quantity: l.lot_quantity, lot_price: l.lot_price };
       });
       listingInfoLoaded = true;
       renderCart();

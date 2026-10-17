@@ -28,6 +28,28 @@
   </div>
 </section>
 
+<!-- ============ VITRINE (vendeurs professionnels) ============ -->
+<section id="shopHero" class="shop-hero" style="display:none;">
+  <div class="container">
+    <div class="shop-card">
+      <div class="shop-cover" id="shopCover"></div>
+      <div class="shop-head">
+        <div class="shop-logo" id="shopLogo"></div>
+        <div class="shop-title-box">
+          <h1 id="shopName"></h1>
+          <p id="shopSub" class="shop-sub"></p>
+          <p style="margin:0 0 8px;"><span class="seller-badge seller-badge-pro">Professionnel</span></p>
+          <p id="shopRating" style="margin:0;"></p>
+        </div>
+      </div>
+      <div id="shopAbout" class="shop-about" style="display:none;">
+        <h2>À propos</h2>
+        <p id="shopDescription"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="reviewsSection" class="listings-section" style="display:none;padding-top:0;">
   <div class="container">
     <h2 style="font-size:1.4rem;margin-bottom:16px;">Avis des acheteurs</h2>
@@ -40,6 +62,15 @@
     <h2 style="font-size:1.4rem;margin-bottom:16px;">Annonces en ligne</h2>
     <div id="sellerListings" class="produce-grid listings-grid"></div>
     <p id="noListingsMessage" style="display:none;margin-top:8px;">Ce vendeur n'a pas d'annonce en ligne pour le moment.</p>
+  </div>
+</section>
+
+<section id="shopLegal" class="listings-section" style="display:none;padding-top:0;">
+  <div class="container">
+    <div class="shop-legal">
+      <h2>Informations sur le professionnel</h2>
+      <dl id="shopLegalList"></dl>
+    </div>
   </div>
 </section>
 
@@ -128,8 +159,8 @@
   // Note moyenne : « 3,5 × [fraise] · 12 avis ». Moins de 3 avis : « Nouveau vendeur ».
   const MIN_REVIEWS_FOR_AVERAGE = 3;
 
-  function renderRating(rating) {
-    const el = document.getElementById('sellerRating');
+  function renderRating(rating, targetId) {
+    const el = document.getElementById(targetId || 'sellerRating');
     el.textContent = '';
     el.className = 'seller-rating';
     const count = rating && Number(rating.count) ? Number(rating.count) : 0;
@@ -309,7 +340,90 @@
     });
   }
 
+  // Une image de la vitrine n'est acceptée que si son adresse commence par https://
+  function safeImageUrl(value) {
+    return typeof value === 'string' && /^https:\/\//i.test(value) ? value : null;
+  }
+
+  // « 90000000000011 » -> « 900 000 000 00011 »
+  function formatSiret(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    return digits.length === 14 ? digits.slice(0, 3) + ' ' + digits.slice(3, 6) + ' ' + digits.slice(6, 9) + ' ' + digits.slice(9) : String(value || '');
+  }
+
+  function addLegalRow(list, label, value) {
+    if (!value) return;
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    list.appendChild(dt);
+    list.appendChild(dd);
+  }
+
+  // La vitrine d'un vendeur professionnel : couverture, logo, nom, présentation, et ses informations légales
+  function renderShop(seller, shop) {
+    const displayName = shop.name || seller.pseudo || 'Vendeur de ' + seller.city;
+    document.title = displayName + ' — Agrivoisin';
+
+    const cover = document.getElementById('shopCover');
+    cover.textContent = '';
+    const coverUrl = safeImageUrl(shop.cover_url);
+    if (coverUrl) {
+      const img = document.createElement('img');
+      img.src = coverUrl;
+      img.alt = '';
+      cover.appendChild(img);
+    }
+
+    const logo = document.getElementById('shopLogo');
+    logo.textContent = '';
+    const logoUrl = safeImageUrl(shop.logo_url);
+    if (logoUrl) {
+      const img = document.createElement('img');
+      img.src = logoUrl;
+      img.alt = '';
+      logo.appendChild(img);
+    } else {
+      logo.textContent = displayName.replace(/^\[[^\]]*\]\s*/, '').charAt(0).toUpperCase() || '?';
+    }
+
+    document.getElementById('shopName').textContent = displayName;
+    const sub = document.getElementById('shopSub');
+    const subParts = [];
+    if (seller.pseudo && seller.pseudo !== displayName) subParts.push(seller.pseudo);
+    subParts.push(seller.city);
+    sub.textContent = subParts.join(' · ');
+
+    renderRating(seller.rating, 'shopRating');
+
+    if (shop.description) {
+      document.getElementById('shopDescription').textContent = shop.description;
+      document.getElementById('shopAbout').style.display = 'block';
+    }
+
+    const list = document.getElementById('shopLegalList');
+    list.textContent = '';
+    addLegalRow(list, 'Nom', displayName);
+    addLegalRow(list, 'SIRET', shop.siret ? formatSiret(shop.siret) : '');
+    addLegalRow(list, 'Adresse de l\'entreprise', shop.address);
+    addLegalRow(list, 'Ville', shop.city || seller.city);
+    document.getElementById('shopLegal').style.display = 'block';
+
+    document.getElementById('shopHero').style.display = 'block';
+  }
+
   function renderSeller(seller) {
+    const shop = seller.seller_type === 'professionnel' ? seller.shop : null;
+
+    if (shop) {
+      renderShop(seller, shop);
+      renderReviews(seller.reviews);
+      renderListings(seller.listings);
+      loadingMessage.style.display = 'none';
+      return;
+    }
+
     const hasPseudo = !!seller.pseudo;
     document.title = (hasPseudo ? seller.pseudo : 'Vendeur de ' + seller.city) + ' — Agrivoisin';
 
@@ -367,6 +481,37 @@
   .review-who { font-size:0.85rem; color:#6B5842; }
   .review-text { margin:0; line-height:1.6; overflow-wrap:anywhere; white-space:pre-line; }
   .seller-listing-stock { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
+
+  .shop-hero { padding:0 0 24px; }
+  .shop-card { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); overflow:hidden; max-width:900px; margin:0 auto; text-align:left; }
+  .shop-cover { height:220px; background:linear-gradient(135deg,#BFD8B8 0%,#6E9A6C 55%,#4C7A50 100%); }
+  .shop-cover img { width:100%; height:100%; object-fit:cover; display:block; }
+  .shop-head { display:flex; align-items:flex-end; gap:20px; padding:0 32px 24px; margin-top:-48px; }
+  .shop-logo { width:104px; height:104px; flex-shrink:0; border-radius:50%; border:5px solid var(--white); background:#8DB600; color:#2F3A00; font-family:var(--font-display); font-size:2.6rem; font-weight:800; display:flex; align-items:center; justify-content:center; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.15); }
+  .shop-logo img { width:100%; height:100%; object-fit:cover; display:block; }
+  .shop-title-box { padding-top:56px; min-width:0; }
+  .shop-title-box h1 { font-size:1.8rem; margin:0 0 4px; text-align:left; overflow-wrap:anywhere; }
+  .shop-sub { margin:0 0 10px; color:#6B5842; }
+  .shop-title-box .seller-rating { justify-content:flex-start; font-size:1.2rem; }
+  .shop-title-box .seller-rating-icon { width:30px; height:30px; }
+  .shop-about { padding:0 32px 32px; border-top:1px solid #eee; }
+  .shop-about h2 { font-size:1.2rem; margin:22px 0 8px; text-align:left; }
+  .shop-about p { margin:0; line-height:1.7; white-space:pre-line; overflow-wrap:anywhere; }
+  .shop-legal { background:var(--white); border-radius:20px; box-shadow:var(--shadow-soft); padding:22px 28px; max-width:900px; margin:0 auto; text-align:left; }
+  .shop-legal h2 { font-size:1.1rem; margin:0 0 12px; text-align:left; }
+  .shop-legal dl { margin:0; display:grid; grid-template-columns:max-content 1fr; gap:6px 18px; }
+  .shop-legal dt { font-weight:700; color:#6B5842; }
+  .shop-legal dd { margin:0; overflow-wrap:anywhere; }
+  @media (max-width: 640px) {
+    .shop-cover { height:150px; }
+    .shop-head { flex-direction:column; align-items:flex-start; gap:6px; padding:0 20px 20px; margin-top:-44px; }
+    .shop-logo { width:88px; height:88px; font-size:2.2rem; }
+    .shop-title-box { padding-top:6px; }
+    .shop-about { padding:0 20px 24px; }
+    .shop-legal { padding:18px 20px; }
+    .shop-legal dl { grid-template-columns:1fr; gap:2px 0; }
+    .shop-legal dd { margin-bottom:10px; }
+  }
 
   .price-wrap { display:inline-flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
   .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }

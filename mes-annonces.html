@@ -205,9 +205,12 @@
 
   // 'none', 'soon' (pas encore commencée), 'active' (en cours) ou 'over' (terminée)
   function promoStatus(item) {
-    if (promoPriceOf(item) == null || !item.promo_starts_at || !item.promo_ends_at) return 'none';
+    const clearance = item.promo_clearance === true;
+    if (promoPriceOf(item) == null || !item.promo_starts_at || (!item.promo_ends_at && !clearance)) return 'none';
     const today = todayParis();
     if (today < item.promo_starts_at) return 'soon';
+    // Un déstockage n'a pas de date de fin : il se termine quand le stock est vendu
+    if (clearance) return isSoldOut(item) ? 'over' : 'active';
     if (today > item.promo_ends_at) return 'over';
     return 'active';
   }
@@ -216,9 +219,12 @@
     const status = promoStatus(item);
     if (status === 'none') return '';
     const label = item.promo_percent != null ? '-' + item.promo_percent + ' %' : 'Prix spécial';
-    const isDay = item.promo_starts_at === item.promo_ends_at;
-    const name = isDay ? 'Offre du jour' : 'Promotion';
-    const period = isDay
+    const isClearance = item.promo_clearance === true;
+    const isDay = !isClearance && item.promo_starts_at === item.promo_ends_at;
+    const name = isClearance ? 'Déstockage' : (isDay ? 'Offre du jour' : 'Promotion');
+    const period = isClearance
+      ? (status === 'over' ? 'stock épuisé' : 'jusqu\'à épuisement du stock')
+      : isDay
       ? 'le ' + formatDateOnly(item.promo_starts_at)
       : 'du ' + formatDateOnly(item.promo_starts_at) + ' au ' + formatDateOnly(item.promo_ends_at);
     const detail = euros(promoPriceOf(item)) + unitText + ' au lieu de ' + euros(item.price) + unitText;
@@ -228,7 +234,7 @@
     if (status === 'soon') {
       return '<span class="promo-badge promo-soon">' + name + ' à venir : ' + escapeHtml(label) + ' · ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
     }
-    return '<span class="promo-badge promo-over">' + name + ' terminée (' + escapeHtml(period) + ')</span>';
+    return '<span class="promo-badge promo-over">' + name + (isClearance ? ' terminé (' : ' terminée (') + escapeHtml(period) + ')</span>';
   }
 
   function buildPromoFormHtml(item) {
@@ -236,7 +242,7 @@
     const status = promoStatus(item);
     const today = todayParis();
     const start = hasPromo && status !== 'over' ? item.promo_starts_at : today;
-    const end = hasPromo && status !== 'over' ? item.promo_ends_at : addDays(today, 7);
+    const end = hasPromo && status !== 'over' && item.promo_ends_at ? item.promo_ends_at : addDays(today, 7);
     const isPrice = hasPromo && item.promo_percent == null;
     const options = PROMO_PERCENTS.map(function (p) {
       const selected = !isPrice && Number(item.promo_percent) === p ? ' selected' : '';
@@ -244,14 +250,16 @@
     }).join('') + '<option value="price"' + (isPrice ? ' selected' : '') + '>Prix personnalisé</option>';
     const unit = item.unit ? ' par ' + escapeHtml(item.unit) : '';
     // Une promotion d'un seul jour est une « Offre du jour »
-    const isDay = hasPromo && status !== 'over' && item.promo_starts_at === item.promo_ends_at;
+    const isClearance = hasPromo && status !== 'over' && item.promo_clearance === true;
+    const isDay = hasPromo && status !== 'over' && !isClearance && item.promo_starts_at === item.promo_ends_at;
 
     return (
       '<div class="promo-form">' +
       '<label>Type d\'offre</label>' +
       '<select class="promo-kind">' +
-      '<option value="promo"' + (isDay ? '' : ' selected') + '>Promotion (plusieurs jours)</option>' +
+      '<option value="promo"' + (isDay || isClearance ? '' : ' selected') + '>Promotion (plusieurs jours)</option>' +
       '<option value="day"' + (isDay ? ' selected' : '') + '>Offre du jour (un seul jour)</option>' +
+      '<option value="clearance"' + (isClearance ? ' selected' : '') + '>Déstockage (jusqu\'à épuisement du stock)</option>' +
       '</select>' +
       '<label>Réduction</label>' +
       '<select class="promo-offer">' + options + '</select>' +
@@ -348,7 +356,11 @@
     priceRow.style.display = offer === 'price' ? 'block' : 'none';
 
     // Offre du jour : une seule date (« Jour de l'offre »), pas de date de fin
-    const isDay = form.querySelector('.promo-kind').value === 'day';
+    const kind = form.querySelector('.promo-kind').value;
+    const isDay = kind === 'day';
+    const isClearance = kind === 'clearance';
+    // Déstockage : aucune date à choisir (il commence aujourd'hui et dure jusqu'à épuisement du stock)
+    form.querySelector('.promo-dates').style.display = isClearance ? 'none' : 'flex';
     form.querySelector('.promo-end-wrap').style.display = isDay ? 'none' : 'block';
     form.querySelector('.promo-start-label').textContent = isDay ? 'Jour de l\'offre' : 'Début';
 
@@ -361,7 +373,7 @@
     }
     preview.textContent = newPrice == null
       ? 'Indiquez un prix pour voir le résultat.'
-      : (isDay ? 'Offre du jour : vos acheteurs verront ' : 'Vos acheteurs verront : ') + euros(newPrice) + unit + ' au lieu de ' + euros(item.price) + unit;
+      : (isDay ? 'Offre du jour : vos acheteurs verront ' : isClearance ? 'Déstockage dès aujourd\'hui, jusqu\'à épuisement du stock : vos acheteurs verront ' : 'Vos acheteurs verront : ') + euros(newPrice) + unit + ' au lieu de ' + euros(item.price) + unit;
   }
 
   container.addEventListener('click', async function (e) {
@@ -400,10 +412,16 @@
       payload.mode = 'none';
     } else {
       const offer = form.querySelector('.promo-offer').value;
-      payload.startsAt = form.querySelector('.promo-start').value;
-      payload.endsAt = form.querySelector('.promo-kind').value === 'day'
-        ? payload.startsAt
-        : form.querySelector('.promo-end').value;
+      const kind = form.querySelector('.promo-kind').value;
+      if (kind === 'clearance') {
+        // Déstockage : pas de dates, le serveur commence aujourd'hui
+        payload.clearance = true;
+      } else {
+        payload.startsAt = form.querySelector('.promo-start').value;
+        payload.endsAt = kind === 'day'
+          ? payload.startsAt
+          : form.querySelector('.promo-end').value;
+      }
       if (offer === 'price') {
         payload.mode = 'price';
         payload.promoPrice = parseFloat(form.querySelector('.promo-price-input').value);
@@ -436,6 +454,7 @@
       item.promo_price = d.promotion.promo_price;
       item.promo_starts_at = d.promotion.promo_starts_at;
       item.promo_ends_at = d.promotion.promo_ends_at;
+      item.promo_clearance = d.promotion.promo_clearance === true;
       renderAll();
     } catch (err) {
       buttons.forEach((b) => { b.disabled = false; });

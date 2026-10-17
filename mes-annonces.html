@@ -215,7 +215,34 @@
     return 'active';
   }
 
+  // Un lot : un prix pour une quantité (par exemple 3 kg pour 7,00 €), avec des dates comme une promotion
+  function hasLot(item) {
+    return item.lot_quantity != null && item.lot_price != null && !!item.promo_starts_at && !!item.promo_ends_at;
+  }
+
+  function lotStatus(item) {
+    if (!hasLot(item)) return 'none';
+    const today = todayParis();
+    if (today < item.promo_starts_at) return 'soon';
+    if (today > item.promo_ends_at) return 'over';
+    return 'active';
+  }
+
+  function lotBadgeHtml(item) {
+    const status = lotStatus(item);
+    if (status === 'none') return '';
+    const q = Number(item.lot_quantity);
+    const unitName = item.unit ? String(item.unit) : 'kg';
+    const period = 'du ' + formatDateOnly(item.promo_starts_at) + ' au ' + formatDateOnly(item.promo_ends_at);
+    const fullPrice = Math.round(Number(item.price) * q * 100) / 100;
+    const detail = q + ' ' + unitLabel(unitName, q) + ' pour ' + euros(item.lot_price) + ' (au lieu de ' + euros(fullPrice) + ')';
+    if (status === 'active') return '<span class="promo-badge">Lot en cours : ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
+    if (status === 'soon') return '<span class="promo-badge promo-soon">Lot à venir : ' + escapeHtml(detail) + ' · ' + escapeHtml(period) + '</span>';
+    return '<span class="promo-badge promo-over">Lot terminé (' + escapeHtml(period) + ')</span>';
+  }
+
   function promoBadgeHtml(item, unitText) {
+    if (hasLot(item)) return lotBadgeHtml(item);
     const status = promoStatus(item);
     if (status === 'none') return '';
     const label = item.promo_percent != null ? '-' + item.promo_percent + ' %' : 'Prix spécial';
@@ -238,12 +265,14 @@
   }
 
   function buildPromoFormHtml(item) {
-    const hasPromo = promoPriceOf(item) != null;
-    const status = promoStatus(item);
+    const hasLotOffer = hasLot(item);
+    const hasPromo = promoPriceOf(item) != null || hasLotOffer;
+    const status = hasLotOffer ? lotStatus(item) : promoStatus(item);
     const today = todayParis();
     const start = hasPromo && status !== 'over' ? item.promo_starts_at : today;
     const end = hasPromo && status !== 'over' && item.promo_ends_at ? item.promo_ends_at : addDays(today, 7);
-    const isPrice = hasPromo && item.promo_percent == null;
+    const isLot = hasLotOffer && status !== 'over';
+    const isPrice = hasPromo && !hasLotOffer && item.promo_percent == null;
     const options = PROMO_PERCENTS.map(function (p) {
       const selected = !isPrice && Number(item.promo_percent) === p ? ' selected' : '';
       return '<option value="' + p + '"' + selected + '>-' + p + ' %</option>';
@@ -251,18 +280,27 @@
     const unit = item.unit ? ' par ' + escapeHtml(item.unit) : '';
     // Une promotion d'un seul jour est une « Offre du jour »
     const isClearance = hasPromo && status !== 'over' && item.promo_clearance === true;
-    const isDay = hasPromo && status !== 'over' && !isClearance && item.promo_starts_at === item.promo_ends_at;
+    const isDay = hasPromo && !hasLotOffer && status !== 'over' && !isClearance && item.promo_starts_at === item.promo_ends_at;
 
     return (
       '<div class="promo-form">' +
       '<label>Type d\'offre</label>' +
       '<select class="promo-kind">' +
-      '<option value="promo"' + (isDay || isClearance ? '' : ' selected') + '>Promotion (plusieurs jours)</option>' +
+      '<option value="promo"' + (isDay || isClearance || isLot ? '' : ' selected') + '>Promotion (plusieurs jours)</option>' +
       '<option value="day"' + (isDay ? ' selected' : '') + '>Offre du jour (un seul jour)</option>' +
       '<option value="clearance"' + (isClearance ? ' selected' : '') + '>Déstockage (jusqu\'à épuisement du stock)</option>' +
+      '<option value="lot"' + (isLot ? ' selected' : '') + '>Lot (un prix pour une quantité)</option>' +
       '</select>' +
+      '<div class="promo-reduction-row">' +
       '<label>Réduction</label>' +
       '<select class="promo-offer">' + options + '</select>' +
+      '</div>' +
+      '<div class="promo-lot-row" style="display:none;">' +
+      '<label>Quantité du lot (en ' + escapeHtml(item.unit || 'kg') + ')</label>' +
+      '<input type="number" class="promo-lot-quantity" step="1" min="2" max="50" placeholder="Ex : 3" value="' + (isLot ? escapeHtml(String(item.lot_quantity)) : '') + '">' +
+      '<label>Prix du lot (€ pour toute la quantité)</label>' +
+      '<input type="number" class="promo-lot-price" step="0.01" min="0.01" placeholder="Ex : 7.00" value="' + (isLot ? escapeHtml(Number(item.lot_price).toFixed(2)) : '') + '">' +
+      '</div>' +
       '<div class="promo-price-row" style="display:' + (isPrice ? 'block' : 'none') + ';">' +
       '<label>Prix promotionnel (€' + unit + ')</label>' +
       '<input type="number" class="promo-price-input" step="0.01" min="0.01" placeholder="Ex : 2.50" value="' + (isPrice ? escapeHtml(Number(item.promo_price).toFixed(2)) : '') + '">' +
@@ -353,7 +391,11 @@
     const priceRow = form.querySelector('.promo-price-row');
     const preview = form.querySelector('.promo-preview');
     const unit = item.unit ? '/' + item.unit : '';
-    priceRow.style.display = offer === 'price' ? 'block' : 'none';
+    const kindValue = form.querySelector('.promo-kind').value;
+    const isLotKind = kindValue === 'lot';
+    priceRow.style.display = offer === 'price' && !isLotKind ? 'block' : 'none';
+    form.querySelector('.promo-reduction-row').style.display = isLotKind ? 'none' : 'block';
+    form.querySelector('.promo-lot-row').style.display = isLotKind ? 'block' : 'none';
 
     // Offre du jour : une seule date (« Jour de l'offre »), pas de date de fin
     const kind = form.querySelector('.promo-kind').value;
@@ -363,6 +405,19 @@
     form.querySelector('.promo-dates').style.display = isClearance ? 'none' : 'flex';
     form.querySelector('.promo-end-wrap').style.display = isDay ? 'none' : 'block';
     form.querySelector('.promo-start-label').textContent = isDay ? 'Jour de l\'offre' : 'Début';
+
+    if (isLotKind) {
+      const lq = parseInt(form.querySelector('.promo-lot-quantity').value, 10);
+      const lp = parseFloat(form.querySelector('.promo-lot-price').value);
+      if (!(lq >= 2) || !(lp > 0)) {
+        preview.textContent = 'Indiquez la quantité et le prix du lot pour voir le résultat.';
+      } else {
+        const unitName = item.unit ? String(item.unit) : 'kg';
+        const full = Math.round(Number(item.price) * lq * 100) / 100;
+        preview.textContent = 'Vos acheteurs verront : ' + lq + ' ' + unitLabel(unitName, lq) + ' pour ' + euros(lp) + ' (au lieu de ' + euros(full) + '). Au-delà du lot, le reste se vend au prix normal.';
+      }
+      return;
+    }
 
     let newPrice = null;
     if (offer === 'price') {
@@ -413,7 +468,13 @@
     } else {
       const offer = form.querySelector('.promo-offer').value;
       const kind = form.querySelector('.promo-kind').value;
-      if (kind === 'clearance') {
+      if (kind === 'lot') {
+        payload.mode = 'lot';
+        payload.startsAt = form.querySelector('.promo-start').value;
+        payload.endsAt = form.querySelector('.promo-end').value;
+        payload.lotQuantity = parseInt(form.querySelector('.promo-lot-quantity').value, 10);
+        payload.lotPrice = parseFloat(form.querySelector('.promo-lot-price').value);
+      } else if (kind === 'clearance') {
         // Déstockage : pas de dates, le serveur commence aujourd'hui
         payload.clearance = true;
       } else {
@@ -422,7 +483,9 @@
           ? payload.startsAt
           : form.querySelector('.promo-end').value;
       }
-      if (offer === 'price') {
+      if (kind === 'lot') {
+        // le lot est déjà complet ci-dessus
+      } else if (offer === 'price') {
         payload.mode = 'price';
         payload.promoPrice = parseFloat(form.querySelector('.promo-price-input').value);
       } else {
@@ -455,6 +518,8 @@
       item.promo_starts_at = d.promotion.promo_starts_at;
       item.promo_ends_at = d.promotion.promo_ends_at;
       item.promo_clearance = d.promotion.promo_clearance === true;
+      item.lot_quantity = d.promotion.lot_quantity != null ? d.promotion.lot_quantity : null;
+      item.lot_price = d.promotion.lot_price != null ? d.promotion.lot_price : null;
       renderAll();
     } catch (err) {
       buttons.forEach((b) => { b.disabled = false; });

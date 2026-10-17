@@ -16,13 +16,15 @@ function todayInParis() {
 // Applique la promotion en cours (réservée aux vendeurs professionnels, début et fin inclus).
 // Les champs de promotion ne sont jamais envoyés tels quels au navigateur.
 function withCurrentPrice(item) {
-  const { promo_percent, promo_price, promo_starts_at, promo_ends_at, ...rest } = item;
+  const { promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, ...rest } = item;
   const seller = Array.isArray(item.sellers) ? item.sellers[0] : item.sellers;
   if (!seller || seller.seller_type !== 'professionnel') return rest;
-  if (!promo_starts_at || !promo_ends_at) return rest;
+  // Un déstockage n'a pas de date de fin : il dure tant qu'il reste du stock
+  const clearance = promo_clearance === true;
+  if (!promo_starts_at || (!promo_ends_at && !clearance)) return rest;
 
   const today = todayInParis();
-  if (today < promo_starts_at || today > promo_ends_at) return rest;
+  if (today < promo_starts_at || (promo_ends_at && today > promo_ends_at)) return rest;
 
   const normal = Number(item.price);
   let promo = null;
@@ -40,7 +42,9 @@ function withCurrentPrice(item) {
     promo_label: promo_percent != null ? '-' + Number(promo_percent) + ' %' : 'Prix spécial',
     promo_ends_at: promo_ends_at,
     // Une promotion d'un seul jour est une « Offre du jour »
-    promo_day: promo_starts_at === promo_ends_at,
+    promo_day: !clearance && promo_starts_at === promo_ends_at,
+    // Un déstockage dure jusqu'à épuisement du stock
+    promo_clearance: clearance,
   };
 }
 
@@ -229,7 +233,7 @@ export default async function handler(req, res) {
   try {
     const { data: rawListings, error } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
       .order('created_at', { ascending: false });
 
     if (error) {

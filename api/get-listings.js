@@ -39,6 +39,8 @@ function withCurrentPrice(item) {
     original_price: normal,
     promo_label: promo_percent != null ? '-' + Number(promo_percent) + ' %' : 'Prix spécial',
     promo_ends_at: promo_ends_at,
+    // Une promotion d'un seul jour est une « Offre du jour »
+    promo_day: promo_starts_at === promo_ends_at,
   };
 }
 

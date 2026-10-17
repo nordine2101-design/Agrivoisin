@@ -55,18 +55,29 @@ async function setPromotion(req, res, seller) {
 
   if (mode === 'none') {
     // Retirer la promotion
-    update = { promo_percent: null, promo_price: null, promo_starts_at: null, promo_ends_at: null };
+    update = { promo_percent: null, promo_price: null, promo_starts_at: null, promo_ends_at: null, promo_clearance: false };
   } else if (mode === 'percent' || mode === 'price') {
-    const { startsAt, endsAt } = body;
+    // Déstockage : la réduction commence aujourd'hui et n'a pas de date de fin (elle s'arrête quand le stock est vendu)
+    const clearance = body.clearance === true;
+    let startsAt;
+    let endsAt;
 
-    if (!isRealDate(startsAt) || !isRealDate(endsAt)) {
-      return res.status(400).json({ error: 'Indiquez une date de début et une date de fin valides.' });
-    }
-    if (endsAt < startsAt) {
-      return res.status(400).json({ error: 'La date de fin doit être le même jour ou après la date de début.' });
-    }
-    if (endsAt < todayInParis()) {
-      return res.status(400).json({ error: 'La date de fin est déjà passée.' });
+    if (clearance) {
+      startsAt = todayInParis();
+      endsAt = null;
+    } else {
+      startsAt = body.startsAt;
+      endsAt = body.endsAt;
+
+      if (!isRealDate(startsAt) || !isRealDate(endsAt)) {
+        return res.status(400).json({ error: 'Indiquez une date de début et une date de fin valides.' });
+      }
+      if (endsAt < startsAt) {
+        return res.status(400).json({ error: 'La date de fin doit être le même jour ou après la date de début.' });
+      }
+      if (endsAt < todayInParis()) {
+        return res.status(400).json({ error: 'La date de fin est déjà passée.' });
+      }
     }
 
     if (mode === 'percent') {
@@ -74,7 +85,7 @@ async function setPromotion(req, res, seller) {
       if (!ALLOWED_PERCENTS.includes(percent)) {
         return res.status(400).json({ error: 'Réduction non proposée. Choisissez parmi : ' + ALLOWED_PERCENTS.map((p) => '-' + p + ' %').join(', ') + '.' });
       }
-      update = { promo_percent: percent, promo_price: null, promo_starts_at: startsAt, promo_ends_at: endsAt };
+      update = { promo_percent: percent, promo_price: null, promo_starts_at: startsAt, promo_ends_at: endsAt, promo_clearance: clearance };
     } else {
       const promoPrice = Math.round(Number(body.promoPrice) * 100) / 100;
       const normalPrice = Number(listing.price);
@@ -84,7 +95,7 @@ async function setPromotion(req, res, seller) {
       if (promoPrice >= normalPrice) {
         return res.status(400).json({ error: 'Le prix promotionnel doit être inférieur au prix normal (' + normalPrice.toFixed(2).replace('.', ',') + ' €).' });
       }
-      update = { promo_percent: null, promo_price: promoPrice, promo_starts_at: startsAt, promo_ends_at: endsAt };
+      update = { promo_percent: null, promo_price: promoPrice, promo_starts_at: startsAt, promo_ends_at: endsAt, promo_clearance: clearance };
     }
   } else {
     return res.status(400).json({ error: 'Type de promotion inconnu.' });
@@ -140,7 +151,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at, promo_percent, promo_price, promo_starts_at, promo_ends_at')
+      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance')
       .eq('seller_id', seller.id)
       .order('created_at', { ascending: false });
 
@@ -153,4 +164,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-    

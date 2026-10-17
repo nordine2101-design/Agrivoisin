@@ -13,6 +13,32 @@ function todayInParis() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
 
+// Interrupteur : afficher ou non l'adresse de l'entreprise sur la vitrine d'un vendeur professionnel.
+// false = l'adresse reste cachée (choix actuel, en attendant l'avis d'un juriste). true = elle est affichée.
+const SHOW_PRO_ADDRESS = false;
+
+// Vitrine d'un vendeur professionnel : le nom de la boutique, sa présentation, ses images,
+// et ses informations légales (SIRET, et adresse de l'entreprise si l'interrupteur ci-dessus est sur true).
+// Elle n'est jamais envoyée pour un particulier, et jamais avec la liste des annonces.
+async function loadShop(sellerId) {
+  const { data, error } = await supabase
+    .from('sellers')
+    .select('shop_name, shop_description, shop_cover_url, shop_logo_url, address, siret, city')
+    .eq('id', sellerId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const clean = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+  return {
+    name: clean(data.shop_name),
+    description: clean(data.shop_description),
+    cover_url: clean(data.shop_cover_url),
+    logo_url: clean(data.shop_logo_url),
+    address: SHOW_PRO_ADDRESS ? clean(data.address) : null,
+    city: clean(data.city),
+    siret: clean(data.siret),
+  };
+}
+
 // Applique la promotion en cours (réservée aux vendeurs professionnels, début et fin inclus).
 // Les champs de promotion ne sont jamais envoyés tels quels au navigateur.
 function withCurrentPrice(item) {
@@ -304,11 +330,22 @@ export default async function handler(req, res) {
         .filter((item) => item.seller_id === sellerId)
         .map(({ seller_id, ...item }) => item);
 
+      const isProSeller = target.sellers.seller_type === 'professionnel';
+      let shop = null;
+      if (isProSeller) {
+        try {
+          shop = await loadShop(sellerId);
+        } catch (shopError) {
+          console.error('Lecture de la vitrine impossible :', shopError);
+        }
+      }
+
       return res.status(200).json({
         seller: {
           pseudo: target.sellers.pseudo || null,
           city: target.sellers.city,
-          seller_type: target.sellers.seller_type === 'professionnel' ? 'professionnel' : 'particulier',
+          seller_type: isProSeller ? 'professionnel' : 'particulier',
+          shop,
           rating: { average: rating.count ? rating.average : null, count: rating.count },
           reviews,
           listings: sellerListings,

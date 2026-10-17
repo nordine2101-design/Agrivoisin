@@ -294,6 +294,15 @@
       }
       body.appendChild(footer);
 
+      // Lot en cours (par exemple 3 kg pour 7,00 €) : le prix à l'unité reste le prix normal
+      if (item.lot_quantity != null && item.lot_price != null) {
+        const lotEnd = item.lot_ends_at ? String(item.lot_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
+        const lotPill = document.createElement('span');
+        lotPill.className = 'promo-pill';
+        lotPill.textContent = 'Lot : ' + item.lot_quantity + ' ' + unitLabel(item.unit, Number(item.lot_quantity)) + ' pour ' + Number(item.lot_price).toFixed(2).replace('.', ',') + ' €' + (lotEnd ? ' · jusqu\'au ' + lotEnd : '');
+        body.appendChild(lotPill);
+      }
+
       card.appendChild(imageLink);
       card.appendChild(body);
       grid.appendChild(card);

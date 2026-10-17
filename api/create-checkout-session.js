@@ -41,10 +41,12 @@ function todayInParis() {
 function currentPrice(listing, seller) {
   const normal = Number(listing.price);
   if (!seller || seller.seller_type !== 'professionnel') return normal;
-  if (!listing.promo_starts_at || !listing.promo_ends_at) return normal;
+  // Un déstockage n'a pas de date de fin : il dure tant qu'il reste du stock
+  const clearance = listing.promo_clearance === true;
+  if (!listing.promo_starts_at || (!listing.promo_ends_at && !clearance)) return normal;
 
   const today = todayInParis();
-  if (today < listing.promo_starts_at || today > listing.promo_ends_at) return normal;
+  if (today < listing.promo_starts_at || (listing.promo_ends_at && today > listing.promo_ends_at)) return normal;
 
   let promo = null;
   if (listing.promo_percent != null) {
@@ -102,7 +104,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
+      .select('id, title, price, unit, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
       .in('id', listingIds);
 
     if (listingsError) {

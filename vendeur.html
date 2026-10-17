@@ -283,7 +283,9 @@
         const promoEnd = item.promo_ends_at ? String(item.promo_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
         const pill = document.createElement('span');
         pill.className = 'promo-pill';
-        pill.textContent = 'Promo ' + (item.promo_label || '') + (promoEnd ? ' · jusqu\'au ' + promoEnd : '');
+        pill.textContent = item.promo_day
+          ? 'Offre du jour ' + (item.promo_label || '') + ' · aujourd\'hui seulement'
+          : 'Promo ' + (item.promo_label || '') + (promoEnd ? ' · jusqu\'au ' + promoEnd : '');
         body.appendChild(pill);
       } else {
         footer.appendChild(price);

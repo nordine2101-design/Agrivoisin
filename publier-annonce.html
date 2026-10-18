@@ -40,6 +40,13 @@
       <input type="date" id="harvestDate" style="display:none;">
       <p id="harvestDateHint" style="display:none;font-size:0.85em;color:#888;margin-top:-8px;">Cette date détermine le niveau de fraîcheur affiché sur votre annonce.</p>
 
+      <div id="proAttestWrap" style="display:none;text-align:left;background:var(--cream-soft);border-radius:10px;padding:12px;">
+        <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:0.9rem;background:none;color:var(--soil);padding:0;border-radius:0;">
+          <input type="checkbox" id="proAttest" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;">
+          <span>Je confirme avoir déclaré mon activité aux autorités compétentes (par exemple la DDPP pour les produits transformés, ou la déclaration de ruches pour le miel) et respecter l'étiquetage obligatoire de mes produits.</span>
+        </label>
+      </div>
+
       <label for="description">Description</label>
       <input type="text" id="description" placeholder="Décrivez votre récolte">
 
@@ -170,7 +177,20 @@
   // Catégories que les particuliers peuvent vendre (produits frais, non transformés)
   const PARTICULIER_CATEGORIES = ["Fruits", "Légumes", "Aromates", "Fleurs du jardin"];
 
+  let currentSellerType = 'particulier';
+
+  // La case de confirmation n'apparaît que pour un professionnel qui choisit une catégorie réservée aux professionnels
+  function updateProAttest() {
+    const needed = currentSellerType === 'professionnel'
+      && categorySelect.value !== ''
+      && !PARTICULIER_CATEGORIES.includes(categorySelect.value);
+    document.getElementById('proAttestWrap').style.display = needed ? '' : 'none';
+    document.getElementById('proAttest').required = needed;
+    if (!needed) document.getElementById('proAttest').checked = false;
+  }
+
   function fillCategories(sellerType) {
+    currentSellerType = sellerType;
     categorySelect.innerHTML = '<option value="" disabled selected>Choisissez une catégorie</option>';
     Object.keys(CATEGORIES).forEach(function (cat) {
       if (sellerType !== 'professionnel' && !PARTICULIER_CATEGORIES.includes(cat)) return;
@@ -193,12 +213,13 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d && d.sellerType === 'professionnel') fillCategories('professionnel');
+        if (d && d.sellerType === 'professionnel') { fillCategories('professionnel'); updateProAttest(); }
       })
       .catch(function () {});
   });
 
   categorySelect.addEventListener('change', function () {
+    updateProAttest();
     const subcats = CATEGORIES[categorySelect.value] || [];
 
     subcategorySelect.innerHTML = '<option value="" disabled selected>Choisissez une sous-catégorie</option>';
@@ -699,6 +720,7 @@
       harvestDateLabel.style.display = 'none';
       harvestDateHint.style.display = 'none';
       photoPreviewWrap.style.display = 'none';
+      document.getElementById('proAttestWrap').style.display = 'none';
       buildPickupDays();
       renderPickupPreview();
 

@@ -124,6 +124,78 @@ const PSEUDO_REQUIRED_ERROR = 'Choisissez un pseudo : il est obligatoire pour ve
 const PSEUDO_TAKEN_ERROR = 'Ce pseudo est déjà pris. Choisissez-en un autre.';
 const PSEUDO_CHECK_ERROR = 'Impossible de vérifier le pseudo pour le moment. Réessayez dans quelques instants.';
 
+// --- Informations fiscales du vendeur (déclaration DAC7 à l'administration fiscale) ---
+// Date de naissance (majeur), numéro fiscal (13 chiffres) ou, à défaut, lieu de naissance.
+// Un professionnel indique aussi sa raison sociale (et son numéro de TVA s'il en a un).
+// Agrivoisin n'existe que pour la France : la résidence fiscale est enregistrée « FR ».
+function cleanTaxInfo(sellerType, siret, raw) {
+  const t = raw && typeof raw === 'object' ? raw : {};
+  const bad = (message) => ({ ok: false, status: 400, error: message });
+
+  const birthDate = String(t.birthDate == null ? '' : t.birthDate).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+    return bad('Indiquez votre date de naissance.');
+  }
+  const birth = new Date(birthDate + 'T00:00:00Z');
+  if (Number.isNaN(birth.getTime()) || birth.toISOString().slice(0, 10) !== birthDate || birthDate < '1900-01-01') {
+    return bad("La date de naissance n'est pas valide.");
+  }
+  const now = new Date();
+  const eighteenYearsAgo = new Date(Date.UTC(now.getUTCFullYear() - 18, now.getUTCMonth(), now.getUTCDate()));
+  if (birth > eighteenYearsAgo) {
+    return bad('Il faut être majeur pour vendre sur Agrivoisin.');
+  }
+
+  let taxId = String(t.taxId == null ? '' : t.taxId).replace(/[\s.]/g, '');
+  if (taxId && !/^\d{13}$/.test(taxId)) {
+    return bad('Le numéro fiscal comporte 13 chiffres (il figure sur votre avis d\'impôt).');
+  }
+
+  let birthPlace = String(t.birthPlace == null ? '' : t.birthPlace).trim().replace(/\s+/g, ' ');
+  if (birthPlace.length > 100) {
+    return bad('Le lieu de naissance est trop long.');
+  }
+
+  let legalName = null;
+  let vatNumber = null;
+  if (sellerType === 'professionnel') {
+    legalName = String(t.legalName == null ? '' : t.legalName).trim().replace(/\s+/g, ' ');
+    if (legalName.length < 2 || legalName.length > 120) {
+      return bad("Indiquez le nom de votre entreprise (raison sociale).");
+    }
+    const vat = String(t.vatNumber == null ? '' : t.vatNumber).replace(/[\s.]/g, '').toUpperCase();
+    if (vat) {
+      if (!/^FR[0-9A-Z]{2}\d{9}$/.test(vat)) {
+        return bad('Le numéro de TVA doit ressembler à FR12345678901.');
+      }
+      vatNumber = vat;
+    }
+    // Sans numéro fiscal personnel, l'identifiant de l'entreprise est son SIREN (les 9 premiers chiffres du SIRET)
+    if (!taxId && siret) {
+      taxId = siret.slice(0, 9);
+    }
+  }
+
+  // Sans numéro fiscal, le lieu de naissance est obligatoire
+  if (!taxId && birthPlace.length < 2) {
+    return bad("Indiquez votre numéro fiscal ou, si vous n'en avez pas, votre lieu de naissance.");
+  }
+
+  return {
+    ok: true,
+    info: {
+      legal_name: legalName,
+      birth_date: birthDate,
+      birth_place: birthPlace || null,
+      tax_country: 'FR',
+      tax_id: taxId || null,
+      vat_number: vatNumber,
+    },
+  };
+}
+
+const TAX_SAVE_ERROR = "Impossible d'enregistrer vos informations fiscales pour le moment. Réessayez dans quelques instants.";
+
 export default async function handler(req, res) {
   // Simple vérification "cette ville va-t-elle avec ce code postal ?"
   // (utilisée par le formulaire d'inscription, avant de créer le compte)
@@ -166,6 +238,7 @@ export default async function handler(req, res) {
     const sellerTypeRaw = req.body.sellerType;
     const siretRaw = req.body.siret;
     const pseudoRaw = req.body.pseudo;
+    const taxRaw = req.body.tax;
 
     // 0. Vérifier que la personne est bien connectée
     const authHeader = req.headers.authorization || '';
@@ -195,6 +268,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Le numéro SIRET doit comporter 14 chiffres.' });
       }
     }
+
+    // 0 quater. Informations fiscales (déclaration à l'administration fiscale)
+    const cleanedTax = cleanTaxInfo(sellerType, siret, taxRaw);
+    if (!cleanedTax.ok) {
+      return res.status(cleanedTax.status).json({ error: cleanedTax.error });
+    }
+    const taxInfo = cleanedTax.info;
 
     // 0 ter. Pseudo affiché aux acheteurs (obligatoire : voir l'étape 2 bis)
     const cleanedPseudo = cleanPseudo(pseudoRaw);
@@ -267,6 +347,7 @@ export default async function handler(req, res) {
 
     // 4. Enregistrer (ou mettre à jour) ce vendeur dans notre base de données Supabase
     let dbError = null;
+    let sellerId = existingSeller ? existingSeller.id : null;
 
     if (existingSeller) {
       const changes = {
@@ -299,8 +380,11 @@ export default async function handler(req, res) {
           seller_type: sellerType,
           siret: siret,
           pseudo: pseudo,
-        });
+        })
+        .select('id')
+        .single();
       dbError = result.error;
+      sellerId = result.data ? result.data.id : null;
     }
 
     if (dbError) {
@@ -323,6 +407,16 @@ export default async function handler(req, res) {
       return res.status(500).json({
         error: "Impossible d'enregistrer votre compte vendeur pour le moment. Réessayez dans quelques instants.",
       });
+    }
+
+    // 4 bis. Enregistrer les informations fiscales (table fermée au public, lue seulement par le serveur)
+    const taxResult = await supabase
+      .from('seller_tax_info')
+      .upsert({ seller_id: sellerId, ...taxInfo, collected_at: new Date().toISOString() }, { onConflict: 'seller_id' });
+
+    if (taxResult.error) {
+      console.error('Erreur Supabase (informations fiscales) :', taxResult.error);
+      return res.status(500).json({ error: TAX_SAVE_ERROR });
     }
 
     // 5. Générer le lien d'inscription (onboarding) Stripe pour ce compte

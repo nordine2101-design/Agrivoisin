@@ -81,6 +81,12 @@
 
         <label for="sellerSiret">Votre numéro SIRET (14 chiffres)</label>
         <input type="text" id="sellerSiret" placeholder="Ex : 123 456 789 00012" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
+
+        <label for="sellerLegalName">Nom de votre entreprise (raison sociale)</label>
+        <input type="text" id="sellerLegalName" placeholder="Ex : Ferme du Val" maxlength="120" autocomplete="off" style="width:100%;box-sizing:border-box;">
+
+        <label for="sellerVat">Numéro de TVA (si vous en avez un)</label>
+        <input type="text" id="sellerVat" placeholder="Ex : FR12345678901" maxlength="20" autocomplete="off" style="width:100%;box-sizing:border-box;">
       </div>
 
       <label for="sellerPseudo">Votre pseudo (affiché aux acheteurs)</label>
@@ -98,6 +104,18 @@
 
       <label for="sellerAddress">Votre adresse complète (sera communiquée à l'acheteur après paiement uniquement)</label>
       <input type="text" id="sellerAddress" placeholder="Ex : 12 rue des Jardins, 75000 Paris" required>
+
+      <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:18px 0 4px;padding:10px 12px;background:var(--cream-soft);border-radius:var(--radius-sm);"><strong>Informations fiscales.</strong> La loi oblige Agrivoisin à recueillir ces informations auprès des vendeurs et à les transmettre à l'administration fiscale. Elles ne sont jamais affichées sur le site.</p>
+
+      <label for="sellerBirthDate">Votre date de naissance</label>
+      <input type="date" id="sellerBirthDate" min="1900-01-01" required>
+
+      <label for="sellerTaxId">Votre numéro fiscal (13 chiffres)</label>
+      <input type="text" id="sellerTaxId" placeholder="Ex : 12 34 567 890 123" inputmode="numeric" maxlength="17" autocomplete="off">
+      <p style="font-size:0.8rem;color:#6B5842;margin:4px 0 0;">Il figure sur votre avis d'impôt. Si vous n'en avez pas, laissez vide et indiquez votre lieu de naissance.</p>
+
+      <label for="sellerBirthPlace">Votre lieu de naissance (si vous n'avez pas de numéro fiscal)</label>
+      <input type="text" id="sellerBirthPlace" placeholder="Ex : Nancy" maxlength="100" autocomplete="off">
 
       <label style="display:flex;align-items:flex-start;gap:10px;margin:18px 0 6px;font-weight:400;font-size:0.92rem;line-height:1.5;cursor:pointer;">
         <input type="checkbox" id="acceptSellerTerms" required style="width:auto;margin:4px 0 0;flex-shrink:0;">
@@ -190,6 +208,46 @@
   const siretBlock = document.getElementById('siretBlock');
   const siretInput = document.getElementById('sellerSiret');
   const pseudoInput = document.getElementById('sellerPseudo');
+  const legalNameInput = document.getElementById('sellerLegalName');
+  const vatInput = document.getElementById('sellerVat');
+  const birthDateInput = document.getElementById('sellerBirthDate');
+  const taxIdInput = document.getElementById('sellerTaxId');
+  const birthPlaceInput = document.getElementById('sellerBirthPlace');
+
+  // Un vendeur doit être majeur : la date de naissance ne peut pas être plus récente qu'il y a 18 ans
+  (function () {
+    const limit = new Date();
+    limit.setFullYear(limit.getFullYear() - 18);
+    birthDateInput.max = limit.toISOString().slice(0, 10);
+  })();
+
+  // Informations fiscales : mêmes règles que sur le serveur (qui les revérifie)
+  function taxValidationError(sellerType, tax) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tax.birthDate)) {
+      return 'Indiquez votre date de naissance.';
+    }
+    if (tax.birthDate < '1900-01-01' || tax.birthDate > birthDateInput.max) {
+      return tax.birthDate > birthDateInput.max
+        ? 'Il faut être majeur pour vendre sur Agrivoisin.'
+        : "La date de naissance n'est pas valide.";
+    }
+    const taxId = tax.taxId.replace(/[\s.]/g, '');
+    if (taxId && !/^\d{13}$/.test(taxId)) {
+      return "Le numéro fiscal comporte 13 chiffres (il figure sur votre avis d'impôt).";
+    }
+    if (sellerType === 'professionnel') {
+      if (tax.legalName.trim().length < 2) {
+        return "Indiquez le nom de votre entreprise (raison sociale).";
+      }
+      const vat = tax.vatNumber.replace(/[\s.]/g, '').toUpperCase();
+      if (vat && !/^FR[0-9A-Z]{2}\d{9}$/.test(vat)) {
+        return 'Le numéro de TVA doit ressembler à FR12345678901.';
+      }
+    } else if (!taxId && tax.birthPlace.trim().length < 2) {
+      return "Indiquez votre numéro fiscal ou, si vous n'en avez pas, votre lieu de naissance.";
+    }
+    return '';
+  }
 
   // Pseudo : 3 à 20 caractères (lettres, chiffres, espaces, tirets), ni espace ni tiret au début ou à la fin
   const PSEUDO_ERROR = 'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.';
@@ -209,6 +267,7 @@
     const isPro = selectedSellerType() === 'professionnel';
     siretBlock.style.display = isPro ? 'block' : 'none';
     siretInput.required = isPro;
+    legalNameInput.required = isPro;
   }
   sellerForm.querySelectorAll('input[name="sellerType"]').forEach((radio) => {
     radio.addEventListener('change', refreshSellerType);
@@ -241,6 +300,20 @@
       return;
     }
 
+    const tax = {
+      birthDate: birthDateInput.value,
+      birthPlace: birthPlaceInput.value,
+      taxId: taxIdInput.value,
+      legalName: sellerType === 'professionnel' ? legalNameInput.value : '',
+      vatNumber: sellerType === 'professionnel' ? vatInput.value : '',
+    };
+    const taxError = taxValidationError(sellerType, tax);
+    if (taxError) {
+      errorEl.textContent = 'Erreur : ' + taxError;
+      errorEl.style.display = 'block';
+      return;
+    }
+
     btn.textContent = 'Création en cours...';
     btn.disabled = true;
     errorEl.style.display = 'none';
@@ -257,7 +330,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ email, city, postalCode, address, sellerType, siret, pseudo }),
+        body: JSON.stringify({ email, city, postalCode, address, sellerType, siret, pseudo, tax }),
       });
 
       const data = await response.json();

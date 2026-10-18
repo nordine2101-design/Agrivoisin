@@ -58,11 +58,29 @@
 
           <label for="sellerSiret">Votre numéro SIRET (14 chiffres)</label>
           <input type="text" id="sellerSiret" placeholder="Ex : 123 456 789 00012" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
+
+          <label for="sellerLegalName">Nom de votre entreprise (raison sociale)</label>
+          <input type="text" id="sellerLegalName" placeholder="Ex : Ferme du Val" maxlength="120" autocomplete="off" style="width:100%;box-sizing:border-box;">
+
+          <label for="sellerVat">Numéro de TVA (si vous en avez un)</label>
+          <input type="text" id="sellerVat" placeholder="Ex : FR12345678901" maxlength="20" autocomplete="off" style="width:100%;box-sizing:border-box;">
         </div>
 
         <label for="sellerPseudo">Votre pseudo (affiché aux acheteurs)</label>
         <input type="text" id="sellerPseudo" placeholder="Ex : Jardin de Marie" maxlength="20" autocomplete="off" style="width:100%;box-sizing:border-box;">
         <p style="font-size:0.8rem;color:#6B5842;margin:4px 0 0;">3 à 20 caractères. Les acheteurs ne voient jamais votre nom ni votre e-mail.</p>
+
+        <p style="font-size:0.85rem;line-height:1.5;color:var(--ink);margin:18px 0 4px;padding:10px 12px;background:var(--cream-soft);border-radius:var(--radius-sm);"><strong>Informations fiscales.</strong> La loi oblige Agrivoisin à recueillir ces informations auprès des vendeurs et à les transmettre à l'administration fiscale. Elles ne sont jamais affichées sur le site.</p>
+
+        <label for="sellerBirthDate">Votre date de naissance</label>
+        <input type="date" id="sellerBirthDate" min="1900-01-01" style="width:100%;box-sizing:border-box;">
+
+        <label for="sellerTaxId">Votre numéro fiscal (13 chiffres)</label>
+        <input type="text" id="sellerTaxId" placeholder="Ex : 12 34 567 890 123" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
+        <p style="font-size:0.8rem;color:#6B5842;margin:4px 0 0;">Il figure sur votre avis d'impôt. Si vous n'en avez pas, laissez vide et indiquez votre lieu de naissance.</p>
+
+        <label for="sellerBirthPlace">Votre lieu de naissance (si vous n'avez pas de numéro fiscal)</label>
+        <input type="text" id="sellerBirthPlace" placeholder="Ex : Nancy" maxlength="100" autocomplete="off" style="width:100%;box-sizing:border-box;">
       </div>
 
       <label for="name">Nom complet</label>
@@ -140,6 +158,46 @@
   const siretBlock = document.getElementById('siretBlock');
   const siretInput = document.getElementById('sellerSiret');
   const pseudoInput = document.getElementById('sellerPseudo');
+  const legalNameInput = document.getElementById('sellerLegalName');
+  const vatInput = document.getElementById('sellerVat');
+  const birthDateInput = document.getElementById('sellerBirthDate');
+  const taxIdInput = document.getElementById('sellerTaxId');
+  const birthPlaceInput = document.getElementById('sellerBirthPlace');
+
+  // Un vendeur doit être majeur : la date de naissance ne peut pas être plus récente qu'il y a 18 ans
+  (function () {
+    const limit = new Date();
+    limit.setFullYear(limit.getFullYear() - 18);
+    birthDateInput.max = limit.toISOString().slice(0, 10);
+  })();
+
+  // Informations fiscales : mêmes règles que sur le serveur (qui les revérifie)
+  function taxValidationError(sellerType, tax) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tax.birthDate)) {
+      return 'Indiquez votre date de naissance.';
+    }
+    if (tax.birthDate < '1900-01-01' || tax.birthDate > birthDateInput.max) {
+      return tax.birthDate > birthDateInput.max
+        ? 'Il faut être majeur pour vendre sur Agrivoisin.'
+        : "La date de naissance n'est pas valide.";
+    }
+    const taxId = tax.taxId.replace(/[\s.]/g, '');
+    if (taxId && !/^\d{13}$/.test(taxId)) {
+      return "Le numéro fiscal comporte 13 chiffres (il figure sur votre avis d'impôt).";
+    }
+    if (sellerType === 'professionnel') {
+      if (tax.legalName.trim().length < 2) {
+        return "Indiquez le nom de votre entreprise (raison sociale).";
+      }
+      const vat = tax.vatNumber.replace(/[\s.]/g, '').toUpperCase();
+      if (vat && !/^FR[0-9A-Z]{2}\d{9}$/.test(vat)) {
+        return 'Le numéro de TVA doit ressembler à FR12345678901.';
+      }
+    } else if (!taxId && tax.birthPlace.trim().length < 2) {
+      return "Indiquez votre numéro fiscal ou, si vous n'en avez pas, votre lieu de naissance.";
+    }
+    return '';
+  }
 
   // Pseudo : 3 à 20 caractères (lettres, chiffres, espaces, tirets), ni espace ni tiret au début ou à la fin
   const PSEUDO_ERROR = 'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.';
@@ -159,6 +217,7 @@
     const isPro = selectedType === 'jardinier' && selectedSellerType() === 'professionnel';
     siretBlock.style.display = isPro ? 'block' : 'none';
     siretInput.required = isPro;
+    legalNameInput.required = isPro;
   }
   signupForm.querySelectorAll('input[name="sellerType"]').forEach((radio) => {
     radio.addEventListener('change', refreshSellerType);
@@ -179,6 +238,7 @@
         postalCodeInput.required = true;
         sellerTypeBlock.style.display = 'block';
         pseudoInput.required = true;
+        birthDateInput.required = true;
       } else {
         sellerAddressLabel.style.display = 'none';
         sellerAddressInput.style.display = 'none';
@@ -192,6 +252,12 @@
         siretInput.value = '';
         pseudoInput.required = false;
         pseudoInput.value = '';
+        birthDateInput.required = false;
+        birthDateInput.value = '';
+        taxIdInput.value = '';
+        birthPlaceInput.value = '';
+        legalNameInput.value = '';
+        vatInput.value = '';
       }
       refreshSellerType();
     });
@@ -234,6 +300,24 @@
       btn.disabled = false;
       pseudoInput.focus();
       return;
+    }
+
+    const tax = {
+      birthDate: birthDateInput.value,
+      birthPlace: birthPlaceInput.value,
+      taxId: taxIdInput.value,
+      legalName: sellerType === 'professionnel' ? legalNameInput.value : '',
+      vatNumber: sellerType === 'professionnel' ? vatInput.value : '',
+    };
+    if (selectedType === 'jardinier') {
+      const taxError = taxValidationError(sellerType, tax);
+      if (taxError) {
+        errorEl.textContent = 'Erreur : ' + taxError;
+        errorEl.style.display = 'block';
+        btn.textContent = 'Créer mon compte';
+        btn.disabled = false;
+        return;
+      }
     }
 
     if (selectedType === 'jardinier') {
@@ -301,7 +385,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + accessToken,
         },
-        body: JSON.stringify({ email, city, postalCode, address: sellerAddress, sellerType, siret, pseudo }),
+        body: JSON.stringify({ email, city, postalCode, address: sellerAddress, sellerType, siret, pseudo, tax }),
       });
 
       const stripeData = await response.json();

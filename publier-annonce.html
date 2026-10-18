@@ -167,11 +167,35 @@
     }
   });
 
-  Object.keys(CATEGORIES).forEach(function (cat) {
-    const opt = document.createElement('option');
-    opt.value = cat;
-    opt.textContent = cat;
-    categorySelect.appendChild(opt);
+  // Catégories que les particuliers peuvent vendre (produits frais, non transformés)
+  const PARTICULIER_CATEGORIES = ["Fruits", "Légumes", "Aromates", "Fleurs du jardin"];
+
+  function fillCategories(sellerType) {
+    categorySelect.innerHTML = '<option value="" disabled selected>Choisissez une catégorie</option>';
+    Object.keys(CATEGORIES).forEach(function (cat) {
+      if (sellerType !== 'professionnel' && !PARTICULIER_CATEGORIES.includes(cat)) return;
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      categorySelect.appendChild(opt);
+    });
+  }
+
+  // Par prudence, on commence avec les catégories des particuliers,
+  // puis on ajoute les autres si le vendeur est un professionnel.
+  fillCategories('particulier');
+
+  supabaseClient.auth.getSession().then(function (result) {
+    const session = result.data.session;
+    if (!session) return;
+    fetch('/api/get-seller-listings', {
+      headers: { Authorization: 'Bearer ' + session.access_token },
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.sellerType === 'professionnel') fillCategories('professionnel');
+      })
+      .catch(function () {});
   });
 
   categorySelect.addEventListener('change', function () {

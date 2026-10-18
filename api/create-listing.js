@@ -68,6 +68,10 @@ function validatePickupHours(input) {
   };
 }
 
+// Catégories que les particuliers peuvent vendre (produits frais, non transformés).
+// Toutes les autres sont réservées aux vendeurs professionnels.
+const PARTICULIER_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin'];
+
 // Quantité disponible : un nombre entier d'unités (par exemple 5 kg ou 3 bottes), de 1 à 9999
 const MAX_QUANTITY = 9999;
 
@@ -103,7 +107,7 @@ export default async function handler(req, res) {
     // 1. Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
-      .select('id, city, latitude, longitude')
+      .select('id, city, latitude, longitude, seller_type')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -118,6 +122,14 @@ export default async function handler(req, res) {
     if (!seller.city || seller.latitude == null || seller.longitude == null) {
       return res.status(400).json({
         error: "Votre ville n'est pas encore reconnue sur la carte, votre annonce ne peut donc pas être publiée. Renseignez votre ville et votre code postal sur la page « Devenir vendeur » (vendre.html).",
+      });
+    }
+
+    // 2 bis. Les catégories de produits transformés, de miel, de plants et de graines
+    //        sont réservées aux vendeurs professionnels
+    if (seller.seller_type !== 'professionnel' && !PARTICULIER_CATEGORIES.includes(category)) {
+      return res.status(403).json({
+        error: 'Cette catégorie est réservée aux vendeurs professionnels. En tant que particulier, vous pouvez vendre des fruits, des légumes, des aromates et des fleurs du jardin.',
       });
     }
 

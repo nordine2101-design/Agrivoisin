@@ -67,6 +67,16 @@
         </label>
       </fieldset>
 
+      <div class="pro-offer" id="particulierOffer">
+        <strong>Conditions pour les particuliers</strong>
+        <ul>
+          <li><strong>Aucun abonnement et aucun engagement.</strong></li>
+          <li>Commission d'Agrivoisin : 15&nbsp;% de chaque vente.</li>
+          <li>2&nbsp;€ de frais de service les mois où vous avez au moins une vente.</li>
+          <li>Un seul virement par mois sur votre compte.</li>
+        </ul>
+      </div>
+
       <div id="siretBlock" style="display:none;">
         <div class="pro-offer" id="proOffer">
           <strong>Offre de lancement pour les professionnels</strong>
@@ -266,6 +276,7 @@
   function refreshSellerType() {
     const isPro = selectedSellerType() === 'professionnel';
     siretBlock.style.display = isPro ? 'block' : 'none';
+    document.getElementById('particulierOffer').style.display = isPro ? 'none' : 'block';
     siretInput.required = isPro;
     legalNameInput.required = isPro;
   }

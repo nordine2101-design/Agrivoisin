@@ -220,6 +220,95 @@ async function adminListReviews() {
   };
 }
 
+// Suivi fiscal (règle européenne DAC7) : seuils de déclaration pour la vente de biens, sur une année civile.
+// « Seuil proche » = moment où Agrivoisin demande ses informations fiscales à un vendeur particulier.
+// « Seuil atteint » = le vendeur doit être déclaré à l'administration fiscale (30 ventes ou plus, ou plus de 2 000 €).
+const FISCAL_NEAR_SALES = 20;
+const FISCAL_NEAR_CENTS = 150000;
+const FISCAL_HIT_SALES = 30;
+const FISCAL_HIT_CENTS = 200000;
+
+// Année civile d'une date, à l'heure de Paris
+function parisYearOf(iso) {
+  return Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric' }).format(new Date(iso)));
+}
+
+// « hit » = seuil atteint, « near » = à contacter, « pro » = professionnel (informations données à l'inscription), « ok » = rien à faire
+function fiscalState(salesCount, totalCents, sellerType) {
+  if (salesCount >= FISCAL_HIT_SALES || totalCents > FISCAL_HIT_CENTS) return sellerType === 'professionnel' ? 'pro' : 'hit';
+  if (salesCount >= FISCAL_NEAR_SALES || totalCents >= FISCAL_NEAR_CENTS) return sellerType === 'professionnel' ? 'pro' : 'near';
+  return sellerType === 'professionnel' ? 'pro' : 'ok';
+}
+
+// Total des ventes de chaque vendeur sur l'année : une vente = un versement (une commande chez ce vendeur),
+// hors versements entièrement remboursés ; les remboursements partiels sont retirés du montant.
+function totalsBySeller(payoutRows, year) {
+  const totals = {};
+  (payoutRows || []).forEach((row) => {
+    if (!row || !row.seller_id || row.status === 'rembourse') return;
+    if (parisYearOf(row.created_at) !== year) return;
+    const entry = totals[row.seller_id] || { salesCount: 0, totalCents: 0 };
+    entry.salesCount += 1;
+    entry.totalCents += Math.max(0, (Number(row.amount_cents) || 0) - (Number(row.refunded_cents) || 0));
+    totals[row.seller_id] = entry;
+  });
+  return totals;
+}
+
+async function adminListSellerTotals() {
+  const year = Number(todayInParis().slice(0, 4));
+  // Marge de deux jours avant le 1er janvier : le tri exact par année se fait à l'heure de Paris ensuite
+  const since = new Date(Date.UTC(year - 1, 11, 30)).toISOString();
+
+  const payoutRows = [];
+  const PAGE = 1000;
+  for (let page = 0; page < 50; page += 1) {
+    const { data, error } = await supabase
+      .from('payouts')
+      .select('seller_id, amount_cents, refunded_cents, status, created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+    if (error) throw new Error('Lecture des ventes impossible : ' + error.message);
+    payoutRows.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+
+  const totals = totalsBySeller(payoutRows, year);
+  const sellerIds = Object.keys(totals);
+
+  const sellers = [];
+  for (let i = 0; i < sellerIds.length; i += 200) {
+    const chunk = sellerIds.slice(i, i + 200);
+    const { data, error } = await supabase.from('sellers').select('id, pseudo, city, seller_type').in('id', chunk);
+    if (error) throw new Error('Lecture des vendeurs impossible : ' + error.message);
+    sellers.push(...(data || []));
+  }
+
+  const rank = { hit: 0, near: 1, ok: 2, pro: 2 };
+  const list = sellerIds.map((id) => {
+    const seller = sellers.find((x) => x.id === id) || {};
+    const type = seller.seller_type === 'professionnel' ? 'professionnel' : 'particulier';
+    const { salesCount, totalCents } = totals[id];
+    return {
+      sellerId: id,
+      pseudo: seller.pseudo || null,
+      city: seller.city || null,
+      sellerType: type,
+      salesCount,
+      totalCents,
+      state: fiscalState(salesCount, totalCents, type),
+    };
+  });
+  list.sort((a, b) => (rank[a.state] - rank[b.state]) || (b.salesCount - a.salesCount) || (b.totalCents - a.totalCents));
+
+  return {
+    year,
+    thresholds: { nearSales: FISCAL_NEAR_SALES, nearCents: FISCAL_NEAR_CENTS, hitSales: FISCAL_HIT_SALES, hitCents: FISCAL_HIT_CENTS },
+    sellers: list,
+  };
+}
+
 async function handleAdminAction(req, res) {
   try {
     const admin = await requireAdmin(req, res);
@@ -229,6 +318,10 @@ async function handleAdminAction(req, res) {
 
     if (action === 'admin_list_reviews') {
       return res.status(200).json(await adminListReviews());
+    }
+
+    if (action === 'admin_list_seller_totals') {
+      return res.status(200).json(await adminListSellerTotals());
     }
 
     if (action === 'admin_set_review_hidden') {
@@ -261,7 +354,7 @@ async function handleAdminAction(req, res) {
 }
 
 export default async function handler(req, res) {
-  // POST : actions de l'administrateur (modération des commentaires)
+  // POST : actions de l'administrateur (modération des commentaires, suivi fiscal des vendeurs)
   if (req.method === 'POST') {
     return handleAdminAction(req, res);
   }

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Suivi fiscal des vendeurs — Agrivoisin</title>
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ SUIVI FISCAL DES VENDEURS (page réservée à l'administrateur) ============ -->
+<section class="page-header">
+  <div class="container admin-wrap">
+    <div style="text-align:left;margin-bottom:12px;">
+      <a href="index.html" class="btn btn-ghost">Retour au site</a>
+      <a href="admin-avis.html" class="btn btn-ghost">Commentaires</a>
+      <a href="admin-problemes.html" class="btn btn-ghost">Problèmes signalés</a>
+    </div>
+    <h1>Suivi fiscal des vendeurs</h1>
+    <p id="pageSubtitle">Page réservée à l'administrateur d'Agrivoisin. Elle montre, pour chaque vendeur, ses ventes de l'année en cours (payées et non remboursées), pour savoir à qui demander les informations fiscales.</p>
+
+    <p id="loadingMessage" class="admin-state">Chargement...</p>
+    <p id="notLoggedMessage" class="admin-state" style="display:none;">Vous devez être connecté. <a href="connexion.html?retour=admin-fiscal.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
+    <p id="forbiddenMessage" class="admin-state" style="display:none;">Cette page est réservée à l'administrateur d'Agrivoisin.</p>
+    <p id="errorMessage" class="admin-state" style="display:none;"></p>
+    <button type="button" id="retryBtn" class="btn btn-primary" style="display:none;margin:0 auto 16px;">Réessayer</button>
+
+    <div id="content" style="display:none;">
+      <div class="admin-toolbar">
+        <h2 id="sellersTitle">Vendeurs</h2>
+        <button type="button" id="refreshBtn" class="btn btn-ghost">Actualiser</button>
+      </div>
+      <p id="legend" class="admin-legend"></p>
+      <p id="noSellers" class="admin-empty" style="display:none;">Aucune vente cette année pour le moment.</p>
+      <div id="sellersList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="cgv.html">Conditions générales</a></li>
+          <li><a href="confidentialite.html">Confidentialité</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const loadingMessage = document.getElementById('loadingMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const forbiddenMessage = document.getElementById('forbiddenMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const retryBtn = document.getElementById('retryBtn');
+  const content = document.getElementById('content');
+  const sellersList = document.getElementById('sellersList');
+  const noSellers = document.getElementById('noSellers');
+  const sellersTitle = document.getElementById('sellersTitle');
+  const legend = document.getElementById('legend');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  const euro = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+  function formatEuros(cents) { return euro.format((Number(cents) || 0) / 100); }
+  function formatSales(n) { return n + ' vente' + (n > 1 ? 's' : ''); }
+
+  // Tout ce qui vient de la base est mis dans la page avec textContent : jamais interprété comme du code
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  const BADGES = {
+    hit: { cls: 'hit', text: 'Seuil atteint : informations fiscales à obtenir' },
+    near: { cls: 'near', text: 'À contacter : seuil proche' },
+    pro: { cls: 'ok', text: "Informations de l'entreprise données à l'inscription" },
+    ok: { cls: 'ok', text: 'Rien à faire' },
+  };
+
+  function numberBlock(value, limit) {
+    const block = el('div');
+    block.appendChild(el('strong', null, value));
+    block.appendChild(el('span', null, limit));
+    return block;
+  }
+
+  function sellerCard(s, t) {
+    const card = el('div', 'admin-card' + (s.state === 'hit' ? ' state-hit' : s.state === 'near' ? ' state-near' : ' state-ok'));
+
+    const head = el('div', 'admin-card-head');
+    head.appendChild(el('span', 'admin-card-title', (s.pseudo || 'Sans pseudo') + (s.city ? ' · ' + s.city : '')));
+    head.appendChild(el('span', 'admin-card-amount', s.sellerType === 'professionnel' ? 'Professionnel' : 'Particulier'));
+    card.appendChild(head);
+
+    const numbers = el('div', 'fisc-numbers');
+    numbers.appendChild(numberBlock(formatSales(s.salesCount), 'sur ' + formatSales(t.hitSales)));
+    numbers.appendChild(numberBlock(formatEuros(s.totalCents), 'sur ' + formatEuros(t.hitCents)));
+    card.appendChild(numbers);
+
+    const badge = BADGES[s.state] || BADGES.ok;
+    card.appendChild(el('div', 'fisc-badge ' + badge.cls, badge.text));
+    return card;
+  }
+
+  function showOnly(which) {
+    [loadingMessage, notLoggedMessage, forbiddenMessage, errorMessage, content].forEach((e) => { e.style.display = 'none'; });
+    retryBtn.style.display = 'none';
+    if (which) which.style.display = 'block';
+  }
+
+  async function getToken() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    return session ? session.access_token : null;
+  }
+
+  async function callAdmin(token, body) {
+    const response = await fetch('/api/get-listings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    return { ok: response.ok, status: response.status, data };
+  }
+
+  async function load() {
+    showOnly(loadingMessage);
+    const token = await getToken();
+    if (!token) {
+      showOnly(notLoggedMessage);
+      return;
+    }
+
+    try {
+      const result = await callAdmin(token, { action: 'admin_list_seller_totals' });
+
+      if (result.status === 401) { showOnly(notLoggedMessage); return; }
+      if (result.status === 403) { showOnly(forbiddenMessage); return; }
+      if (!result.ok) throw new Error(result.data.error || 'Erreur');
+
+      const sellers = result.data.sellers || [];
+      const t = result.data.thresholds;
+      sellersTitle.textContent = 'Vendeurs, année ' + result.data.year + ' (' + sellers.length + ')';
+      legend.textContent = 'Seuils : « À contacter » dès ' + formatSales(t.nearSales) + ' ou ' + formatEuros(t.nearCents)
+        + ' · « Seuil atteint » dès ' + formatSales(t.hitSales) + ' ou plus de ' + formatEuros(t.hitCents) + '.';
+      sellersList.replaceChildren(...sellers.map((s) => sellerCard(s, t)));
+      noSellers.style.display = sellers.length === 0 ? 'block' : 'none';
+      showOnly(content);
+    } catch (err) {
+      console.error(err);
+      errorMessage.textContent = 'Impossible de charger le suivi des vendeurs pour le moment.';
+      showOnly(errorMessage);
+      retryBtn.style.display = 'block';
+    }
+  }
+
+  refreshBtn.addEventListener('click', load);
+  retryBtn.addEventListener('click', load);
+
+  load();
+</script>
+
+<style>
+  .admin-wrap { max-width:860px; }
+  .admin-state { margin:16px 0; color:#C8352F; text-align:center; }
+  .admin-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+  .admin-toolbar h2 { font-size:1.2rem; margin:0; text-align:left; }
+  .admin-legend { color:#6B5842; font-size:0.85rem; text-align:left; margin:0 0 16px; }
+  .admin-empty { color:#6B5842; text-align:left; margin:8px 0; }
+  .admin-card { background:#fff; border:1px solid #e6e0d3; border-radius:16px; padding:16px; margin-bottom:16px; text-align:left; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+  .admin-card.state-hit { border-left:4px solid #C8352F; }
+  .admin-card.state-near { border-left:4px solid #E08A1E; }
+  .admin-card-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:10px; }
+  .admin-card-title { font-weight:700; color:var(--leaf-deep); }
+  .admin-card-amount { font-weight:700; white-space:nowrap; }
+  .fisc-numbers { display:flex; gap:32px; flex-wrap:wrap; margin:4px 0 10px; }
+  .fisc-numbers div { display:flex; flex-direction:column; }
+  .fisc-numbers strong { font-size:1.15rem; }
+  .fisc-numbers span { font-size:0.8rem; color:#6B5842; }
+  .fisc-badge { display:inline-block; font-size:0.85rem; font-weight:700; padding:5px 12px; border-radius:999px; }
+  .fisc-badge.ok { background:#EAF2E8; color:#4C7A50; }
+  .fisc-badge.near { background:#FFF0D9; color:#B26A0B; }
+  .fisc-badge.hit { background:#FBE3E1; color:#C8352F; }
+  @media (max-width: 540px) {
+    .admin-card-head { flex-direction:column; gap:4px; }
+  }
+</style>
+
+</body>
+</html>

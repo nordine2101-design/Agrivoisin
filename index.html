@@ -17,7 +17,7 @@
     <a href="index.html" class="logo">
       <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:320px;width:auto;">
     </a>
-    <span id="userEmailDisplay" style="position:absolute;top:40px;right:122px;font-size:0.85rem;color:#D97D45;font-weight:600;">🍎 Non connecté</span>
+    <span id="userEmailDisplay" style="position:absolute;top:40px;right:122px;font-size:0.85rem;color:#C8352F;font-weight:600;">🍎 Non connecté</span>
     <a href="panier.html" class="cart-icon" aria-label="Panier" style="position:absolute;top:12px;right:32px;width:76px;height:76px;">
       <img src="panier-agrivoisin.png" alt="Panier" style="width:100%;height:100%;object-fit:contain;">
       <span class="cart-count" style="width:28px;height:28px;font-size:0.85rem;top:-7px;right:-7px;">0</span>
@@ -35,8 +35,8 @@
     <div class="header-actions">
       <a href="mes-annonces.html" class="btn btn-ghost">Mes annonces</a>
       <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
-      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
-      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
+      <a href="connexion.html" class="btn btn-ghost" id="loginLink">Se connecter</a>
+      <a href="inscription.html" class="btn btn-primary" id="signupLink">Créer un compte</a>
       <button class="nav-toggle" aria-label="Menu">
         <span></span><span></span><span></span>
       </button>
@@ -405,8 +405,21 @@
   supabaseClient.auth.getSession().then(({ data: { session } }) => {
     const emailDisplay = document.getElementById('userEmailDisplay');
     if (session) {
-      emailDisplay.textContent = '🍏 Connecté';
+      const email = (session.user && session.user.email) || 'Connecté';
+      emailDisplay.textContent = '🍏 ' + email;
       emailDisplay.style.color = '#4C7A50';
+
+      // Connecté : « Se connecter » devient « Se déconnecter » et « Créer un compte » disparaît
+      const loginLink = document.getElementById('loginLink');
+      const signupLink = document.getElementById('signupLink');
+      loginLink.textContent = 'Se déconnecter';
+      loginLink.setAttribute('href', '#');
+      signupLink.style.display = 'none';
+      loginLink.addEventListener('click', async (event) => {
+        event.preventDefault();
+        await supabaseClient.auth.signOut();
+        window.location.href = 'index.html';
+      });
     }
   });
 </script>

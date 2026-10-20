@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nouveau mot de passe — Agrivoisin</title>
+<meta name="description" content="Choisissez un nouveau mot de passe pour votre compte Agrivoisin.">
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+<style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-form-box { max-width:420px; margin:0 auto; text-align:left; }
+  .my-video { width:500px; flex-shrink:0; position:sticky; top:20px; box-sizing:border-box; padding:10px; background:var(--cream-soft); border-radius:28px; }
+  .my-video video { width:480px; height:auto; aspect-ratio:1082 / 720; display:block; border-radius:20px; }
+  .pw-wrap { position:relative; display:flex; flex-direction:column; }
+  .pw-wrap input { width:100%; box-sizing:border-box; padding-right:48px; }
+  .pw-eye { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px; cursor:pointer; display:flex; align-items:center; color:#6B5842; }
+  .pw-eye:focus-visible { outline:2px solid var(--leaf); border-radius:6px; }
+  .pw-eye svg { width:22px; height:22px; display:block; }
+  .pw-eye .eye-off { display:none; }
+  .pw-eye.shown .eye-on { display:none; }
+  .pw-eye.shown .eye-off { display:block; }
+</style>
+</head>
+<body>
+
+<!-- ============ NOUVEAU MOT DE PASSE ============ -->
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
+      <h1>Nouveau mot de passe</h1>
+    </div>
+    <p class="auth-subtitle" id="pageSubtitle">Vérification de votre lien...</p>
+
+    <div class="my-form-box">
+      <form class="auth-form" id="resetForm" style="display:none;">
+        <label for="newPassword">Nouveau mot de passe</label>
+        <div class="pw-wrap">
+          <input type="password" id="newPassword" placeholder="8 caractères minimum" minlength="8" required autocomplete="new-password">
+          <button type="button" class="pw-eye" aria-label="Afficher le mot de passe" title="Afficher le mot de passe">
+            <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+
+        <label for="confirmPassword">Confirmer le mot de passe</label>
+        <div class="pw-wrap">
+          <input type="password" id="confirmPassword" placeholder="Retapez-le" minlength="8" required autocomplete="new-password">
+          <button type="button" class="pw-eye" aria-label="Afficher le mot de passe" title="Afficher le mot de passe">
+            <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+
+        <button type="submit" class="btn btn-primary auth-submit" id="resetBtn">Enregistrer le mot de passe</button>
+      </form>
+
+      <p class="auth-switch" id="resetError" style="color:#C8352F;display:none;"></p>
+      <p class="auth-switch" id="resetSuccess" style="color:#4C7A50;display:none;"></p>
+
+      <p class="auth-switch" id="invalidLinkBlock" style="display:none;"><a href="connexion.html">Retour à la connexion</a></p>
+    </div>
+  </div>
+
+  <div class="my-video">
+    <video src="taupe-video.mp4" autoplay muted playsinline></video>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="cgv.html">Conditions générales</a></li>
+          <li><a href="confidentialite.html">Confidentialité</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const resetForm = document.getElementById('resetForm');
+  const pageSubtitle = document.getElementById('pageSubtitle');
+  const resetError = document.getElementById('resetError');
+  const resetSuccess = document.getElementById('resetSuccess');
+  const invalidLinkBlock = document.getElementById('invalidLinkBlock');
+  let formShown = false;
+
+  // Les yeux : afficher / cacher le code, champ par champ
+  document.querySelectorAll('.pw-eye').forEach(function (eye) {
+    eye.addEventListener('click', function () {
+      const input = eye.parentNode.querySelector('input');
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      eye.classList.toggle('shown', show);
+      const label = show ? 'Cacher le mot de passe' : 'Afficher le mot de passe';
+      eye.setAttribute('aria-label', label);
+      eye.setAttribute('title', label);
+    });
+  });
+
+  function showForm() {
+    if (formShown) return;
+    formShown = true;
+    pageSubtitle.textContent = 'Choisissez un nouveau mot de passe pour votre compte.';
+    resetForm.style.display = '';
+    document.getElementById('newPassword').focus();
+  }
+
+  function showInvalidLink() {
+    if (formShown) return;
+    pageSubtitle.textContent = "Ce lien n'est plus valable (il a peut-être déjà servi ou a expiré).";
+    resetError.textContent = "Refaites une demande depuis la page de connexion, avec « Mot de passe oublié ? ».";
+    resetError.style.display = 'block';
+    invalidLinkBlock.style.display = '';
+  }
+
+  // Le lien reçu par e-mail ouvre cette page avec une session « récupération » : on la reconnaît ici
+  supabaseClient.auth.onAuthStateChange(function (event, session) {
+    if (event === 'PASSWORD_RECOVERY' && session) showForm();
+  });
+
+  // Si rien n'a été reconnu au bout de quelques secondes, le lien n'est pas valable
+  setTimeout(async function () {
+    if (formShown) return;
+    const hash = window.location.hash || '';
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session && hash.indexOf('type=recovery') !== -1) showForm();
+    else showInvalidLink();
+  }, 3000);
+
+  resetForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('resetBtn');
+    const p1 = document.getElementById('newPassword').value;
+    const p2 = document.getElementById('confirmPassword').value;
+    resetError.style.display = 'none';
+    resetSuccess.style.display = 'none';
+
+    if (p1.length < 8) {
+      resetError.textContent = 'Le mot de passe doit comporter au moins 8 caractères.';
+      resetError.style.display = 'block';
+      return;
+    }
+    if (p1 !== p2) {
+      resetError.textContent = 'Les deux mots de passe ne sont pas identiques.';
+      resetError.style.display = 'block';
+      return;
+    }
+
+    btn.textContent = 'Enregistrement...';
+    btn.disabled = true;
+
+    const { error } = await supabaseClient.auth.updateUser({ password: p1 });
+
+    if (error) {
+      let text = "Impossible d'enregistrer le mot de passe. Réessayez ou refaites une demande depuis la page de connexion.";
+      const msg = String(error.message || '').toLowerCase();
+      if (msg.indexOf('different from the old') !== -1) text = "Choisissez un mot de passe différent de l'ancien.";
+      else if (msg.indexOf('at least') !== -1 || msg.indexOf('weak') !== -1) text = "Ce mot de passe est trop faible. Choisissez-en un d'au moins 8 caractères, plus difficile à deviner.";
+      resetError.textContent = text;
+      resetError.style.display = 'block';
+      btn.textContent = 'Enregistrer le mot de passe';
+      btn.disabled = false;
+      return;
+    }
+
+    resetForm.style.display = 'none';
+    pageSubtitle.textContent = 'Votre mot de passe est enregistré.';
+    resetSuccess.textContent = 'Mot de passe enregistré ! Vous êtes connecté. Redirection...';
+    resetSuccess.style.display = 'block';
+    setTimeout(function () { window.location.href = 'index.html'; }, 1800);
+  });
+</script>
+</body>
+</html>

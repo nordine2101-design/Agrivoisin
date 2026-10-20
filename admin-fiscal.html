@@ -121,6 +121,28 @@
     ok: { cls: 'ok', text: 'Rien à faire' },
   };
 
+  // « 12/10/2026 » (date de Paris)
+  function formatDate(iso) {
+    return iso ? new Date(iso).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' }) : '—';
+  }
+
+  function formatReminders(n) {
+    if (!n) return 'aucune relance';
+    return n + ' relance' + (n > 1 ? 's' : '');
+  }
+
+  // Ligne « Informations fiscales » d'un vendeur particulier (les professionnels les donnent à l'inscription)
+  function taxLine(info) {
+    const status = info && info.status;
+    const line = el('p', 'tax-line' + (status === 'requested' ? ' todo' : ''));
+    line.appendChild(el('b', null, 'Informations fiscales : '));
+    let text = 'non demandées';
+    if (status === 'received') text = 'reçues le ' + formatDate(info.date);
+    else if (status === 'requested') text = 'demandées le ' + formatDate(info.date) + ' · ' + formatReminders(info.reminders);
+    line.appendChild(document.createTextNode(text));
+    return line;
+  }
+
   function numberBlock(value, limit) {
     const block = el('div');
     block.appendChild(el('strong', null, value));
@@ -140,6 +162,8 @@
     numbers.appendChild(numberBlock(formatSales(s.salesCount), 'sur ' + formatSales(t.hitSales)));
     numbers.appendChild(numberBlock(formatEuros(s.totalCents), 'sur ' + formatEuros(t.hitCents)));
     card.appendChild(numbers);
+
+    if (s.sellerType !== 'professionnel') card.appendChild(taxLine(s.taxInfo));
 
     const badge = BADGES[s.state] || BADGES.ok;
     card.appendChild(el('div', 'fisc-badge ' + badge.cls, badge.text));
@@ -223,6 +247,9 @@
   .fisc-numbers div { display:flex; flex-direction:column; }
   .fisc-numbers strong { font-size:1.15rem; }
   .fisc-numbers span { font-size:0.8rem; color:#6B5842; }
+  .tax-line { font-size:0.88rem; margin:0 0 10px; color:#3b3b3b; }
+  .tax-line b { color:var(--leaf-deep); }
+  .tax-line.todo b { color:#C8352F; }
   .fisc-badge { display:inline-block; font-size:0.85rem; font-weight:700; padding:5px 12px; border-radius:999px; }
   .fisc-badge.ok { background:#EAF2E8; color:#4C7A50; }
   .fisc-badge.near { background:#FFF0D9; color:#B26A0B; }

@@ -102,7 +102,13 @@
       <input type="email" id="email" placeholder="vous@exemple.com" required>
 
       <label for="password">Mot de passe</label>
-      <input type="password" id="password" placeholder="8 caractères minimum" minlength="8" required>
+      <div class="pw-wrap">
+        <input type="password" id="password" placeholder="8 caractères minimum" minlength="8" required>
+        <button type="button" class="pw-eye" id="pwEye" aria-label="Afficher le mot de passe" title="Afficher le mot de passe">
+          <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
 
       <label for="city">Ville ou village</label>
       <input type="text" id="city" placeholder="Votre ville" required>
@@ -153,6 +159,14 @@
   .pro-offer ul { margin:0; padding-left:20px; list-style:disc; }
   .pro-offer li { margin:3px 0; }
   .auth-form .seller-type-option:has(input:focus-visible) { outline:2px solid var(--leaf-deep); outline-offset:2px; }
+  .pw-wrap { position:relative; display:flex; flex-direction:column; }
+  .pw-wrap input { width:100%; box-sizing:border-box; padding-right:48px; }
+  .pw-eye { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px; cursor:pointer; display:flex; align-items:center; color:#6B5842; }
+  .pw-eye:focus-visible { outline:2px solid var(--leaf); border-radius:6px; }
+  .pw-eye svg { width:22px; height:22px; display:block; }
+  .pw-eye .eye-off { display:none; }
+  .pw-eye.shown .eye-on { display:none; }
+  .pw-eye.shown .eye-off { display:block; }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(
@@ -274,6 +288,24 @@
       }
       refreshSellerType();
     });
+  });
+
+  // Œil du mot de passe : afficher / cacher le code (le même pour acheteur et vendeur)
+  const pwInput = document.getElementById('password');
+  const pwEye = document.getElementById('pwEye');
+  function setPasswordShown(show) {
+    pwInput.type = show ? 'text' : 'password';
+    pwEye.classList.toggle('shown', show);
+    const label = show ? 'Cacher le mot de passe' : 'Afficher le mot de passe';
+    pwEye.setAttribute('aria-label', label);
+    pwEye.setAttribute('title', label);
+  }
+  pwEye.addEventListener('click', function () {
+    setPasswordShown(pwInput.type === 'password');
+  });
+  // Après la création du compte, le formulaire se vide : le code redevient caché
+  document.getElementById('signupForm').addEventListener('reset', function () {
+    setPasswordShown(false);
   });
 
   document.getElementById('signupForm').addEventListener('submit', async function (e) {

@@ -285,6 +285,25 @@ async function adminListSellerTotals() {
     sellers.push(...(data || []));
   }
 
+  // État des informations fiscales (seulement des dates et un nombre : jamais le contenu des informations)
+  const taxRows = [];
+  for (let i = 0; i < sellerIds.length; i += 200) {
+    const chunk = sellerIds.slice(i, i + 200);
+    const { data, error } = await supabase
+      .from('seller_tax_info')
+      .select('seller_id, requested_at, collected_at, reminder_count')
+      .in('seller_id', chunk);
+    if (error) throw new Error('Lecture des informations fiscales impossible : ' + error.message);
+    taxRows.push(...(data || []));
+  }
+
+  function taxInfoOf(id) {
+    const row = taxRows.find((x) => x.seller_id === id);
+    if (row && row.collected_at) return { status: 'received', date: row.collected_at };
+    if (row && row.requested_at) return { status: 'requested', date: row.requested_at, reminders: Number(row.reminder_count) || 0 };
+    return { status: 'none' };
+  }
+
   const rank = { hit: 0, near: 1, ok: 2, pro: 2 };
   const list = sellerIds.map((id) => {
     const seller = sellers.find((x) => x.id === id) || {};
@@ -298,6 +317,7 @@ async function adminListSellerTotals() {
       salesCount,
       totalCents,
       state: fiscalState(salesCount, totalCents, type),
+      taxInfo: taxInfoOf(id),
     };
   });
   list.sort((a, b) => (rank[a.state] - rank[b.state]) || (b.salesCount - a.salesCount) || (b.totalCents - a.totalCents));
@@ -467,3 +487,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+

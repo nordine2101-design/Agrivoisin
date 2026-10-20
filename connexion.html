@@ -32,9 +32,9 @@
   <div class="my-panel">
     <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
-      <h1>Content de vous revoir</h1>
+      <h1 id="pageTitle">Content de vous revoir</h1>
     </div>
-    <p class="auth-subtitle">Connectez-vous pour retrouver vos annonces et vos commandes.</p>
+    <p class="auth-subtitle" id="pageSubtitle">Connectez-vous pour retrouver vos annonces et vos commandes.</p>
 
     <div class="my-form-box">
       <form class="auth-form" id="loginForm">
@@ -50,15 +50,23 @@
           </button>
         </div>
 
-        <a href="#" class="auth-link-inline">Mot de passe oublié ?</a>
+        <a href="#" class="auth-link-inline" id="forgotLink">Mot de passe oublié ?</a>
 
         <button type="submit" class="btn btn-primary auth-submit" id="loginBtn">Se connecter</button>
+      </form>
+
+      <form class="auth-form" id="forgotForm" style="display:none;">
+        <label for="forgotEmail">Adresse e-mail</label>
+        <input type="email" id="forgotEmail" placeholder="vous@exemple.com" required>
+
+        <button type="submit" class="btn btn-primary auth-submit" id="forgotBtn">Envoyer le lien</button>
       </form>
 
       <p class="auth-switch" id="loginError" style="color:#C8352F;display:none;"></p>
       <p class="auth-switch" id="loginSuccess" style="color:#4C7A50;display:none;"></p>
 
-      <p class="auth-switch">Pas encore de compte ? <a href="inscription.html">Créer un compte</a></p>
+      <p class="auth-switch" id="backToLogin" style="display:none;"><a href="#" id="backToLoginLink">Retour à la connexion</a></p>
+      <p class="auth-switch" id="noAccountLine">Pas encore de compte ? <a href="inscription.html">Créer un compte</a></p>
     </div>
   </div>
 
@@ -131,6 +139,64 @@
     const label = show ? 'Cacher le mot de passe' : 'Afficher le mot de passe';
     this.setAttribute('aria-label', label);
     this.setAttribute('title', label);
+  });
+
+  // Mot de passe oublié : on remplace le formulaire de connexion par un champ e-mail
+  const loginFormEl = document.getElementById('loginForm');
+  const forgotFormEl = document.getElementById('forgotForm');
+  const loginErrorEl = document.getElementById('loginError');
+  const loginSuccessEl = document.getElementById('loginSuccess');
+
+  function showForgot(show) {
+    loginFormEl.style.display = show ? 'none' : '';
+    forgotFormEl.style.display = show ? '' : 'none';
+    document.getElementById('backToLogin').style.display = show ? '' : 'none';
+    document.getElementById('noAccountLine').style.display = show ? 'none' : '';
+    document.getElementById('pageTitle').textContent = show ? 'Mot de passe oublié' : 'Content de vous revoir';
+    document.getElementById('pageSubtitle').textContent = show
+      ? "Indiquez l'adresse e-mail de votre compte. Nous vous envoyons un lien pour choisir un nouveau mot de passe."
+      : 'Connectez-vous pour retrouver vos annonces et vos commandes.';
+    loginErrorEl.style.display = 'none';
+    loginSuccessEl.style.display = 'none';
+    if (show) {
+      document.getElementById('forgotEmail').value = document.getElementById('email').value;
+      document.getElementById('forgotEmail').focus();
+    }
+  }
+  document.getElementById('forgotLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    showForgot(true);
+  });
+  document.getElementById('backToLoginLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    showForgot(false);
+  });
+
+  forgotFormEl.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('forgotBtn');
+    btn.textContent = 'Envoi en cours...';
+    btn.disabled = true;
+    loginErrorEl.style.display = 'none';
+    loginSuccessEl.style.display = 'none';
+
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(
+      document.getElementById('forgotEmail').value.trim(),
+      { redirectTo: window.location.origin + '/nouveau-mot-de-passe.html' }
+    );
+
+    btn.textContent = 'Envoyer le lien';
+    btn.disabled = false;
+
+    if (error) {
+      loginErrorEl.textContent = "Impossible d'envoyer l'e-mail pour le moment. Réessayez dans quelques minutes.";
+      loginErrorEl.style.display = 'block';
+      return;
+    }
+
+    // Même message que l'adresse existe ou non (on ne révèle pas qui a un compte)
+    loginSuccessEl.textContent = "Si un compte existe avec cette adresse, un e-mail vient d'être envoyé. Pensez à regarder dans vos courriers indésirables.";
+    loginSuccessEl.style.display = 'block';
   });
 
   document.getElementById('loginForm').addEventListener('submit', async function (e) {

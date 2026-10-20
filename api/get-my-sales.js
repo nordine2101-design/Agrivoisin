@@ -13,8 +13,151 @@ function parisMonth(iso) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7);
 }
 
+// ---------------------------------------------------------------------------
+// Informations fiscales d'un vendeur particulier (règle européenne DAC7).
+// Agrivoisin les demande quand le vendeur approche des seuils : 20 ventes ou 1 500 € dans l'année.
+// Les professionnels donnent les informations de leur entreprise à l'inscription : rien à leur demander ici.
+// Cette page ne renvoie jamais le contenu des informations, seulement l'état de la demande.
+// ---------------------------------------------------------------------------
+const FISCAL_NEAR_SALES = 20;
+const FISCAL_NEAR_CENTS = 150000;
+
+// Date d'aujourd'hui à Paris, « AAAA-MM-JJ »
+function todayInParis() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+}
+
+// Année civile d'une date, à l'heure de Paris
+function parisYearOf(iso) {
+  return Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric' }).format(new Date(iso)));
+}
+
+// Ventes de l'année de CE vendeur : une vente = un versement, hors versements entièrement remboursés,
+// les remboursements partiels étant retirés du montant (même règle que la page de suivi fiscal de l'administrateur)
+async function loadYearTotals(sellerId) {
+  const year = Number(todayInParis().slice(0, 4));
+  const since = new Date(Date.UTC(year - 1, 11, 30)).toISOString();
+  let salesCount = 0;
+  let totalCents = 0;
+  const PAGE = 1000;
+  for (let page = 0; page < 20; page += 1) {
+    const { data, error } = await supabase
+      .from('payouts')
+      .select('amount_cents, refunded_cents, status, created_at')
+      .eq('seller_id', sellerId)
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+    if (error) throw new Error('Lecture des ventes impossible : ' + error.message);
+    (data || []).forEach((row) => {
+      if (row.status === 'rembourse') return;
+      if (parisYearOf(row.created_at) !== year) return;
+      salesCount += 1;
+      totalCents += Math.max(0, (Number(row.amount_cents) || 0) - (Number(row.refunded_cents) || 0));
+    });
+    if (!data || data.length < PAGE) break;
+  }
+  return { salesCount, totalCents };
+}
+
+// État de la demande d'informations fiscales pour ce vendeur :
+// « none » = rien à demander, « needed » = à renseigner (avec la date de la demande), « received » = déjà reçues.
+// La première fois que le seuil est atteint, la date de la demande est enregistrée.
+async function loadTaxRequest(seller) {
+  if (seller.seller_type === 'professionnel') return { status: 'none' };
+
+  const { data: row, error: rowError } = await supabase
+    .from('seller_tax_info')
+    .select('requested_at, collected_at')
+    .eq('seller_id', seller.id)
+    .maybeSingle();
+  if (rowError) throw new Error('Lecture des informations fiscales impossible : ' + rowError.message);
+
+  if (row && row.collected_at) return { status: 'received', date: row.collected_at };
+
+  let requestedAt = row ? row.requested_at : null;
+  if (!requestedAt) {
+    const totals = await loadYearTotals(seller.id);
+    const reached = totals.salesCount >= FISCAL_NEAR_SALES || totals.totalCents >= FISCAL_NEAR_CENTS;
+    if (!reached) return { status: 'none' };
+
+    requestedAt = new Date().toISOString();
+    const saved = row
+      ? await supabase.from('seller_tax_info').update({ requested_at: requestedAt }).eq('seller_id', seller.id)
+      : await supabase.from('seller_tax_info').insert({ seller_id: seller.id, requested_at: requestedAt });
+    if (saved.error) throw new Error('Enregistrement de la demande impossible : ' + saved.error.message);
+  }
+  return { status: 'needed', date: requestedAt };
+}
+
+// Enregistre les informations fiscales envoyées par le vendeur (seulement si elles lui ont été demandées)
+async function saveTaxInfo(req, res, seller) {
+  if (seller.seller_type === 'professionnel') {
+    return res.status(400).json({ error: "Ces informations ne sont demandées qu'aux vendeurs particuliers." });
+  }
+
+  const body = req.body || {};
+  const clean = (value, max) => String(value == null ? '' : value).replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+
+  const legalName = clean(body.legalName, 120);
+  if (legalName.length < 2 || !/\p{L}/u.test(legalName)) {
+    return res.status(400).json({ error: 'Indiquez votre nom et votre prénom.' });
+  }
+
+  const birthDate = String(body.birthDate == null ? '' : body.birthDate).trim();
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate);
+  const parsed = dateMatch ? new Date(Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]))) : null;
+  const validDate = parsed
+    && parsed.getUTCFullYear() === Number(dateMatch[1])
+    && parsed.getUTCMonth() === Number(dateMatch[2]) - 1
+    && parsed.getUTCDate() === Number(dateMatch[3])
+    && birthDate >= '1900-01-01'
+    && birthDate <= todayInParis();
+  if (!validDate) {
+    return res.status(400).json({ error: 'Indiquez une date de naissance valide.' });
+  }
+
+  const taxId = String(body.taxId == null ? '' : body.taxId).replace(/\s+/g, '');
+  if (taxId && !/^\d{13}$/.test(taxId)) {
+    return res.status(400).json({ error: 'Le numéro fiscal doit comporter 13 chiffres.' });
+  }
+
+  const birthPlace = clean(body.birthPlace, 100);
+  if (!taxId && birthPlace.length < 2) {
+    return res.status(400).json({ error: "Indiquez votre numéro fiscal ou, à défaut, votre lieu de naissance." });
+  }
+
+  const request = await loadTaxRequest(seller);
+  if (request.status === 'received') {
+    return res.status(409).json({ error: 'Vos informations ont déjà été reçues. Pour les modifier, écrivez-nous depuis la page Contact.' });
+  }
+  if (request.status !== 'needed') {
+    return res.status(403).json({ error: "Ces informations ne vous sont pas demandées pour le moment." });
+  }
+
+  const collectedAt = new Date().toISOString();
+  const { error: saveError } = await supabase
+    .from('seller_tax_info')
+    .update({
+      legal_name: legalName,
+      birth_date: birthDate,
+      birth_place: birthPlace || null,
+      tax_country: 'FR',
+      tax_id: taxId || null,
+      collected_at: collectedAt,
+    })
+    .eq('seller_id', seller.id);
+  if (saveError) {
+    console.error('Erreur Supabase (informations fiscales) :', saveError.message);
+    return res.status(500).json({ error: "Impossible d'enregistrer vos informations pour le moment. Réessayez." });
+  }
+
+  return res.status(200).json({ taxInfo: { status: 'received', date: collectedAt } });
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
+  // GET : les ventes du vendeur ; POST : l'envoi de ses informations fiscales
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
 
@@ -37,7 +180,7 @@ export default async function handler(req, res) {
     // Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
       .from('sellers')
-      .select('id')
+      .select('id, seller_type')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -45,6 +188,22 @@ export default async function handler(req, res) {
 
     if (sellerError || !seller) {
       return res.status(400).json({ error: "Aucun compte vendeur trouvé pour ce compte. Devenez d'abord vendeur." });
+    }
+
+    if (req.method === 'POST') {
+      const action = req.body && req.body.action;
+      if (action === 'save_tax_info') {
+        return await saveTaxInfo(req, res, seller);
+      }
+      return res.status(400).json({ error: 'Action inconnue.' });
+    }
+
+    // Demande d'informations fiscales (pas bloquant : si la lecture échoue, la page affiche quand même les ventes)
+    let taxInfo = { status: 'none' };
+    try {
+      taxInfo = await loadTaxRequest(seller);
+    } catch (taxError) {
+      console.error('Informations fiscales :', taxError.message);
     }
 
     // Les articles vendus par CE vendeur (jamais l'identité de l'acheteur)
@@ -58,7 +217,7 @@ export default async function handler(req, res) {
     const orderIds = [...new Set((items || []).map((it) => it.order_id).filter(Boolean))];
 
     if (orderIds.length === 0) {
-      return res.status(200).json({ sales: [] });
+      return res.status(200).json({ sales: [], taxInfo });
     }
 
     // Les ventes les plus récentes d'abord (seulement la date : rien sur l'acheteur)
@@ -182,7 +341,7 @@ export default async function handler(req, res) {
       };
     });
 
-    res.status(200).json({ sales });
+    res.status(200).json({ sales, taxInfo });
 
   } catch (error) {
     console.error(error);

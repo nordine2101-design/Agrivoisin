@@ -409,15 +409,26 @@
       emailDisplay.textContent = '🍏 ' + email;
       emailDisplay.style.color = '#4C7A50';
 
-      // Connecté : « Se connecter » devient « Se déconnecter » et « Créer un compte » disparaît
+      // Connecté : « Se connecter » devient « Se déconnecter » (« Créer un compte » reste visible)
       const loginLink = document.getElementById('loginLink');
-      const signupLink = document.getElementById('signupLink');
       loginLink.textContent = 'Se déconnecter';
       loginLink.setAttribute('href', '#');
-      signupLink.style.display = 'none';
       loginLink.addEventListener('click', async (event) => {
         event.preventDefault();
-        await supabaseClient.auth.signOut();
+        loginLink.textContent = 'Déconnexion...';
+        // On demande la déconnexion à Supabase, mais sans attendre plus de 2 secondes
+        try {
+          await Promise.race([
+            supabaseClient.auth.signOut(),
+            new Promise((resolve) => setTimeout(resolve, 2000)),
+          ]);
+        } catch (e) { /* on continue : on efface la session de ce navigateur ci-dessous */ }
+        // Dans tous les cas, on efface la session enregistrée dans ce navigateur
+        try {
+          Object.keys(localStorage).forEach((key) => {
+            if (key.indexOf('sb-') === 0 && key.indexOf('-auth-token') !== -1) localStorage.removeItem(key);
+          });
+        } catch (e) { /* ignoré */ }
         window.location.href = 'index.html';
       });
     }

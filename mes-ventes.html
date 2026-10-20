@@ -22,6 +22,7 @@
     <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de vos ventes...</p>
     <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous devez être connecté pour voir vos ventes. <a href="connexion.html?retour=mes-ventes.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
     <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;"></p>
+    <div id="taxContainer" style="text-align:left;"></div>
     <p id="noSalesMessage" style="display:none;margin-top:16px;">Vous n'avez pas encore de vente. Elles apparaîtront ici dès qu'un acheteur aura passé commande.</p>
 
     <div id="notSellerSection" style="display:none;margin-top:16px;">
@@ -93,6 +94,7 @@
   const noSalesMessage = document.getElementById('noSalesMessage');
   const notSellerSection = document.getElementById('notSellerSection');
   const salesContainer = document.getElementById('salesContainer');
+  const taxContainer = document.getElementById('taxContainer');
 
   // Protège l'affichage : un titre d'annonce n'est jamais interprété comme du code
   function escapeHtml(value) {
@@ -139,6 +141,84 @@
     const n = Number(value);
     return Number.isInteger(n) ? n + ' €' : formatAmount(n);
   }
+
+  // ---------- Informations fiscales demandées au vendeur particulier (règle européenne DAC7) ----------
+
+  function renderTaxBox(taxInfo) {
+    const status = taxInfo && taxInfo.status;
+
+    if (status === 'received') {
+      taxContainer.innerHTML =
+        '<div class="tax-done"><b>Informations fiscales reçues le ' + escapeHtml(formatDate(taxInfo.date)) + '.</b><br>' +
+        'Merci, vous n\'avez rien d\'autre à faire. Pour les modifier, écrivez-nous depuis la <a href="contact.html">page Contact</a>.</div>';
+      return;
+    }
+
+    if (status !== 'needed') {
+      taxContainer.innerHTML = '';
+      return;
+    }
+
+    taxContainer.innerHTML =
+      '<form class="tax-box" id="taxForm" novalidate>' +
+      '<h2>Informations demandées pour les impôts</h2>' +
+      '<p>La loi oblige Agrivoisin à transmettre à l\'administration fiscale l\'identité des vendeurs et les sommes perçues. ' +
+      'Merci de renseigner ces informations pour continuer à vendre sans interruption. Elles ne sont jamais visibles par les acheteurs.</p>' +
+      '<label for="taxName">Nom et prénom</label>' +
+      '<input id="taxName" type="text" maxlength="120" autocomplete="name">' +
+      '<label for="taxBirthDate">Date de naissance</label>' +
+      '<input id="taxBirthDate" type="date" min="1900-01-01" max="' + new Date().toISOString().slice(0, 10) + '" autocomplete="bday">' +
+      '<label for="taxId">Numéro fiscal (13 chiffres)</label>' +
+      '<input id="taxId" type="text" inputmode="numeric" maxlength="20" autocomplete="off">' +
+      '<p class="hint">Vous ne l\'avez pas ? Indiquez à la place votre lieu de naissance.</p>' +
+      '<label for="taxBirthPlace">Lieu de naissance (si pas de numéro fiscal)</label>' +
+      '<input id="taxBirthPlace" type="text" maxlength="100" autocomplete="off">' +
+      '<p class="tax-error" style="display:none;"></p>' +
+      '<button type="submit" class="btn btn-primary">Envoyer mes informations</button>' +
+      '</form>';
+  }
+
+  taxContainer.addEventListener('submit', async (event) => {
+    if (event.target.id !== 'taxForm') return;
+    event.preventDefault();
+
+    const form = event.target;
+    const errorEl = form.querySelector('.tax-error');
+    const button = form.querySelector('button');
+    const showError = (text) => { errorEl.textContent = text; errorEl.style.display = 'block'; };
+    errorEl.style.display = 'none';
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      showError('Session expirée, reconnectez-vous.');
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Envoi...';
+
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({
+          action: 'save_tax_info',
+          legalName: form.querySelector('#taxName').value,
+          birthDate: form.querySelector('#taxBirthDate').value,
+          taxId: form.querySelector('#taxId').value,
+          birthPlace: form.querySelector('#taxBirthPlace').value,
+        }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
+      renderTaxBox(data.taxInfo);
+    } catch (err) {
+      showError(err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message);
+      button.disabled = false;
+      button.textContent = 'Envoyer mes informations';
+    }
+  });
 
   // État de l'argent pour cette vente
   function renderMoneyBox(payout) {
@@ -271,6 +351,8 @@
         throw new Error(data.error || 'Erreur');
       }
 
+      renderTaxBox(data.taxInfo);
+
       const sales = data.sales || [];
 
       if (sales.length === 0) {
@@ -306,6 +388,17 @@
   .money-total { border-top:1px solid #e6e0d3; margin-top:4px; padding-top:6px; font-weight:700; color:var(--leaf-deep); }
   #salesContainer p.money-note { margin:8px 0 0; font-size:0.8rem; color:#888; line-height:1.4; }
   #salesContainer p.payout-note { font-size:0.85rem; color:#6B5842; margin:0 0 12px; }
+  .tax-box { text-align:left; border:1px solid #F0C48A; background:#FFF6E8; border-radius:12px; padding:14px; margin-bottom:16px; }
+  .tax-box h2 { font-size:1rem; margin:0 0 6px; color:#B26A0B; }
+  .tax-box p { font-size:0.85rem; line-height:1.5; margin:0 0 10px; color:#5b4a35; }
+  .tax-box label { display:block; font-size:0.78rem; font-weight:700; color:var(--leaf-deep); margin:8px 0 3px; }
+  .tax-box input { width:100%; box-sizing:border-box; padding:9px; border:1px solid #ddd; border-radius:8px; font-size:0.9rem; font-family:inherit; }
+  .tax-box p.hint { font-size:0.78rem; color:#888; margin:4px 0 0; }
+  .tax-box p.tax-error { color:#C8352F; font-weight:700; margin:10px 0 0; }
+  .tax-box .btn { margin-top:12px; width:100%; }
+  .tax-box .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .tax-done { text-align:left; border:1px solid #cfe3cf; background:#f6f9f5; border-radius:12px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:#4C7A50; line-height:1.5; }
+  .tax-done a { color:var(--leaf-deep); font-weight:700; }
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
   .money-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }

@@ -15,6 +15,14 @@
   .my-form-box { max-width:420px; margin:0 auto; text-align:left; }
   .my-video { width:500px; flex-shrink:0; position:sticky; top:20px; box-sizing:border-box; padding:10px; background:var(--cream-soft); border-radius:28px; }
   .my-video video { width:480px; height:auto; aspect-ratio:1082 / 720; display:block; border-radius:20px; }
+  .pw-wrap { position:relative; display:flex; flex-direction:column; }
+  .pw-wrap input { width:100%; box-sizing:border-box; padding-right:48px; }
+  .pw-eye { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px; cursor:pointer; display:flex; align-items:center; color:#6B5842; }
+  .pw-eye:focus-visible { outline:2px solid var(--leaf); border-radius:6px; }
+  .pw-eye svg { width:22px; height:22px; display:block; }
+  .pw-eye .eye-off { display:none; }
+  .pw-eye.shown .eye-on { display:none; }
+  .pw-eye.shown .eye-off { display:block; }
 </style>
 </head>
 <body>
@@ -34,7 +42,13 @@
         <input type="email" id="email" placeholder="vous@exemple.com" required>
 
         <label for="password">Mot de passe</label>
-        <input type="password" id="password" placeholder="••••••••" required>
+        <div class="pw-wrap">
+          <input type="password" id="password" placeholder="••••••••" required>
+          <button type="button" class="pw-eye" id="pwEye" aria-label="Afficher le mot de passe" title="Afficher le mot de passe">
+            <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
 
         <a href="#" class="auth-link-inline">Mot de passe oublié ?</a>
 
@@ -107,6 +121,17 @@
   // Seul un nom de page du site est accepté, jamais une adresse extérieure.
   const returnParam = new URLSearchParams(window.location.search).get('retour');
   const returnPage = returnParam && /^[a-zA-Z0-9-]+\.html$/.test(returnParam) ? returnParam : 'index.html';
+
+  // Œil du mot de passe : afficher / cacher le code
+  document.getElementById('pwEye').addEventListener('click', function () {
+    const input = document.getElementById('password');
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    this.classList.toggle('shown', show);
+    const label = show ? 'Cacher le mot de passe' : 'Afficher le mot de passe';
+    this.setAttribute('aria-label', label);
+    this.setAttribute('title', label);
+  });
 
   document.getElementById('loginForm').addEventListener('submit', async function (e) {
     e.preventDefault();

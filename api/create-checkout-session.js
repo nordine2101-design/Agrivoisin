@@ -31,6 +31,35 @@ function unitLabel(unit, count) {
   return pluralWord(u);
 }
 
+// L'adresse de livraison de l'acheteur (expédition) : on ne se fie jamais au navigateur, tout est vérifié ici.
+// Renvoie { address } (adresse propre) ou { error }.
+function cleanText(value, max) {
+  return typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '';
+}
+
+function validateShippingAddress(input) {
+  if (!input || typeof input !== 'object') {
+    return { error: 'Indiquez votre adresse de livraison pour commander avec expédition.' };
+  }
+  const name = cleanText(input.name, 100);
+  const street = cleanText(input.address, 150);
+  const address2 = cleanText(input.address2, 100);
+  const postalCode = cleanText(input.postal_code, 10);
+  const city = cleanText(input.city, 80);
+  const phone = cleanText(input.phone, 30);
+
+  if (name.length < 2) return { error: 'Adresse de livraison : indiquez votre nom et prénom.' };
+  if (street.length < 5) return { error: 'Adresse de livraison : indiquez votre adresse.' };
+  if (!/^\d{5}$/.test(postalCode)) return { error: 'Adresse de livraison : le code postal doit comporter 5 chiffres.' };
+  if (city.length < 2) return { error: 'Adresse de livraison : indiquez votre ville.' };
+  const digits = phone.replace(/[\s.\-()]/g, '');
+  if (!/^(\+33|0033|0)[1-9]\d{8}$/.test(digits)) {
+    return { error: 'Adresse de livraison : indiquez un numéro de téléphone français valide (pour le transporteur).' };
+  }
+
+  return { address: { name, address: street, address2, postal_code: postalCode, city, country: 'France', phone } };
+}
+
 // Date d'aujourd'hui à Paris, « AAAA-MM-JJ »
 function todayInParis() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
@@ -81,7 +110,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { cart } = req.body;
+    const { cart, delivery } = req.body;
 
     // Le paiement est réservé aux personnes connectées
     const authHeader = req.headers.authorization || '';
@@ -121,7 +150,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
+      .select('id, title, price, unit, quantity_available, delivery_mode, shipping_tiers, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
       .in('id', listingIds);
 
     if (listingsError) {
@@ -194,6 +223,40 @@ export default async function handler(req, res) {
 
     if (stockProblems.length > 0) {
       return res.status(409).json({ error: stockProblems.join(' ') });
+    }
+
+    // L'expédition : pour chaque annonce, le mode de remise est celui du vendeur (retrait, expédition, ou les deux au choix de
+    // l'acheteur). Les frais viennent des paliers de l'annonce, selon la quantité commandée (relue plus haut, jamais crue sur parole).
+    const choices = delivery && typeof delivery === 'object' && delivery.choices && typeof delivery.choices === 'object' ? delivery.choices : {};
+    const shippingFees = {};
+    const shippingLines = [];
+    for (const key of Object.keys(requested)) {
+      const listing = listingsById[key];
+      const mode = listing.delivery_mode === 'expedition' || listing.delivery_mode === 'les_deux' ? listing.delivery_mode : 'retrait';
+      const shipped = mode === 'expedition' || (mode === 'les_deux' && choices[key] === 'expedition');
+      if (!shipped) continue;
+
+      const quantity = requested[key];
+      const tiers = Array.isArray(listing.shipping_tiers) ? listing.shipping_tiers : [];
+      const tier = tiers.find((t) => quantity >= Number(t.min) && quantity <= Number(t.max));
+      const title = String(listing.title || 'cette annonce').slice(0, 60);
+      if (!tier || !Number.isFinite(Number(tier.price)) || Number(tier.price) < 0) {
+        return res.status(400).json({
+          error: `Les frais d'expédition de « ${title} » ne sont pas disponibles pour ${quantity} ${unitLabel(listing.unit, quantity)}. Modifiez la quantité ou choisissez le retrait.`,
+        });
+      }
+      const feeCents = Math.round(Number(tier.price) * 100);
+      shippingFees[key] = feeCents;
+      shippingLines.push({ listing, quantity, feeCents });
+    }
+
+    let shippingAddress = null;
+    if (shippingLines.length > 0) {
+      const checked = validateShippingAddress(delivery && delivery.address);
+      if (checked.error) {
+        return res.status(400).json({ error: checked.error });
+      }
+      shippingAddress = checked.address;
     }
 
     // Les lots : pour chaque annonce, autant de lots complets que possible (3 kg pour 7 €, 6 kg = 2 lots),
@@ -288,6 +351,22 @@ export default async function handler(req, res) {
       }
     });
 
+    // Les frais d'expédition : une ligne par annonce expédiée (un frais à 0 € n'a pas de ligne de paiement)
+    shippingLines.forEach(({ listing, quantity, feeCents }) => {
+      if (feeCents <= 0) return;
+      lineItems.push({
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: `Expédition — ${listing.title || 'Récolte Agrivoisin'}`.slice(0, 120),
+            description: `Frais d'expédition pour ${quantity} ${unitLabel(listing.unit, quantity)}`,
+          },
+          unit_amount: feeCents,
+        },
+        quantity: 1,
+      });
+    });
+
     // Les frais de service de l'acheteur : une seule ligne par commande, même avec plusieurs vendeurs
     lineItems.push({
       price_data: {
@@ -311,7 +390,11 @@ export default async function handler(req, res) {
 
     const { data: savedCart, error: cartError } = await supabase
       .from('checkout_carts')
-      .insert({ buyer_id: buyerId, lines: cartLines })
+      .insert({
+        buyer_id: buyerId,
+        lines: cartLines,
+        shipping: shippingAddress ? { address: shippingAddress, fees: shippingFees } : null,
+      })
       .select('id')
       .single();
 

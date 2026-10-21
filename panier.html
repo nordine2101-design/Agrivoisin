@@ -27,6 +27,32 @@
     <div id="cartContent" style="display:none;text-align:left;">
       <div id="cartItems" class="cart-items-list" style="margin-bottom:20px;"></div>
 
+      <div id="addrBox" class="addr-box" style="display:none;">
+        <div class="cart-ship-title">Adresse de livraison</div>
+        <label for="addrName">Nom et prénom</label>
+        <input id="addrName" type="text" maxlength="100" autocomplete="name">
+        <label for="addrStreet">Adresse</label>
+        <input id="addrStreet" type="text" maxlength="150" autocomplete="address-line1">
+        <label for="addrStreet2">Complément d'adresse (facultatif)</label>
+        <input id="addrStreet2" type="text" maxlength="100" autocomplete="address-line2">
+        <div class="addr-row">
+          <div>
+            <label for="addrPostal">Code postal</label>
+            <input id="addrPostal" type="text" inputmode="numeric" maxlength="5" autocomplete="postal-code">
+          </div>
+          <div style="flex:2;">
+            <label for="addrCity">Ville</label>
+            <input id="addrCity" type="text" maxlength="80" autocomplete="address-level2">
+          </div>
+        </div>
+        <label for="addrCountry">Pays</label>
+        <input id="addrCountry" type="text" value="France" disabled>
+        <label for="addrPhone">Téléphone (pour le transporteur)</label>
+        <input id="addrPhone" type="tel" maxlength="30" autocomplete="tel">
+        <p class="addr-note">Ces informations sont transmises uniquement au vendeur, pour expédier votre commande.</p>
+        <p id="addrError" class="addr-error" style="display:none;" role="alert"></p>
+      </div>
+
       <div class="cart-summary" style="max-width:none;margin-left:0;padding:20px;">
         <div class="cart-summary-row">
           <span>Sous-total</span>
@@ -46,7 +72,6 @@
         </div>
 
         <p id="cartMinNote" class="cart-min-note" style="display:none;"></p>
-        <p id="cartShipNote" class="cart-min-note" style="display:none;"></p>
         <label class="cart-terms" style="display:flex;align-items:flex-start;gap:10px;margin:16px 0 10px;font-size:0.9rem;line-height:1.5;cursor:pointer;text-align:left;">
           <input type="checkbox" id="acceptCartTerms" style="width:auto;margin:4px 0 0;flex-shrink:0;">
           <span>J'ai lu et j'accepte les <a href="cgv.html" target="_blank" rel="noopener" style="text-decoration:underline;">conditions générales</a>.</span>
@@ -141,6 +166,15 @@
   .cart-ship-fee { margin-top:4px; font-weight:700; color:var(--leaf-deep); }
   .cart-ship-fee span { font-weight:400; }
   .cart-ship-sub { font-size:0.8rem; color:#6B5842; margin-top:2px; }
+  .addr-box { margin:0 0 20px; padding:18px; border-radius:16px; background:var(--white); border:2px solid #9FC49A; }
+  .addr-box label { display:block; font-size:0.8rem; font-weight:700; color:var(--leaf-deep); margin:0 0 4px; }
+  .addr-box input { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #e6e0d3; border-radius:12px; font:inherit; font-size:0.95rem; margin:0 0 10px; background:#fff; color:#3d3a35; }
+  .addr-box input:disabled { background:#f7f6f2; color:#6B5842; }
+  .addr-box input.addr-invalid { border-color:#C8352F; }
+  .addr-row { display:flex; gap:10px; }
+  .addr-row > div { flex:1; }
+  .addr-box p.addr-note { font-size:0.8rem; color:#6B5842; margin:2px 0 0; }
+  .addr-box p.addr-error { font-size:0.88rem; font-weight:600; color:#C8352F; margin:10px 0 0; }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(
@@ -261,18 +295,13 @@
   let isLoggedIn = null;
   let cartHasProblem = false;
   let belowMinimum = false;
-  // Le paiement avec expédition n'est pas encore ouvert : on bloque le bouton plutôt que de facturer sans les frais
-  let shipBlocked = false;
-  const SHIP_LABEL = 'Paiement avec expédition : bientôt disponible';
+  let anyShipping = false;
 
   function updateCheckoutButton() {
     const btn = document.getElementById('checkoutBtn');
     if (cartHasProblem) {
       btn.disabled = true;
       btn.textContent = FIX_LABEL;
-    } else if (shipBlocked) {
-      btn.disabled = true;
-      btn.textContent = SHIP_LABEL;
     } else if (belowMinimum) {
       // Sous le minimum : le bouton ne paie pas, il ramène vers les annonces pour ajouter des articles
       btn.disabled = false;
@@ -534,17 +563,11 @@
 
     cartHasProblem = problem;
     belowMinimum = totalCents < MIN_ORDER_CENTS;
-    shipBlocked = anyShip;
+    anyShipping = anyShip;
     updateCheckoutButton();
 
-    // Expédition choisie : le paiement n'est pas encore ouvert, on le dit clairement
-    const shipNote = document.getElementById('cartShipNote');
-    if (anyShip) {
-      shipNote.textContent = 'Le paiement avec expédition sera disponible très bientôt. Pour payer maintenant, choisissez le retrait.';
-      shipNote.style.display = 'block';
-    } else {
-      shipNote.style.display = 'none';
-    }
+    // L'adresse de livraison n'est demandée que si au moins une annonce est expédiée
+    document.getElementById('addrBox').style.display = anyShip ? 'block' : 'none';
 
     // Les adresses des vendeurs ne sont communiquées que pour les retraits
     document.getElementById('cartTrustNote').style.display = anyPickup ? '' : 'none';
@@ -597,8 +620,58 @@
     updateCheckoutButton();
   });
 
+  // ---------- L'adresse de livraison : gardée le temps de la visite (jamais en dehors de cet onglet) ----------
+  const addrFields = {
+    name: document.getElementById('addrName'),
+    address: document.getElementById('addrStreet'),
+    address2: document.getElementById('addrStreet2'),
+    postal_code: document.getElementById('addrPostal'),
+    city: document.getElementById('addrCity'),
+    phone: document.getElementById('addrPhone'),
+  };
+  const addrError = document.getElementById('addrError');
+
+  try {
+    const savedAddr = JSON.parse(sessionStorage.getItem('agrivoisin_address') || '{}');
+    Object.keys(addrFields).forEach((k) => { if (savedAddr && typeof savedAddr[k] === 'string') addrFields[k].value = savedAddr[k]; });
+  } catch (e) {}
+
+  Object.keys(addrFields).forEach((k) => {
+    addrFields[k].addEventListener('input', () => {
+      addrFields[k].classList.remove('addr-invalid');
+      addrError.style.display = 'none';
+      try {
+        const data = {};
+        Object.keys(addrFields).forEach((key) => { data[key] = addrFields[key].value; });
+        sessionStorage.setItem('agrivoisin_address', JSON.stringify(data));
+      } catch (e) {}
+    });
+  });
+
+  // Vérifie l'adresse saisie : { address } ou { error, field }
+  function readAddress() {
+    Object.keys(addrFields).forEach((k) => addrFields[k].classList.remove('addr-invalid'));
+    const value = (k) => addrFields[k].value.replace(/\s+/g, ' ').trim();
+    const address = {
+      name: value('name'),
+      address: value('address'),
+      address2: value('address2'),
+      postal_code: value('postal_code'),
+      city: value('city'),
+      phone: value('phone'),
+    };
+    if (address.name.length < 2) return { error: 'Indiquez votre nom et prénom.', field: addrFields.name };
+    if (address.address.length < 5) return { error: 'Indiquez votre adresse.', field: addrFields.address };
+    if (!/^\d{5}$/.test(address.postal_code)) return { error: 'Le code postal doit comporter 5 chiffres.', field: addrFields.postal_code };
+    if (address.city.length < 2) return { error: 'Indiquez votre ville.', field: addrFields.city };
+    if (!/^(\+33|0033|0)[1-9]\d{8}$/.test(address.phone.replace(/[\s.\-()]/g, ''))) {
+      return { error: 'Indiquez un numéro de téléphone français valide (pour le transporteur).', field: addrFields.phone };
+    }
+    return { address };
+  }
+
   checkoutBtn.addEventListener('click', async () => {
-    if (cartHasProblem || shipBlocked) return;
+    if (cartHasProblem) return;
 
     // Sous le minimum : aucun paiement, on va ajouter des articles (le panier est conservé)
     if (belowMinimum) {
@@ -625,6 +698,30 @@
     termsError.style.display = 'none';
 
     const cart = getCart();
+
+    // Expédition : l'adresse de livraison doit être complète (le serveur la vérifie aussi)
+    let delivery = null;
+    if (anyShipping) {
+      const checked = readAddress();
+      if (checked.error) {
+        addrError.textContent = checked.error;
+        addrError.style.display = 'block';
+        if (checked.field) {
+          checked.field.classList.add('addr-invalid');
+          checked.field.focus();
+        }
+        return;
+      }
+      addrError.style.display = 'none';
+      // Le choix retrait / expédition, pour les annonces du panier seulement
+      const saved = getDelivery();
+      const choices = {};
+      cart.forEach((item) => {
+        if (item.listingId && saved[String(item.listingId)]) choices[String(item.listingId)] = saved[String(item.listingId)];
+      });
+      delivery = { choices, address: checked.address };
+    }
+
     checkoutBtn.textContent = 'Redirection en cours...';
     checkoutBtn.disabled = true;
 
@@ -635,7 +732,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ cart }),
+        body: JSON.stringify({ cart, delivery }),
       });
 
       // Session expirée : retour par la connexion

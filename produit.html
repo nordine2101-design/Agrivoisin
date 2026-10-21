@@ -29,6 +29,11 @@
         <p style="font-size:0.75rem;font-weight:700;color:var(--leaf-deep);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.05em;">Horaires de retrait</p>
         <div id="listingPickupLines" style="font-size:0.9rem;line-height:1.7;"></div>
       </div>
+      <div id="listingShip" style="display:none;margin-bottom:18px;padding:12px 14px;border-radius:12px;background:var(--cream-soft);text-align:left;">
+        <p style="font-size:0.75rem;font-weight:700;color:var(--leaf-deep);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.05em;">Expédition par le vendeur</p>
+        <div id="listingShipLines" style="font-size:0.9rem;line-height:1.7;"></div>
+        <p id="listingShipNote" style="font-size:0.8rem;color:#6B5842;margin:8px 0 0;"></p>
+      </div>
       <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
       <p style="margin-bottom:22px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span><span id="listingLot" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
       <p id="listingStock" style="display:none;margin:-10px 0 18px;font-weight:700;"></p>
@@ -38,7 +43,7 @@
       <a id="viewCartLink" href="panier.html" style="display:none;margin-top:14px;font-weight:700;color:var(--leaf-deep);">Voir mon panier</a>
       <p style="margin:14px 0 0;text-align:center;"><a href="#" id="reportOpenLink" style="font-size:0.82rem;color:#8a7a62;text-decoration:underline;text-underline-offset:2px;">Signaler cette annonce</a></p>
 
-      <p class="product-trust-note" style="margin-top:20px;text-align:left;">
+      <p class="product-trust-note" id="listingTrustNote" style="margin-top:20px;text-align:left;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:20px;height:20px;flex-shrink:0;"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
         <span>L'adresse du vendeur vous sera communiquée automatiquement après confirmation du paiement.</span>
       </p>
@@ -364,8 +369,11 @@
 
     renderSellerRating(item.seller_rating);
 
+    // Mode de remise choisi par le vendeur : retrait (par défaut, anciennes annonces), expédition, ou les deux
+    const deliveryMode = item.delivery_mode === 'expedition' || item.delivery_mode === 'les_deux' ? item.delivery_mode : 'retrait';
+
     const pickupLines = pickupGroups(item.listing_pickup_hours);
-    if (pickupLines.length > 0) {
+    if (pickupLines.length > 0 && deliveryMode !== 'expedition') {
       const linesEl = document.getElementById('listingPickupLines');
       linesEl.innerHTML = '';
       pickupLines.forEach((line) => {
@@ -377,6 +385,35 @@
         linesEl.appendChild(row);
       });
       document.getElementById('listingPickup').style.display = 'block';
+    }
+
+    // Frais d'expédition par palier de quantité : « 1 à 2 bocaux : 5,00 € »
+    const tiers = Array.isArray(item.shipping_tiers) ? item.shipping_tiers : [];
+    if (deliveryMode !== 'retrait' && tiers.length > 0) {
+      const shipLinesEl = document.getElementById('listingShipLines');
+      shipLinesEl.innerHTML = '';
+      tiers.forEach((tier) => {
+        const min = Number(tier.min);
+        const max = Number(tier.max);
+        const range = min === max
+          ? min + ' ' + unitLabel(item.unit, min)
+          : min + ' à ' + max + ' ' + unitLabel(item.unit, max);
+        const row = document.createElement('div');
+        const rangeEl = document.createElement('strong');
+        rangeEl.textContent = range;
+        row.appendChild(rangeEl);
+        row.appendChild(document.createTextNode(' : ' + Number(tier.price).toFixed(2).replace('.', ',') + ' €'));
+        shipLinesEl.appendChild(row);
+      });
+      document.getElementById('listingShipNote').textContent = deliveryMode === 'les_deux'
+        ? "Frais d'expédition par commande. Vous choisirez retrait ou expédition dans votre panier."
+        : "Frais d'expédition par commande.";
+      document.getElementById('listingShip').style.display = 'block';
+    }
+
+    // Sans retrait, l'adresse du vendeur n'est pas communiquée : on ne l'annonce pas
+    if (deliveryMode === 'expedition') {
+      document.getElementById('listingTrustNote').style.display = 'none';
     }
 
     const descEl = document.getElementById('listingDescription');

@@ -19,6 +19,8 @@ function commissionCents(amountCents, sellerType) {
   return Math.round((amountCents * commissionPercentFor(sellerType)) / 100);
 }
 
+// Forfait d'Agrivoisin sur les frais d'expédition : 0,50 € par commande expédiée et par vendeur (jamais plus que les frais eux-mêmes)
+const SHIPPING_FLAT_FEE_CENTS = 50;
 const SHIPPED_RELEASE_DAYS = 30; // délai de sécurité avant le versement d'une commande expédiée (le colis doit partir avant)
 const AUTO_RELEASE_DAYS = 3;  // délai avant le versement automatique au vendeur (annonces sans horaires de retrait)
 const PICKUP_RELEASE_DELAY_MS = 48 * 60 * 60 * 1000; // avec horaires : libération 48 h après la fin du créneau de retrait
@@ -412,7 +414,7 @@ export default async function handler(req, res) {
         const pickupListingIds = sellerListingIds.filter((id) => !(String(id) in shippingFees));
         const shippedListingIds = sellerListingIds.filter((id) => String(id) in shippingFees);
         const pickupWindow = computePickupWindow(pickupListingIds, slotsByListing, purchaseMs);
-        // Les frais d'expédition de ce vendeur : ils lui sont reversés en entier (sans commission)
+        // Les frais d'expédition de ce vendeur : ils lui sont reversés, moins le forfait de 0,50 € par commande
         const sellerShippingCents = shippedListingIds.reduce((sum, id) => sum + (servedShippingFees[id] || 0), 0);
         // Une commande expédiée n'est pas libérée à la date d'un retrait : on laisse 30 jours, le temps que le vendeur envoie le colis
         let releaseAt = pickupWindow ? pickupWindow.release.toISOString() : legacyReleaseAt;
@@ -425,7 +427,8 @@ export default async function handler(req, res) {
           seller_id: sellerId,
           amount_cents: amount,
           shipping_cents: sellerShippingCents,
-          commission_cents: commissionCents(amount, sellerTypes[sellerId]),
+          // La commission sur les produits, plus le forfait de 0,50 € si le vendeur expédie (plafonné aux frais d'expédition)
+          commission_cents: commissionCents(amount, sellerTypes[sellerId]) + (sellerShippingCents > 0 ? Math.min(SHIPPING_FLAT_FEE_CENTS, sellerShippingCents) : 0),
           stripe_fee_cents: totalCardFee !== null && chargedTotalCents > 0 ? Math.floor((totalCardFee * (amount + sellerShippingCents)) / chargedTotalCents) : null,
           stripe_charge_id: chargeId,
           status: 'en_attente',

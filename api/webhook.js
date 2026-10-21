@@ -19,6 +19,7 @@ function commissionCents(amountCents, sellerType) {
   return Math.round((amountCents * commissionPercentFor(sellerType)) / 100);
 }
 
+const SHIPPED_RELEASE_DAYS = 30; // délai de sécurité avant le versement d'une commande expédiée (le colis doit partir avant)
 const AUTO_RELEASE_DAYS = 3;  // délai avant le versement automatique au vendeur (annonces sans horaires de retrait)
 const PICKUP_RELEASE_DELAY_MS = 48 * 60 * 60 * 1000; // avec horaires : libération 48 h après la fin du créneau de retrait
 
@@ -119,29 +120,45 @@ function readServiceFee(session) {
   return Number.isInteger(value) && value >= 0 && value <= 100 ? value : 0;
 }
 
-// Retrouve les articles d'un paiement : [{ listing_id, seller_id, cents }]
+// Les frais d'expédition rangés avec le panier : { identifiant de l'annonce : centimes }.
+// Une annonce présente dans cette liste est expédiée (même à 0 centime) ; les autres sont en retrait.
+function readShippingFees(shipping) {
+  const fees = {};
+  const raw = shipping && typeof shipping === 'object' ? shipping.fees : null;
+  if (raw && typeof raw === 'object') {
+    Object.entries(raw).forEach(([listingId, cents]) => {
+      if (Number.isInteger(cents) && cents >= 0 && cents <= 50000) {
+        fees[listingId] = cents;
+      }
+    });
+  }
+  return fees;
+}
+
+// Retrouve les articles d'un paiement : { lines: [{ listing_id, seller_id, cents }], shipping } (shipping : adresse et frais, ou null)
 async function loadLines(session) {
   const cartId = session.metadata?.cart_id;
 
   if (cartId) {
     const { data, error } = await supabase
       .from('checkout_carts')
-      .select('lines')
+      .select('lines, shipping')
       .eq('id', cartId)
       .single();
 
     if (error || !data) {
       throw new Error('Panier introuvable (' + cartId + ') : ' + (error ? error.message : 'aucune ligne'));
     }
-    return Array.isArray(data.lines) ? data.lines : [];
+    return { lines: Array.isArray(data.lines) ? data.lines : [], shipping: data.shipping || null };
   }
 
   // Anciens paiements (faits avant ce changement) : le détail était dans le message de Stripe
   const itemsRaw = session.metadata?.items || '';
-  return itemsRaw.split(',').filter(Boolean).map((entry) => {
+  const oldLines = itemsRaw.split(',').filter(Boolean).map((entry) => {
     const [listing_id, seller_id, amount] = entry.split(':');
     return { listing_id, seller_id, cents: parseInt(amount, 10) };
   });
+  return { lines: oldLines, shipping: null };
 }
 
 // Retire une commande qui n'a pas pu être enregistrée en entier, et remet en stock ce qui avait été pris.
@@ -228,8 +245,9 @@ export default async function handler(req, res) {
 
     // 1. Retrouver les articles de ce paiement
     let lines;
+    let shipping = null;
     try {
-      lines = await loadLines(session);
+      ({ lines, shipping } = await loadLines(session));
     } catch (err) {
       console.error('Erreur lecture du panier :', err.message);
       // Stripe réessaiera plus tard
@@ -247,6 +265,11 @@ export default async function handler(req, res) {
 
     const serviceFeeCents = readServiceFee(session);
 
+    // Les frais d'expédition (par annonce expédiée) et l'adresse de livraison de l'acheteur
+    const shippingFees = readShippingFees(shipping);
+    const hasShipping = Object.keys(shippingFees).length > 0;
+    const shippingTotalCents = Object.values(shippingFees).reduce((sum, c) => sum + c, 0);
+
     // 2. Anti-doublon : on réserve la commande avec l'identifiant du paiement Stripe.
     //    Si ce paiement a déjà été traité, la base refuse (identifiant déjà présent) et on s'arrête là.
     const { data: order, error: orderError } = await supabase
@@ -256,6 +279,7 @@ export default async function handler(req, res) {
         total_amount: session.amount_total / 100,
         service_fee_cents: serviceFeeCents,
         stripe_session_id: session.id,
+        shipping_address: hasShipping && shipping.address && typeof shipping.address === 'object' ? shipping.address : null,
       })
       .select()
       .single();
@@ -271,8 +295,8 @@ export default async function handler(req, res) {
 
     // Petite vérification de cohérence (informative)
     const linesTotal = lines.reduce((sum, l) => sum + l.cents, 0);
-    if (linesTotal + serviceFeeCents !== session.amount_total) {
-      console.warn(`Paiement ${session.id} : total des articles (${linesTotal}) et frais de service (${serviceFeeCents}) différents du montant payé (${session.amount_total}).`);
+    if (linesTotal + serviceFeeCents + shippingTotalCents !== session.amount_total) {
+      console.warn(`Paiement ${session.id} : total des articles (${linesTotal}), frais de service (${serviceFeeCents}) et frais d'expédition (${shippingTotalCents}) différents du montant payé (${session.amount_total}).`);
     }
 
     // 3. Le stock : on prend les unités achetées (jamais plus que ce qui reste)
@@ -290,7 +314,19 @@ export default async function handler(req, res) {
 
     // Les articles réellement servis, et ce qu'il faudra rembourser pour les autres
     const servedLines = lines.filter((_, i) => !stock.missing.has(i));
-    const refundCents = lines.reduce((sum, l, i) => sum + (stock.missing.has(i) ? l.cents : 0), 0);
+    // Une annonce expédiée dont plus aucune unité n'est servie : ses frais d'expédition sont remboursés aussi
+    const servedListingIds = new Set(servedLines.map((l) => String(l.listing_id)));
+    const servedShippingFees = {};
+    let unservedShippingCents = 0;
+    Object.entries(shippingFees).forEach(([listingId, cents]) => {
+      if (servedListingIds.has(String(listingId))) {
+        servedShippingFees[listingId] = cents;
+      } else {
+        unservedShippingCents += cents;
+      }
+    });
+    const servedShippingTotal = Object.values(servedShippingFees).reduce((sum, c) => sum + c, 0);
+    const refundCents = lines.reduce((sum, l, i) => sum + (stock.missing.has(i) ? l.cents : 0), 0) + unservedShippingCents;
 
     // 4. Retrouver le paiement (charge) chez Stripe : il servira au versement plus tard
     let chargeId = null;
@@ -308,7 +344,7 @@ export default async function handler(req, res) {
     // Les VRAIS frais de Stripe sur ce paiement, connus dès que l'acheteur a payé : chaque vendeur en verra
     // sa part tout de suite (jamais une supposition). Si Stripe ne donne pas le chiffre, on note « inconnu »
     // et le versement le relèvera plus tard. Jamais bloquant.
-    const servedTotalCents = servedLines.reduce((sum, l) => sum + l.cents, 0);
+    const servedTotalCents = servedLines.reduce((sum, l) => sum + l.cents, 0) + servedShippingTotal;
     let totalCardFee = null;
     let chargedTotalCents = null;
     try {
@@ -329,11 +365,14 @@ export default async function handler(req, res) {
     // libération automatique. Jamais bloquant : si la lecture échoue, la règle de 3 jours s'applique.
     const slotsByListing = {};
     try {
-      const servedListingIds = [...new Set(servedLines.map((l) => l.listing_id))];
-      const { data: slotRows, error: slotsError } = await supabase
-        .from('listing_pickup_hours')
-        .select('listing_id, day_of_week, start_time, end_time')
-        .in('listing_id', servedListingIds);
+      // Seules les annonces retirées chez le vendeur ont des horaires qui comptent
+      const pickupListingIds = [...new Set(servedLines.map((l) => l.listing_id).filter((id) => !(String(id) in shippingFees)))];
+      const { data: slotRows, error: slotsError } = pickupListingIds.length === 0
+        ? { data: [], error: null }
+        : await supabase
+          .from('listing_pickup_hours')
+          .select('listing_id, day_of_week, start_time, end_time')
+          .in('listing_id', pickupListingIds);
       if (slotsError) {
         throw new Error(slotsError.message);
       }
@@ -370,18 +409,29 @@ export default async function handler(req, res) {
 
       const payouts = Object.entries(amountBySeller).map(([sellerId, amount]) => {
         const sellerListingIds = [...new Set(servedLines.filter((l) => l.seller_id === sellerId).map((l) => l.listing_id))];
-        const pickupWindow = computePickupWindow(sellerListingIds, slotsByListing, purchaseMs);
+        const pickupListingIds = sellerListingIds.filter((id) => !(String(id) in shippingFees));
+        const shippedListingIds = sellerListingIds.filter((id) => String(id) in shippingFees);
+        const pickupWindow = computePickupWindow(pickupListingIds, slotsByListing, purchaseMs);
+        // Les frais d'expédition de ce vendeur : ils lui sont reversés en entier (sans commission)
+        const sellerShippingCents = shippedListingIds.reduce((sum, id) => sum + (servedShippingFees[id] || 0), 0);
+        // Une commande expédiée n'est pas libérée à la date d'un retrait : on laisse 30 jours, le temps que le vendeur envoie le colis
+        let releaseAt = pickupWindow ? pickupWindow.release.toISOString() : legacyReleaseAt;
+        if (shippedListingIds.length > 0) {
+          const shippedRelease = new Date(Date.now() + SHIPPED_RELEASE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+          releaseAt = releaseAt > shippedRelease ? releaseAt : shippedRelease;
+        }
         return {
           order_id: order.id,
           seller_id: sellerId,
           amount_cents: amount,
+          shipping_cents: sellerShippingCents,
           commission_cents: commissionCents(amount, sellerTypes[sellerId]),
-          stripe_fee_cents: totalCardFee !== null && chargedTotalCents > 0 ? Math.floor((totalCardFee * amount) / chargedTotalCents) : null,
+          stripe_fee_cents: totalCardFee !== null && chargedTotalCents > 0 ? Math.floor((totalCardFee * (amount + sellerShippingCents)) / chargedTotalCents) : null,
           stripe_charge_id: chargeId,
           status: 'en_attente',
           // Avec horaires de retrait : libération 48 h après la fin du créneau, signalement possible dès son début.
           // Sans horaires : la règle de 3 jours, et aucune attente avant de signaler.
-          auto_release_at: pickupWindow ? pickupWindow.release.toISOString() : legacyReleaseAt,
+          auto_release_at: releaseAt,
           pickup_start_at: pickupWindow ? pickupWindow.start.toISOString() : null,
         };
       });
@@ -398,6 +448,7 @@ export default async function handler(req, res) {
           listing_id: l.listing_id,
           seller_id: l.seller_id,
           price_at_purchase: l.cents / 100,
+          delivery_mode: String(l.listing_id) in shippingFees ? 'expedition' : 'retrait',
         }));
 
         const { error: itemsError } = await supabase.from('order_items').insert(items);

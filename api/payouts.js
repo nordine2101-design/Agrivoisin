@@ -121,22 +121,26 @@ async function releasePayout(payoutId, fromStatuses, restoreStatus = 'en_attente
 
     const { data: siblings, error: siblingsError } = await supabase
       .from('payouts')
-      .select('amount_cents')
+      .select('amount_cents, shipping_cents')
       .eq('order_id', payout.order_id);
 
     if (siblingsError || !siblings || siblings.length === 0) {
       throw new Error('Versements de la commande illisibles');
     }
 
-    const orderTotal = siblings.reduce((sum, p) => sum + p.amount_cents, 0);
+    // Les frais d'expédition (reversés en entier au vendeur, sans commission) font partie de ce que l'acheteur a payé
+    const orderTotal = siblings.reduce((sum, p) => sum + p.amount_cents + (Number(p.shipping_cents) || 0), 0);
+    const shippingCents = Number(payout.shipping_cents) || 0;
     // Chaque vendeur paie sa part des frais de carte, au prorata du montant TOTAL payé par l'acheteur
     // (articles + frais de service). Agrivoisin garde à sa charge la part des frais de service de l'acheteur
     // et des articles remboursés. Pour une ancienne commande (sans frais de service), le total payé
     // est la somme des articles : le calcul est le même qu'avant.
     const chargedTotal = Math.max(Number(charge.amount) || 0, orderTotal);
     // Arrondi vers le bas : le vendeur ne paie jamais plus que sa part
-    const feeShare = chargedTotal > 0 ? Math.floor((totalFee * payout.amount_cents) / chargedTotal) : 0;
-    const beforeMonthlyFee = payout.amount_cents - payout.commission_cents - feeShare;
+    // La part des frais de carte du vendeur porte sur ses produits ET sur ses frais d'expédition
+    const feeShare = chargedTotal > 0 ? Math.floor((totalFee * (payout.amount_cents + shippingCents)) / chargedTotal) : 0;
+    // La commission ne porte que sur les produits : les frais d'expédition lui sont reversés en entier
+    const beforeMonthlyFee = payout.amount_cents + shippingCents - payout.commission_cents - feeShare;
 
     // Les 2 € de frais de service vendeur actif : une seule fois par vendeur et par mois,
     // prélevés sur ce versement sans jamais dépasser ce qu'il rapporte (le reste, s'il y en a un,
@@ -262,7 +266,7 @@ const uniqueValues = (values) => [...new Set(values.filter(Boolean))];
 async function adminList() {
   const { data: problems, error: problemsError } = await supabase
     .from('payouts')
-    .select('id, order_id, seller_id, amount_cents, problem_reason, problem_reported_at, pickup_start_at, last_error')
+    .select('id, order_id, seller_id, amount_cents, shipping_cents, problem_reason, problem_reported_at, pickup_start_at, last_error')
     .eq('status', 'probleme')
     .order('problem_reported_at', { ascending: true })
     .limit(100);
@@ -270,7 +274,7 @@ async function adminList() {
 
   const { data: decided, error: decidedError } = await supabase
     .from('payouts')
-    .select('id, order_id, seller_id, amount_cents, problem_reason, problem_reported_at, resolution, resolved_at, resolution_note, refunded_cents, stripe_refund_id')
+    .select('id, order_id, seller_id, amount_cents, shipping_cents, problem_reason, problem_reported_at, resolution, resolved_at, resolution_note, refunded_cents, stripe_refund_id')
     .not('resolution', 'is', null)
     .order('resolved_at', { ascending: false })
     .limit(20);
@@ -344,7 +348,8 @@ async function adminList() {
       orderDate: order.created_at || null,
       reportedAt: r.problem_reported_at || null,
       reason: r.problem_reason || '',
-      amount: (Number(r.amount_cents) || 0) / 100,
+      amount: ((Number(r.amount_cents) || 0) + (Number(r.shipping_cents) || 0)) / 100,
+      shippingAmount: (Number(r.shipping_cents) || 0) / 100,
       items: grouped.map((g) => ({ title: g.title, unit: g.unit, quantity: g.quantity, amount: g.cents / 100 })),
       seller: { city: seller.city || null, email: seller.email || null },
       buyer: { email: buyerEmails[order.buyer_id] || null },
@@ -364,7 +369,7 @@ async function adminList() {
   };
 }
 
-// « Rembourser l'acheteur » : seuls les articles de ce vendeur sont remboursés (jamais les 0,25 € de frais de service).
+// « Rembourser l'acheteur » : seuls les articles de ce vendeur et ses frais d'expédition sont remboursés (jamais les 0,25 € de frais de service).
 // Le remboursement part chez Stripe avec une clé anti-doublon : cliquer deux fois ne rembourse jamais deux fois.
 async function adminRefund(res, payout, note) {
   if (payout.status === 'rembourse') {
@@ -377,7 +382,7 @@ async function adminRefund(res, payout, note) {
     return res.status(409).json({ error: "Ce versement n'est pas dans l'état « problème signalé »." });
   }
 
-  const amount = Number(payout.amount_cents);
+  const amount = Number(payout.amount_cents) + (Number(payout.shipping_cents) || 0);
   if (!Number.isInteger(amount) || amount <= 0) {
     return res.status(400).json({ error: 'Montant à rembourser invalide.' });
   }
@@ -523,7 +528,7 @@ async function handleAdminAction(req, res) {
 
     const { data: payout, error: payoutError } = await supabase
       .from('payouts')
-      .select('id, status, order_id, seller_id, amount_cents, stripe_charge_id')
+      .select('id, status, order_id, seller_id, amount_cents, shipping_cents, stripe_charge_id')
       .eq('id', payoutId.trim())
       .maybeSingle();
     if (payoutError) {

@@ -102,7 +102,7 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
-    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity } = req.body;
+    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest } = req.body;
 
     // 1. Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
@@ -133,6 +133,18 @@ export default async function handler(req, res) {
       });
     }
 
+    // 2 ter. Un professionnel qui vend une catégorie réservée aux professionnels doit avoir confirmé
+    //        (case à cocher) qu'il a déclaré son activité et respecte l'étiquetage : on garde la date
+    let proAttestedAt = null;
+    if (seller.seller_type === 'professionnel' && !PARTICULIER_CATEGORIES.includes(category)) {
+      if (proAttest !== true) {
+        return res.status(400).json({
+          error: "Pour publier cette annonce, cochez la case de confirmation : vous avez déclaré votre activité aux autorités compétentes et vous respectez l'étiquetage obligatoire de vos produits.",
+        });
+      }
+      proAttestedAt = new Date().toISOString();
+    }
+
     // 3. Les horaires de retrait de cette annonce sont obligatoires, et vérifiés ici
     const hours = validatePickupHours(pickupHours);
     if (hours.error) {
@@ -159,6 +171,7 @@ export default async function handler(req, res) {
         harvest_date: harvestDate,
         image_url: imageUrl,
         quantity_available: stock.quantity,
+        pro_attested_at: proAttestedAt,
       })
       .select()
       .single();

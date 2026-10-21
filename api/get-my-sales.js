@@ -8,6 +8,65 @@ const MAX_SALES = 100;
 // Frais de service mensuel d'un vendeur actif : 2 €, retirés une seule fois par mois
 const MONTHLY_FEE_CENTS = 200;
 
+// Une commande expédiée : l'argent rejoint le compte de paiement 14 jours après l'envoi du colis
+const SHIPPED_RELEASE_DAYS = 14;
+// Forfait d'Agrivoisin par commande expédiée (déjà compris dans la commission enregistrée)
+const SHIPPING_FLAT_FEE_CENTS = 50;
+
+// Le vendeur déclare que le colis est parti (avec, s'il le souhaite, un numéro de suivi)
+async function markShipped(req, res, seller) {
+  const body = req.body || {};
+  const orderId = String(body.orderId == null ? '' : body.orderId).trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(orderId)) {
+    return res.status(400).json({ error: 'Commande inconnue.' });
+  }
+
+  const tracking = String(body.trackingNumber == null ? '' : body.trackingNumber).replace(/\s+/g, ' ').trim();
+  if (tracking.length > 40 || (tracking && !/^[A-Za-z0-9][A-Za-z0-9 \-]*$/.test(tracking))) {
+    return res.status(400).json({ error: 'Le numéro de suivi ne doit contenir que des lettres, des chiffres et des tirets (40 caractères au plus).' });
+  }
+
+  const { data: payout, error: payoutError } = await supabase
+    .from('payouts')
+    .select('id, status, shipping_cents, shipped_at')
+    .eq('seller_id', seller.id)
+    .eq('order_id', orderId)
+    .maybeSingle();
+  if (payoutError) {
+    console.error('Erreur Supabase (colis parti) :', payoutError.message);
+    return res.status(500).json({ error: "Impossible d'enregistrer l'envoi pour le moment. Réessayez." });
+  }
+  if (!payout || !(Number(payout.shipping_cents) > 0)) {
+    return res.status(404).json({ error: "Cette vente n'est pas une commande à expédier." });
+  }
+  if (payout.shipped_at) {
+    return res.status(409).json({ error: 'Cet envoi est déjà enregistré.' });
+  }
+  if (payout.status !== 'en_attente') {
+    return res.status(409).json({ error: "Cette vente ne peut plus être modifiée." });
+  }
+
+  const shippedAt = new Date();
+  const releaseAt = new Date(shippedAt.getTime() + SHIPPED_RELEASE_DAYS * 24 * 60 * 60 * 1000);
+  // Condition « pas encore expédié » dans la requête : deux clics ne comptent qu'une fois
+  const { data: updated, error: updateError } = await supabase
+    .from('payouts')
+    .update({ shipped_at: shippedAt.toISOString(), tracking_number: tracking || null, auto_release_at: releaseAt.toISOString() })
+    .eq('id', payout.id)
+    .eq('status', 'en_attente')
+    .is('shipped_at', null)
+    .select('id');
+  if (updateError) {
+    console.error('Erreur Supabase (colis parti) :', updateError.message);
+    return res.status(500).json({ error: "Impossible d'enregistrer l'envoi pour le moment. Réessayez." });
+  }
+  if (!updated || updated.length === 0) {
+    return res.status(409).json({ error: 'Cet envoi est déjà enregistré.' });
+  }
+
+  return res.status(200).json({ shipment: { shippedAt: shippedAt.toISOString(), trackingNumber: tracking || null, autoReleaseAt: releaseAt.toISOString() } });
+}
+
 // Le mois d'une vente, à l'heure de Paris (comme dans la base) : « 2026-10 »
 function parisMonth(iso) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7);
@@ -156,7 +215,7 @@ async function saveTaxInfo(req, res, seller) {
 }
 
 export default async function handler(req, res) {
-  // GET : les ventes du vendeur ; POST : l'envoi de ses informations fiscales
+  // GET : les ventes du vendeur ; POST : l'envoi de ses informations fiscales ou la déclaration d'un colis parti
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
@@ -195,6 +254,9 @@ export default async function handler(req, res) {
       if (action === 'save_tax_info') {
         return await saveTaxInfo(req, res, seller);
       }
+      if (action === 'mark_shipped') {
+        return await markShipped(req, res, seller);
+      }
       return res.status(400).json({ error: 'Action inconnue.' });
     }
 
@@ -209,7 +271,7 @@ export default async function handler(req, res) {
     // Les articles vendus par CE vendeur (jamais l'identité de l'acheteur)
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('order_id, listing_id, price_at_purchase, listings(title, unit)')
+      .select('order_id, listing_id, price_at_purchase, delivery_mode, listings(title, unit)')
       .eq('seller_id', seller.id);
 
     if (itemsError) throw itemsError;
@@ -223,7 +285,7 @@ export default async function handler(req, res) {
     // Les ventes les plus récentes d'abord (seulement la date : rien sur l'acheteur)
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, created_at')
+      .select('id, created_at, shipping_address')
       .in('id', orderIds)
       .order('created_at', { ascending: false })
       .limit(MAX_SALES);
@@ -236,7 +298,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('order_id, status, auto_release_at, released_at, amount_cents, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents')
+      .select('order_id, status, auto_release_at, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents')
       .eq('seller_id', seller.id)
       .in('order_id', shownOrderIds);
 
@@ -278,6 +340,7 @@ export default async function handler(req, res) {
             unit: it.listings ? (String(it.listings.unit == null ? '' : it.listings.unit).trim() || 'kg') : 'unité',
             quantity: 0,
             amountCents: 0,
+            shipped: it.delivery_mode === 'expedition',
           };
         }
         const cents = Math.round(Number(it.price_at_purchase || 0) * 100);
@@ -294,10 +357,14 @@ export default async function handler(req, res) {
       //   le montant exact de la vente, et ce qui reste à payer des 2 € du mois
       // - problème signalé : aucun chiffre tant que la situation n'est pas réglée
       const toEuros = (cents) => (Number(cents) || 0) / 100;
+      // Expédition : les frais d'expédition de CE vendeur, et le forfait d'Agrivoisin (compris dans la commission enregistrée)
+      const shippingCents = payoutRow ? Number(payoutRow.shipping_cents) || 0 : 0;
+      const flatFeeCents = shippingCents > 0 ? Math.min(SHIPPING_FLAT_FEE_CENTS, shippingCents) : 0;
       let money = null;
       if (payoutRow && payoutRow.status === 'verse') {
         money = {
-          commission: toEuros(payoutRow.commission_cents),
+          commission: toEuros((Number(payoutRow.commission_cents) || 0) - flatFeeCents),
+          flatFee: toEuros(flatFeeCents),
           cardFee: toEuros(payoutRow.stripe_fee_cents),
           monthlyFee: toEuros(payoutRow.monthly_fee_cents),
           received: payoutRow.seller_cents == null ? null : toEuros(payoutRow.seller_cents),
@@ -305,6 +372,8 @@ export default async function handler(req, res) {
       } else if (payoutRow && (payoutRow.status === 'en_attente' || payoutRow.status === 'en_cours')) {
         const amountCents = Number(payoutRow.amount_cents) || 0;
         const commissionCents = Number(payoutRow.commission_cents) || 0;
+        // Ce que l'acheteur a payé à ce vendeur : les articles + l'expédition
+        const grossCents = amountCents + shippingCents;
 
         // Les frais de carte RÉELS, relevés chez Stripe dès le paiement (jamais une supposition).
         // S'ils ne sont pas encore connus : rien n'est affiché à leur place.
@@ -316,17 +385,34 @@ export default async function handler(req, res) {
         const monthlyFeeDue = Math.max(0, feeRow ? (Number(feeRow.due_cents) || 0) - (Number(feeRow.collected_cents) || 0) : MONTHLY_FEE_CENTS);
 
         money = {
-          commission: toEuros(commissionCents),
-          afterCommission: toEuros(amountCents - commissionCents),
+          commission: toEuros(commissionCents - flatFeeCents),
+          flatFee: toEuros(flatFeeCents),
+          afterCommission: toEuros(grossCents - commissionCents),
           // Exact : la vente moins la commission moins les vrais frais de carte (jamais en dessous de 0)
           cardFee: cardFeeKnown ? toEuros(cardFeeCents) : null,
-          saleAmount: cardFeeKnown ? toEuros(Math.max(0, amountCents - commissionCents - cardFeeCents)) : null,
+          saleAmount: cardFeeKnown ? toEuros(Math.max(0, grossCents - commissionCents - cardFeeCents)) : null,
           // Les 2 € du mois restent en ligne séparée : retirés une seule fois, du premier versement du mois
           monthlyFeeDue: toEuros(monthlyFeeDue),
         };
       }
 
+      // L'expédition : l'adresse n'est montrée que tant que le colis n'est pas parti
+      let shipment = null;
+      if (shippingCents > 0) {
+        const a = order.shipping_address && typeof order.shipping_address === 'object' ? order.shipping_address : null;
+        const toShip = payoutRow.status === 'en_attente' && !payoutRow.shipped_at;
+        shipment = {
+          shippingAmount: shippingCents / 100,
+          shippedAt: payoutRow.shipped_at || null,
+          trackingNumber: payoutRow.tracking_number || null,
+          address: toShip && a
+            ? { name: a.name || '', address: a.address || '', address2: a.address2 || '', postalCode: a.postal_code || '', city: a.city || '', country: a.country || 'France', phone: a.phone || '' }
+            : null,
+        };
+      }
+
       return {
+        orderId: order.id,
         createdAt: order.created_at,
         items: Object.values(byListing).map((l) => ({
           title: l.title,
@@ -334,7 +420,9 @@ export default async function handler(req, res) {
           quantity: l.quantity,
           amount: l.amountCents / 100,
         })),
-        totalAmount: totalCents / 100,
+        goodsAmount: totalCents / 100,
+        totalAmount: (totalCents + shippingCents) / 100,
+        shipment,
         payout: payoutRow
           ? { status: payoutRow.status, autoReleaseAt: payoutRow.auto_release_at, releasedAt: payoutRow.released_at, money }
           : null,

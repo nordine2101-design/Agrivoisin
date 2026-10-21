@@ -32,6 +32,10 @@
           <span>Sous-total</span>
           <span id="cartSubtotal">0,00 €</span>
         </div>
+        <div class="cart-summary-row" id="cartShipRow" style="display:none;">
+          <span>Frais d'expédition <span class="cart-fee-hint" id="cartShipHint"></span></span>
+          <span id="cartShipAmount">0,00 €</span>
+        </div>
         <div class="cart-summary-row">
           <span>Frais de service <span class="cart-fee-hint">(une seule fois par commande)</span></span>
           <span id="cartServiceFee">0,25 €</span>
@@ -42,6 +46,7 @@
         </div>
 
         <p id="cartMinNote" class="cart-min-note" style="display:none;"></p>
+        <p id="cartShipNote" class="cart-min-note" style="display:none;"></p>
         <label class="cart-terms" style="display:flex;align-items:flex-start;gap:10px;margin:16px 0 10px;font-size:0.9rem;line-height:1.5;cursor:pointer;text-align:left;">
           <input type="checkbox" id="acceptCartTerms" style="width:auto;margin:4px 0 0;flex-shrink:0;">
           <span>J'ai lu et j'accepte les <a href="cgv.html" target="_blank" rel="noopener" style="text-decoration:underline;">conditions générales</a>.</span>
@@ -49,7 +54,7 @@
         <p id="cartTermsError" style="display:none;color:#C8352F;font-size:0.9rem;margin:0 0 10px;">Cochez la case ci-dessus pour pouvoir payer.</p>
         <button class="btn btn-primary cart-checkout-btn" id="checkoutBtn">Commande avec obligation de paiement</button>
 
-        <p class="product-trust-note" style="margin-top:20px;">
+        <p class="product-trust-note" id="cartTrustNote" style="margin-top:20px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:20px;height:20px;flex-shrink:0;"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
           <span>Les adresses des vendeurs seront communiquées automatiquement après confirmation du paiement.</span>
         </p>
@@ -129,6 +134,13 @@
   .cart-qty-btn { background:var(--cream-soft); color:var(--soil); width:28px; height:28px; border-radius:50%; font-size:1rem; font-weight:700; line-height:1; cursor:pointer; }
   .cart-qty-btn:hover:not(:disabled) { background:#e6e0d3; }
   .cart-qty-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .cart-ship-box { margin-top:2px; padding:10px 12px; border-radius:12px; background:var(--cream-soft); font-size:0.9rem; line-height:1.6; }
+  .cart-ship-title { font-size:0.72rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .cart-ship-opt { display:flex; align-items:center; gap:8px; cursor:pointer; }
+  .cart-ship-opt input { width:auto; margin:0; }
+  .cart-ship-fee { margin-top:4px; font-weight:700; color:var(--leaf-deep); }
+  .cart-ship-fee span { font-weight:400; }
+  .cart-ship-sub { font-size:0.8rem; color:#6B5842; margin-top:2px; }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(
@@ -167,6 +179,22 @@
     return pluralWord(u);
   }
 
+  // Le choix « retrait » ou « expédition » de l'acheteur pour chaque annonce, gardé dans le navigateur
+  function getDelivery() {
+    try {
+      const d = JSON.parse(localStorage.getItem('agrivoisin_delivery') || '{}');
+      return d && typeof d === 'object' ? d : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setDelivery(listingId, mode) {
+    const d = getDelivery();
+    d[String(listingId)] = mode;
+    localStorage.setItem('agrivoisin_delivery', JSON.stringify(d));
+  }
+
   // Unité et stock des annonces, relus dans la base (le panier fonctionne aussi sans)
   let listingInfo = {};
   // Vrai seulement si la liste des annonces a bien été relue : sinon on ne dit jamais « plus disponible »
@@ -202,12 +230,22 @@
           qty: 0,
           stock: info && info.quantity_available != null ? Number(info.quantity_available) : null,
           sample: item,
+          deliveryMode: info && (info.delivery_mode === 'expedition' || info.delivery_mode === 'les_deux') ? info.delivery_mode : 'retrait',
+          tiers: info && Array.isArray(info.shipping_tiers) ? info.shipping_tiers : [],
           // L'annonce n'apparaît plus sur le site (épuisée, supprimée, vendeur incomplet) : elle n'est plus achetable
           unavailable: !!(listingInfoLoaded && item.listingId && !info),
         };
         groups.push(byKey[key]);
       }
       byKey[key].qty += 1;
+    });
+    // Expédition seule : pas de choix. Les deux : le choix de l'acheteur (retrait par défaut). Sinon : retrait.
+    const saved = getDelivery();
+    groups.forEach((g) => {
+      const id = g.sample.listingId ? String(g.sample.listingId) : '';
+      g.choice = g.deliveryMode === 'expedition' ? 'expedition'
+        : g.deliveryMode === 'les_deux' && saved[id] === 'expedition' ? 'expedition'
+        : 'retrait';
     });
     return groups;
   }
@@ -223,12 +261,18 @@
   let isLoggedIn = null;
   let cartHasProblem = false;
   let belowMinimum = false;
+  // Le paiement avec expédition n'est pas encore ouvert : on bloque le bouton plutôt que de facturer sans les frais
+  let shipBlocked = false;
+  const SHIP_LABEL = 'Paiement avec expédition : bientôt disponible';
 
   function updateCheckoutButton() {
     const btn = document.getElementById('checkoutBtn');
     if (cartHasProblem) {
       btn.disabled = true;
       btn.textContent = FIX_LABEL;
+    } else if (shipBlocked) {
+      btn.disabled = true;
+      btn.textContent = SHIP_LABEL;
     } else if (belowMinimum) {
       // Sous le minimum : le bouton ne paie pas, il ramène vers les annonces pour ajouter des articles
       btn.disabled = false;
@@ -279,7 +323,11 @@
 
     itemsEl.innerHTML = '';
     let totalCents = 0;
+    let shipCents = 0;
     let problem = false;
+    let anyShip = false;
+    let anyPickup = false;
+    const shipParts = [];
 
     groupCart(cart).forEach((g) => {
       // Les lots : autant de lots complets que possible, le reste au prix normal
@@ -400,12 +448,78 @@
       if (lotNote) row.appendChild(lotNote);
       row.appendChild(bottom);
 
+      // Mode de remise : choix retrait / expédition, et frais d'expédition selon la quantité de cette annonce
+      let shipProblem = '';
+      if (g.choice === 'expedition') {
+        anyShip = true;
+        const tier = g.tiers.find((t) => g.qty >= Number(t.min) && g.qty <= Number(t.max));
+        if (tier) {
+          const cents = Math.round(Number(tier.price) * 100);
+          shipCents += cents;
+          shipParts.push(formatEuros(cents));
+        } else {
+          shipProblem = "Les frais d'expédition ne sont pas disponibles pour cette quantité : modifiez la quantité ou choisissez le retrait.";
+        }
+      } else {
+        anyPickup = true;
+      }
+
+      if (g.deliveryMode !== 'retrait') {
+        const box = document.createElement('div');
+        box.className = 'cart-ship-box';
+        const title = document.createElement('div');
+        title.className = 'cart-ship-title';
+        title.textContent = g.deliveryMode === 'les_deux' ? 'Comment recevoir cette commande ?' : 'Expédition par le vendeur';
+        box.appendChild(title);
+
+        if (g.deliveryMode === 'les_deux') {
+          const radioName = 'delivery-' + g.sample.listingId;
+          [['retrait', 'Retrait chez le vendeur'], ['expedition', 'Expédition par le vendeur']].forEach((opt) => {
+            const label = document.createElement('label');
+            label.className = 'cart-ship-opt';
+            const input = document.createElement('input');
+            input.type = 'radio';
+            input.name = radioName;
+            input.value = opt[0];
+            input.checked = g.choice === opt[0];
+            input.addEventListener('change', () => {
+              setDelivery(g.sample.listingId, opt[0]);
+              renderCart();
+            });
+            const text = document.createElement('span');
+            text.textContent = opt[1];
+            label.appendChild(input);
+            label.appendChild(text);
+            box.appendChild(label);
+          });
+        }
+
+        if (g.choice === 'expedition') {
+          const feeEl = document.createElement('div');
+          feeEl.className = 'cart-ship-fee';
+          const tier = g.tiers.find((t) => g.qty >= Number(t.min) && g.qty <= Number(t.max));
+          if (tier) {
+            const min = Number(tier.min);
+            const max = Number(tier.max);
+            const range = min === max ? min + ' ' + unitLabel(g.unit, min) : min + ' à ' + max + ' ' + unitLabel(g.unit, max);
+            feeEl.appendChild(document.createTextNode("Frais d'expédition : " + formatEuros(Math.round(Number(tier.price) * 100)) + ' '));
+            const rangeEl = document.createElement('span');
+            rangeEl.textContent = '(' + range + ')';
+            feeEl.appendChild(rangeEl);
+            box.appendChild(feeEl);
+          }
+        }
+        row.appendChild(box);
+      }
+
       // Le problème est dit en rouge sous la ligne, avec l'unité
       let note = '';
       if (g.unavailable) {
         note = 'Cette annonce n\'est plus disponible. Retirez-la de votre panier.';
       } else if (g.stock !== null && g.qty > g.stock) {
         note = 'Il ne reste que ' + g.stock + ' ' + unitLabel(g.unit, g.stock) + ' : réduisez la quantité.';
+      } else if (shipProblem) {
+        note = shipProblem;
       }
       if (note) {
         problem = true;
@@ -420,7 +534,30 @@
 
     cartHasProblem = problem;
     belowMinimum = totalCents < MIN_ORDER_CENTS;
+    shipBlocked = anyShip;
     updateCheckoutButton();
+
+    // Expédition choisie : le paiement n'est pas encore ouvert, on le dit clairement
+    const shipNote = document.getElementById('cartShipNote');
+    if (anyShip) {
+      shipNote.textContent = 'Le paiement avec expédition sera disponible très bientôt. Pour payer maintenant, choisissez le retrait.';
+      shipNote.style.display = 'block';
+    } else {
+      shipNote.style.display = 'none';
+    }
+
+    // Les adresses des vendeurs ne sont communiquées que pour les retraits
+    document.getElementById('cartTrustNote').style.display = anyPickup ? '' : 'none';
+
+    // Ligne des frais d'expédition dans le récapitulatif
+    const shipRow = document.getElementById('cartShipRow');
+    if (anyShip) {
+      document.getElementById('cartShipAmount').textContent = formatEuros(shipCents);
+      document.getElementById('cartShipHint').textContent = shipParts.length > 1 ? '(' + shipParts.join(' + ') + ')' : '';
+      shipRow.style.display = '';
+    } else {
+      shipRow.style.display = 'none';
+    }
 
     // Commande minimum : dite clairement, avec ce qu'il manque
     const minNote = document.getElementById('cartMinNote');
@@ -433,7 +570,7 @@
 
     document.getElementById('cartSubtotal').textContent = formatEuros(totalCents);
     document.getElementById('cartServiceFee').textContent = formatEuros(SERVICE_FEE_CENTS);
-    document.getElementById('cartTotal').textContent = formatEuros(totalCents + SERVICE_FEE_CENTS);
+    document.getElementById('cartTotal').textContent = formatEuros(totalCents + shipCents + SERVICE_FEE_CENTS);
   }
 
   // On relit l'unité exacte et le stock de chaque annonce, puis on réaffiche le panier
@@ -444,7 +581,7 @@
         throw new Error('liste des annonces indisponible');
       }
       data.listings.forEach((l) => {
-        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price, lot_quantity: l.lot_quantity, lot_price: l.lot_price };
+        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price, lot_quantity: l.lot_quantity, lot_price: l.lot_price, delivery_mode: l.delivery_mode, shipping_tiers: l.shipping_tiers };
       });
       listingInfoLoaded = true;
       renderCart();
@@ -461,7 +598,7 @@
   });
 
   checkoutBtn.addEventListener('click', async () => {
-    if (cartHasProblem) return;
+    if (cartHasProblem || shipBlocked) return;
 
     // Sous le minimum : aucun paiement, on va ajouter des articles (le panier est conservé)
     if (belowMinimum) {

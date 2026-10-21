@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Annonces signalées — Agrivoisin</title>
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ ANNONCES SIGNALÉES (page réservée à l'administrateur) ============ -->
+<section class="page-header">
+  <div class="container admin-wrap">
+    <div style="text-align:left;margin-bottom:12px;">
+      <a href="index.html" class="btn btn-ghost">Retour au site</a>
+      <a href="admin-avis.html" class="btn btn-ghost">Commentaires</a>
+      <a href="admin-problemes.html" class="btn btn-ghost">Problèmes signalés</a>
+      <a href="admin-fiscal.html" class="btn btn-ghost">Suivi fiscal</a>
+      <a href="admin-signalements.html" class="btn btn-ghost admin-here">Annonces signalées</a>
+    </div>
+    <h1>Annonces signalées</h1>
+    <p id="pageSubtitle">Page réservée à l'administrateur d'Agrivoisin. Les signalements envoyés par les visiteurs, du plus récent au plus ancien. « Retirer l'annonce » la supprime définitivement du site.</p>
+
+    <p id="loadingMessage" class="admin-state">Chargement...</p>
+    <p id="notLoggedMessage" class="admin-state" style="display:none;">Vous devez être connecté. <a href="connexion.html?retour=admin-signalements.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
+    <p id="forbiddenMessage" class="admin-state" style="display:none;">Cette page est réservée à l'administrateur d'Agrivoisin.</p>
+    <p id="errorMessage" class="admin-state" style="display:none;"></p>
+    <button type="button" id="retryBtn" class="btn btn-primary" style="display:none;margin:0 auto 16px;">Réessayer</button>
+
+    <div id="content" style="display:none;">
+      <div class="admin-toolbar">
+        <h2 id="reportsTitle">Signalements</h2>
+        <button type="button" id="refreshBtn" class="btn btn-ghost">Actualiser</button>
+      </div>
+      <p id="noReports" class="admin-empty" style="display:none;">Aucun signalement pour le moment.</p>
+      <div id="reportsList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="cgv.html">Conditions générales</a></li>
+          <li><a href="confidentialite.html">Confidentialité</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const loadingMessage = document.getElementById('loadingMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const forbiddenMessage = document.getElementById('forbiddenMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const retryBtn = document.getElementById('retryBtn');
+  const content = document.getElementById('content');
+  const reportsList = document.getElementById('reportsList');
+  const noReports = document.getElementById('noReports');
+  const reportsTitle = document.getElementById('reportsTitle');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  // « 06/10/2026 à 12 h 00 » (heure de Paris)
+  function formatDateTime(iso) {
+    if (!iso) return '—';
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    return parts.day + '/' + parts.month + '/' + parts.year + ' à ' + parseInt(parts.hour, 10) + '\u00A0h\u00A0' + parts.minute;
+  }
+
+  function formatDate(iso) {
+    return formatDateTime(iso).split(' à ')[0];
+  }
+
+  // Tout ce qu'a écrit un visiteur est mis dans la page avec textContent : jamais interprété comme du code
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function reportCard(r) {
+    const done = r.status === 'traite';
+    const card = el('div', 'admin-card' + (done ? ' report-done' : ''));
+    card.dataset.reportId = String(r.id);
+
+    const head = el('div', 'admin-card-head');
+    head.appendChild(el('span', 'admin-card-title', r.listingTitle || 'Annonce sans titre'));
+    head.appendChild(el('span', 'admin-meta report-date', formatDateTime(r.createdAt)));
+    card.appendChild(head);
+
+    const line = el('div', 'report-line');
+    line.appendChild(el('span', 'report-reason', r.reasonLabel));
+    if (r.listingExists) {
+      const link = el('a', 'report-link', "Voir l'annonce");
+      link.href = 'produit.html?id=' + encodeURIComponent(r.listingId);
+      link.target = '_blank';
+      link.rel = 'noopener';
+      line.appendChild(link);
+    } else {
+      line.appendChild(el('span', 'report-gone', 'Annonce déjà supprimée'));
+    }
+    card.appendChild(line);
+
+    card.appendChild(el('div', 'review-text', r.details));
+    card.appendChild(el('div', 'admin-meta', 'Signalé par : ' + r.email));
+
+    if (done) {
+      const decisionText = r.decision === 'retiree' ? 'annonce retirée' : 'annonce gardée';
+      card.appendChild(el('div', 'review-status', 'Traité le ' + formatDate(r.handledAt) + ' : ' + decisionText + '.' + (r.adminNote ? ' Note : ' + r.adminNote : '')));
+      return card;
+    }
+
+    card.appendChild(el('div', 'report-todo', 'À traiter'));
+
+    const note = el('textarea', 'report-note');
+    note.rows = 2;
+    note.maxLength = 1000;
+    note.placeholder = 'Votre note (facultatif) : ce que vous avez décidé et pourquoi';
+    card.appendChild(note);
+
+    const actions = el('div', 'admin-actions');
+    const keepBtn = el('button', 'btn btn-ghost report-btn', "Garder l'annonce");
+    keepBtn.type = 'button';
+    keepBtn.dataset.decision = 'maintenue';
+    actions.appendChild(keepBtn);
+    if (r.listingExists) {
+      const removeBtn = el('button', 'btn btn-primary report-btn', "Retirer l'annonce");
+      removeBtn.type = 'button';
+      removeBtn.dataset.decision = 'retiree';
+      actions.appendChild(removeBtn);
+    }
+    card.appendChild(actions);
+
+    const err = el('p', 'admin-error');
+    err.style.display = 'none';
+    card.appendChild(err);
+    return card;
+  }
+
+  function showOnly(which) {
+    [loadingMessage, notLoggedMessage, forbiddenMessage, errorMessage, content].forEach((e) => { e.style.display = 'none'; });
+    retryBtn.style.display = 'none';
+    if (which) which.style.display = 'block';
+  }
+
+  async function getToken() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    return session ? session.access_token : null;
+  }
+
+  async function callAdmin(token, body) {
+    const response = await fetch('/api/get-listings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    return { ok: response.ok, status: response.status, data };
+  }
+
+  async function load() {
+    showOnly(loadingMessage);
+    const token = await getToken();
+    if (!token) {
+      showOnly(notLoggedMessage);
+      return;
+    }
+
+    try {
+      const result = await callAdmin(token, { action: 'admin_list_reports' });
+
+      if (result.status === 401) { showOnly(notLoggedMessage); return; }
+      if (result.status === 403) { showOnly(forbiddenMessage); return; }
+      if (!result.ok) throw new Error(result.data.error || 'Erreur');
+
+      // À traiter d'abord, puis les signalements déjà traités (du plus récent au plus ancien dans chaque groupe)
+      const reports = (result.data.reports || []).slice().sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'nouveau' ? -1 : 1;
+        return String(b.createdAt).localeCompare(String(a.createdAt));
+      });
+      const todo = reports.filter((r) => r.status !== 'traite').length;
+      const handled = reports.length - todo;
+      reportsTitle.textContent = 'Signalements (' + todo + ' à traiter, ' + handled + ' traité' + (handled > 1 ? 's' : '') + ')';
+      reportsList.replaceChildren(...reports.map(reportCard));
+      noReports.style.display = reports.length === 0 ? 'block' : 'none';
+      showOnly(content);
+    } catch (err) {
+      console.error(err);
+      errorMessage.textContent = 'Impossible de charger les signalements pour le moment.';
+      showOnly(errorMessage);
+      retryBtn.style.display = 'block';
+    }
+  }
+
+  let busy = false;
+
+  async function decide(card, decision) {
+    if (busy) return;
+    const errorEl = card.querySelector('.admin-error');
+    errorEl.style.display = 'none';
+
+    if (decision === 'retiree' && !window.confirm("Retirer définitivement cette annonce du site ? Cette action est irréversible.")) return;
+
+    busy = true;
+    const buttons = card.querySelectorAll('.report-btn');
+    buttons.forEach((b) => { b.disabled = true; });
+
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Session expirée, reconnectez-vous.');
+
+      const result = await callAdmin(token, {
+        action: 'admin_handle_report',
+        reportId: card.dataset.reportId,
+        decision: decision,
+        note: card.querySelector('.report-note').value,
+      });
+      if (!result.ok) throw new Error(result.data.error || 'Une erreur est survenue');
+
+      busy = false;
+      await load();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+      buttons.forEach((b) => { b.disabled = false; });
+    } finally {
+      busy = false;
+    }
+  }
+
+  reportsList.addEventListener('click', (e) => {
+    const btn = e.target.closest('.report-btn');
+    if (!btn) return;
+    const card = btn.closest('.admin-card');
+    if (card) decide(card, btn.dataset.decision);
+  });
+
+  refreshBtn.addEventListener('click', load);
+  retryBtn.addEventListener('click', load);
+
+  load();
+</script>
+
+<style>
+  .admin-here { opacity:.45; pointer-events:none; border-style:dashed; }
+  .admin-wrap { max-width:860px; }
+  .admin-state { margin:16px 0; color:#C8352F; text-align:center; }
+  .admin-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+  .admin-toolbar h2 { font-size:1.2rem; margin:0; text-align:left; }
+  .admin-empty { color:#6B5842; text-align:left; margin:8px 0; }
+  .admin-card { background:#fff; border:1px solid #e6e0d3; border-radius:16px; padding:16px; margin-bottom:16px; text-align:left; box-shadow:0 2px 8px rgba(0,0,0,0.05); }
+  .admin-card.report-done { background:#f9f7f2; }
+  .admin-card-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:10px; }
+  .admin-card-title { font-weight:700; color:var(--leaf-deep); }
+  .admin-meta { font-size:0.85rem; color:#6B5842; margin:4px 0; }
+  .report-date { margin:0; white-space:nowrap; }
+  .report-line { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:2px 0 8px; }
+  .report-reason { display:inline-block; padding:3px 10px; border-radius:999px; background:#FDECEA; color:#C8352F; font-size:0.78rem; font-weight:700; }
+  .report-link { font-size:0.85rem; color:var(--leaf-deep); font-weight:700; text-decoration:underline; }
+  .report-gone { font-size:0.85rem; color:#6B5842; font-style:italic; }
+  .review-text { white-space:pre-wrap; word-break:break-word; font-size:0.95rem; line-height:1.5; margin:10px 0; }
+  .review-status { font-size:0.85rem; font-weight:700; color:#4C7A50; margin:8px 0 4px; }
+  .report-todo { font-size:0.85rem; font-weight:700; color:#C26A1E; margin:8px 0 12px; }
+  .report-note { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #e6e0d3; border-radius:12px; font:inherit; font-size:0.9rem; margin-bottom:10px; resize:vertical; }
+  .admin-actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .admin-actions .btn { font-size:0.9rem; padding:10px 16px; }
+  .admin-actions .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  p.admin-error { color:#C8352F; margin:10px 0 0; font-size:0.9rem; }
+  @media (max-width: 540px) {
+    .admin-actions .btn { width:100%; }
+    .admin-card-head { flex-direction:column; gap:4px; }
+  }
+</style>
+
+</body>
+</html>

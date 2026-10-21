@@ -66,7 +66,24 @@
         <img id="photoPreview" style="max-width:160px;border-radius:12px;display:block;">
       </p>
 
-      <div class="pickup-section">
+      <div id="deliveryWrap" class="dm-wrap" style="display:none;">
+        <label class="dm-pill" id="deliveryLabel">Comment l'acheteur reçoit sa commande</label>
+        <div class="dm-modes" role="radiogroup" aria-labelledby="deliveryLabel">
+          <div class="dm-mode" data-mode="retrait" role="radio" tabindex="0" aria-checked="true"><b>Retrait</b><span>L'acheteur vient chercher.</span></div>
+          <div class="dm-mode" data-mode="expedition" role="radio" tabindex="0" aria-checked="false"><b>Expédition</b><span>Vous envoyez le colis.</span></div>
+          <div class="dm-mode" data-mode="les_deux" role="radio" tabindex="0" aria-checked="false"><b>Les deux</b><span>Au choix de l'acheteur.</span></div>
+        </div>
+
+        <div id="shipBox" class="dm-ship" style="display:none;">
+          <h4>Frais d'expédition (par commande)</h4>
+          <p class="dm-hint" id="shipHelp"></p>
+          <div id="shipTiers"></div>
+          <button type="button" id="shipAdd" class="dm-add">+ Ajouter un palier</button>
+          <p class="dm-hint" id="shipPreview" style="margin-top:10px;"></p>
+        </div>
+      </div>
+
+      <div class="pickup-section" id="pickupSection">
         <p class="pickup-title">Horaires de retrait</p>
         <p class="pickup-help">Indiquez quand l'acheteur peut venir chercher cette récolte. Au moins un jour est obligatoire. Faites glisser les poignées pour régler les heures.</p>
         <div id="pickupDays"></div>
@@ -189,6 +206,240 @@
     if (!needed) document.getElementById('proAttest').checked = false;
   }
 
+  // ---------- Mode de remise et frais d'expédition (professionnels, produits qui se conservent) ----------
+
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  // « bocal » -> « bocaux » dès que la quantité dépasse 1 ; « botte de radis » -> « bottes de radis »
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'kg';
+    if (count <= 1) return u;
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u;
+    return pluralWord(u);
+  }
+
+  const deliveryWrap = document.getElementById('deliveryWrap');
+  const shipBox = document.getElementById('shipBox');
+  const shipTiersEl = document.getElementById('shipTiers');
+  const shipAddBtn = document.getElementById('shipAdd');
+  const shipHelp = document.getElementById('shipHelp');
+  const shipPreview = document.getElementById('shipPreview');
+  const pickupSection = document.getElementById('pickupSection');
+  const unitInput = document.getElementById('unit');
+  const quantityInput = document.getElementById('quantity');
+
+  let deliveryMode = 'retrait';
+  // Un palier = { max, price } : le début est déduit du palier précédent (le 1er commence à 1),
+  // et la fin du dernier palier est toujours la quantité disponible.
+  let shipRows = [{ max: null, price: '' }];
+
+  function currentQuantity() {
+    const q = Number(quantityInput.value);
+    return Number.isInteger(q) && q >= 1 && q <= 9999 ? q : null;
+  }
+
+  // Le choix « retrait / expédition » n'existe que pour un professionnel dont la catégorie est réservée aux professionnels
+  function deliveryAvailable() {
+    return currentSellerType === 'professionnel'
+      && categorySelect.value !== ''
+      && !PARTICULIER_CATEGORIES.includes(categorySelect.value);
+  }
+
+  function formatEuro(value) {
+    return Number(value).toFixed(2).replace('.', ',') + ' €';
+  }
+
+  function tierStart(index) {
+    if (index === 0) return 1;
+    const prev = shipRows[index - 1].max;
+    return Number.isInteger(prev) ? prev + 1 : null;
+  }
+
+  function tierEnd(index) {
+    return index === shipRows.length - 1 ? currentQuantity() : shipRows[index].max;
+  }
+
+  // Phrase montrée à l'acheteur, mise à jour en direct
+  function renderShipPreview() {
+    const unit = unitInput.value;
+    const parts = [];
+    shipRows.forEach(function (row, i) {
+      const start = tierStart(i);
+      const end = tierEnd(i);
+      const price = Number(String(row.price).trim().replace(',', '.'));
+      if (!Number.isInteger(start) || !Number.isInteger(end) || end < start || String(row.price).trim() === '' || !Number.isFinite(price)) return;
+      const range = start === end ? start + ' ' + unitLabel(unit, start) : start + ' à ' + end + ' ' + unitLabel(unit, end);
+      parts.push(formatEuro(price) + ' pour ' + range);
+    });
+    shipPreview.textContent = parts.length ? 'L\'acheteur verra : « Expédition : ' + parts.join(' · ') + ' ».' : '';
+  }
+
+  // Remet à jour les débuts de palier (sans toucher aux champs que le vendeur est en train de remplir)
+  function syncTierStarts() {
+    const rowsEls = shipTiersEl.querySelectorAll('.dm-tier');
+    rowsEls.forEach(function (el, i) {
+      const start = tierStart(i);
+      el.querySelector('.dm-min').value = Number.isInteger(start) ? start : '';
+      if (i === shipRows.length - 1) {
+        const q = currentQuantity();
+        el.querySelector('.dm-max').value = q === null ? '' : q;
+      }
+    });
+    renderShipPreview();
+  }
+
+  function updateAddState() {
+    const last = shipRows.length - 1;
+    const q = currentQuantity();
+    const start = tierStart(last);
+    const noRoom = q === null || !Number.isInteger(start) || start >= q || shipRows.length >= 10;
+    shipAddBtn.disabled = noRoom;
+    shipAddBtn.title = noRoom ? 'Plus de place : le dernier palier ne peut pas être coupé' : '';
+  }
+
+  function renderShip() {
+    const q = currentQuantity();
+    const unit = unitInput.value;
+
+    // Si la quantité disponible a baissé, on retire les paliers qui commenceraient au-delà
+    while (q !== null && shipRows.length > 1) {
+      const start = tierStart(shipRows.length - 1);
+      if (Number.isInteger(start) && start > q) shipRows.pop(); else break;
+    }
+
+    shipHelp.textContent = 'Fixez vos frais selon le nombre de ' + unitLabel(unit, 2) + ' commandés. Vous êtes libre des montants.';
+    shipTiersEl.innerHTML = '';
+
+    shipRows.forEach(function (row, i) {
+      const isLast = i === shipRows.length - 1;
+      const el = document.createElement('div');
+      el.className = 'dm-tier';
+
+      const unitText = unitLabel(unit, 2);
+      el.innerHTML =
+        'De <input type="text" class="dm-min" readonly aria-label="Palier ' + (i + 1) + ' : de"> ' +
+        'à <input type="text" inputmode="numeric" class="dm-max" aria-label="Palier ' + (i + 1) + ' : jusqu\'à"' + (isLast ? ' readonly' : '') + '> ' +
+        '<span class="dm-unit"></span> : ' +
+        '<input type="text" inputmode="decimal" class="dm-price" placeholder="0,00" aria-label="Palier ' + (i + 1) + ' : montant en euros"> €';
+      el.querySelector('.dm-unit').textContent = unitText;
+
+      const maxInput = el.querySelector('.dm-max');
+      const priceInput = el.querySelector('.dm-price');
+      if (!isLast && Number.isInteger(row.max)) maxInput.value = row.max;
+      priceInput.value = row.price;
+
+      maxInput.addEventListener('input', function () {
+        const n = parseInt(maxInput.value.replace(/\D/g, ''), 10);
+        row.max = Number.isInteger(n) ? n : null;
+        syncTierStarts();
+        updateAddState();
+      });
+      priceInput.addEventListener('input', function () {
+        row.price = priceInput.value;
+        renderShipPreview();
+      });
+
+      if (shipRows.length > 1) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'dm-remove';
+        remove.textContent = '\u2715 Retirer';
+        remove.setAttribute('aria-label', 'Retirer le palier ' + (i + 1));
+        remove.addEventListener('click', function () {
+          shipRows.splice(i, 1);
+          renderShip();
+        });
+        el.appendChild(remove);
+      }
+
+      shipTiersEl.appendChild(el);
+    });
+
+    syncTierStarts();
+    updateAddState();
+  }
+
+  shipAddBtn.addEventListener('click', function () {
+    const q = currentQuantity();
+    const last = shipRows.length - 1;
+    const start = tierStart(last);
+    if (q === null || !Number.isInteger(start) || start >= q) return;
+    // Le palier qui était le dernier se termine au milieu ; un nouveau dernier palier le suit
+    const middle = Math.min(q - 1, Math.max(start, Math.floor((start + q - 1) / 2)));
+    shipRows[last].max = middle;
+    shipRows.push({ max: null, price: '' });
+    renderShip();
+  });
+
+  function setDeliveryMode(mode) {
+    deliveryMode = mode;
+    document.querySelectorAll('.dm-mode').forEach(function (card) {
+      card.setAttribute('aria-checked', card.dataset.mode === mode ? 'true' : 'false');
+    });
+    shipBox.style.display = mode === 'retrait' ? 'none' : '';
+    pickupSection.style.display = mode === 'expedition' ? 'none' : '';
+    if (mode !== 'retrait') renderShip();
+  }
+
+  document.querySelectorAll('.dm-mode').forEach(function (card) {
+    card.addEventListener('click', function () { setDeliveryMode(card.dataset.mode); });
+    card.addEventListener('keydown', function (e) {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setDeliveryMode(card.dataset.mode); }
+    });
+  });
+
+  function updateDelivery() {
+    const available = deliveryAvailable();
+    deliveryWrap.style.display = available ? '' : 'none';
+    if (!available) setDeliveryMode('retrait');
+  }
+
+  function resetDelivery() {
+    shipRows = [{ max: null, price: '' }];
+    setDeliveryMode('retrait');
+    deliveryWrap.style.display = 'none';
+  }
+
+  unitInput.addEventListener('input', function () { if (deliveryMode !== 'retrait') renderShip(); });
+  quantityInput.addEventListener('input', function () { if (deliveryMode !== 'retrait') renderShip(); });
+
+  // Vérifie les paliers saisis et les prépare pour l'envoi : { tiers } ou { error }
+  function collectShippingTiers(quantity) {
+    const tiers = [];
+    let start = 1;
+    for (let i = 0; i < shipRows.length; i++) {
+      const row = shipRows[i];
+      const isLast = i === shipRows.length - 1;
+      const label = 'Frais d\'expédition, palier ' + (i + 1) + ' : ';
+      const end = isLast ? quantity : row.max;
+      if (!Number.isInteger(end)) {
+        return { error: label + 'indiquez jusqu\'à combien de ' + unitLabel(unitInput.value, 2) + ' ce palier s\'applique.' };
+      }
+      if (end < start) {
+        return { error: label + 'la fin doit être égale ou supérieure au début (' + start + ').' };
+      }
+      if (!isLast && end >= quantity) {
+        return { error: label + 'la fin doit être inférieure à la quantité disponible (' + quantity + ' ' + unitLabel(unitInput.value, quantity) + '). Le dernier palier va jusqu\'à la quantité disponible.' };
+      }
+      const priceText = String(row.price).trim().replace(',', '.');
+      if (!/^\d+(\.\d{1,2})?$/.test(priceText) || Number(priceText) > 500) {
+        return { error: label + 'indiquez un montant en euros entre 0 et 500 (par exemple 5 ou 5,50).' };
+      }
+      tiers.push({ min: start, max: end, price: Number(priceText) });
+      start = end + 1;
+    }
+    return { tiers };
+  }
+
   function fillCategories(sellerType) {
     currentSellerType = sellerType;
     categorySelect.innerHTML = '<option value="" disabled selected>Choisissez une catégorie</option>';
@@ -213,13 +464,14 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d && d.sellerType === 'professionnel') { fillCategories('professionnel'); updateProAttest(); }
+        if (d && d.sellerType === 'professionnel') { fillCategories('professionnel'); updateProAttest(); updateDelivery(); }
       })
       .catch(function () {});
   });
 
   categorySelect.addEventListener('change', function () {
     updateProAttest();
+    updateDelivery();
     const subcats = CATEGORIES[categorySelect.value] || [];
 
     subcategorySelect.innerHTML = '<option value="" disabled selected>Choisissez une sous-catégorie</option>';
@@ -641,11 +893,26 @@
       return;
     }
 
-    const pickup = collectPickupRows();
+    // Le mode de remise (seulement pour un pro, produit qui se conserve) : sans cela, c'est le retrait comme avant
+    const mode = deliveryAvailable() ? deliveryMode : 'retrait';
+
+    // Les horaires de retrait ne sont demandés que si le retrait est proposé
+    const pickup = mode === 'expedition' ? { rows: [] } : collectPickupRows();
     if (pickup.error) {
       errorEl.textContent = 'Erreur : ' + pickup.error;
       errorEl.style.display = 'block';
       return;
+    }
+
+    // Les frais d'expédition par paliers sont vérifiés avant l'envoi de la photo
+    let shipping = { tiers: undefined };
+    if (mode !== 'retrait') {
+      shipping = collectShippingTiers(quantityValue);
+      if (shipping.error) {
+        errorEl.textContent = 'Erreur : ' + shipping.error;
+        errorEl.style.display = 'block';
+        return;
+      }
     }
 
     btn.textContent = 'Publication en cours...';
@@ -695,6 +962,8 @@
         pickupHours: pickup.rows,
         quantity: quantityValue,
         proAttest: document.getElementById('proAttest').checked,
+        deliveryMode: mode,
+        shippingTiers: shipping.tiers,
       };
 
       const response = await fetch('/api/create-listing', {
@@ -722,6 +991,7 @@
       harvestDateHint.style.display = 'none';
       photoPreviewWrap.style.display = 'none';
       document.getElementById('proAttestWrap').style.display = 'none';
+      resetDelivery();
       buildPickupDays();
       renderPickupPreview();
 
@@ -775,6 +1045,26 @@
   .pickup-section .rs-thumb.rs-active { cursor:grabbing; transform:scale(1.12); }
   .pickup-section .rs-ticks { position:relative; height:16px; margin:0 16px; }
   .pickup-section .rs-ticks span { position:absolute; top:0; transform:translateX(-50%); font-size:0.7rem; color:#999; }
+
+  /* Mode de remise et frais d'expédition */
+  .dm-wrap { display:flex; flex-direction:column; gap:6px; }
+  .dm-wrap > label.dm-pill { align-self:flex-start; background:var(--carrot); color:var(--white); padding:5px 16px; border-radius:999px; font-size:0.9rem; }
+  .dm-modes { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  .dm-mode { flex:1; min-width:140px; box-sizing:border-box; border:2px solid #e6e0d3; border-radius:14px; padding:12px; text-align:left; font-size:0.9rem; background:#fff; cursor:pointer; }
+  .dm-mode b { display:block; color:var(--leaf-deep); margin-bottom:2px; }
+  .dm-mode[aria-checked="true"] { border-color:var(--leaf-deep); background:#F1F7EC; }
+  .dm-mode[aria-checked="true"] b::before { content:"\2713\00a0"; }
+  .dm-mode:focus-visible { outline:3px solid rgba(131,193,61,0.55); outline-offset:2px; }
+  .dm-ship { background:var(--cream-soft); border-radius:14px; padding:14px; text-align:left; margin-top:6px; }
+  .dm-ship h4 { margin:0 0 4px; font-size:0.95rem; color:var(--leaf-deep); }
+  .dm-ship p.dm-hint { font-size:0.85rem; line-height:1.4; color:#888; margin:0 0 4px; text-align:left; }
+  .dm-tier { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border-radius:10px; padding:10px 12px; margin-top:8px; font-size:0.9rem; }
+  .auth-form .dm-tier input { width:64px; padding:6px 8px; border:1px solid #e6e0d3; border-radius:8px; font:inherit; box-sizing:border-box; }
+  .auth-form .dm-tier input.dm-price { width:76px; }
+  .auth-form .dm-tier input[readonly] { background:#f6f3ec; color:#6B5842; }
+  .dm-remove { margin-left:auto; background:none; border:none; cursor:pointer; font-family:inherit; color:#C8352F; font-weight:600; font-size:0.8rem; padding:4px 0; }
+  .dm-add { background:none; border:none; cursor:pointer; font-family:inherit; margin-top:10px; padding:4px 0; color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-align:left; align-self:flex-start; }
+  .dm-add:disabled { opacity:0.4; cursor:not-allowed; }
 </style>
 </body>
 </html>

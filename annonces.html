@@ -358,7 +358,7 @@
       card.innerHTML = `
         <a href="produit.html?id=${escapeHtml(item.id)}" class="produce-card-image" style="display:block;position:relative;">
           ${sellerTypeHtml}
-          <img src="${escapeHtml(item.image_url || 'https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop')}" alt="${escapeHtml(item.title)}">
+          <img src="${escapeHtml(item.image_url || 'agrivoisin-logo-final.png')}" alt="${escapeHtml(item.title)}">
         </a>
         <div class="produce-card-body">
           <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${promoPill}${lotPill}

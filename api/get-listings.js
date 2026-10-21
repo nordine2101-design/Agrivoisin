@@ -373,9 +373,113 @@ async function handleAdminAction(req, res) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Signalement d'une annonce (règlement européen sur les services numériques).
+// Ouvert à tous les visiteurs, sans compte : la personne donne son e-mail pour recevoir la réponse.
+// Les signalements sont enregistrés dans la table listing_reports, que seul le serveur peut lire.
+// ---------------------------------------------------------------------------
+const REPORT_REASONS = {
+  interdit_dangereux: 'Produit interdit ou dangereux',
+  faux_particulier: "Faux « particulier » (c'est en réalité un professionnel)",
+  trompeuse_arnaque: 'Annonce trompeuse ou arnaque',
+  contenu_inapproprie: 'Photo ou texte inapproprié',
+  autre: 'Autre',
+};
+const REPORT_DETAILS_MIN = 10;
+const REPORT_DETAILS_MAX = 2000;
+const REPORT_MAX_PER_EMAIL_PER_HOUR = 5;
+const REPORT_MAX_PER_LISTING_PER_HOUR = 20;
+
+async function reportListing(req, res) {
+  try {
+    const body = req.body || {};
+
+    // Champ piège : un humain ne le voit pas, un robot le remplit. On répond « ok » sans rien enregistrer.
+    if (typeof body.website === 'string' && body.website.trim() !== '') {
+      return res.status(200).json({ ok: true });
+    }
+
+    const listingId = typeof body.listingId === 'string' || typeof body.listingId === 'number' ? String(body.listingId).trim() : '';
+    const reason = typeof body.reason === 'string' ? body.reason : '';
+    const details = typeof body.details === 'string' ? body.details.trim() : '';
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+
+    if (!listingId || listingId.length > 64) {
+      return res.status(400).json({ error: 'Annonce introuvable.' });
+    }
+    if (!Object.prototype.hasOwnProperty.call(REPORT_REASONS, reason)) {
+      return res.status(400).json({ error: 'Choisissez pourquoi vous signalez cette annonce.' });
+    }
+    if (details.length < REPORT_DETAILS_MIN) {
+      return res.status(400).json({ error: 'Expliquez en quelques mots ce qui pose problème (' + REPORT_DETAILS_MIN + ' caractères au moins).' });
+    }
+    if (details.length > REPORT_DETAILS_MAX) {
+      return res.status(400).json({ error: 'Votre explication est trop longue (' + REPORT_DETAILS_MAX + ' caractères au plus).' });
+    }
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      return res.status(400).json({ error: 'Indiquez une adresse e-mail valide pour recevoir notre réponse.' });
+    }
+    if (body.confirm !== true) {
+      return res.status(400).json({ error: 'Cochez la case pour confirmer que vos informations sont données de bonne foi.' });
+    }
+
+    // L'annonce doit exister
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, title')
+      .eq('id', listingId)
+      .maybeSingle();
+    if (listingError) {
+      console.error('Erreur Supabase (signalement, lecture annonce) :', listingError);
+      return res.status(500).json({ error: 'Impossible d\'envoyer le signalement pour le moment. Réessayez.' });
+    }
+    if (!listing) {
+      return res.status(404).json({ error: "Cette annonce n'existe plus." });
+    }
+
+    // Limites contre les abus : par adresse e-mail et par annonce, sur la dernière heure
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { data: recent, error: recentError } = await supabase
+      .from('listing_reports')
+      .select('listing_id, reporter_email, created_at')
+      .gte('created_at', since)
+      .limit(1000);
+    if (recentError) {
+      console.error('Erreur Supabase (signalement, lecture récente) :', recentError);
+      return res.status(500).json({ error: 'Impossible d\'envoyer le signalement pour le moment. Réessayez.' });
+    }
+    const rows = recent || [];
+    if (rows.filter((r) => r.reporter_email === email).length >= REPORT_MAX_PER_EMAIL_PER_HOUR
+      || rows.filter((r) => String(r.listing_id) === String(listing.id)).length >= REPORT_MAX_PER_LISTING_PER_HOUR) {
+      return res.status(429).json({ error: 'Trop de signalements en peu de temps. Réessayez plus tard.' });
+    }
+
+    const { error: insertError } = await supabase.from('listing_reports').insert({
+      listing_id: String(listing.id),
+      listing_title: String(listing.title || '').slice(0, 200),
+      reason,
+      details,
+      reporter_email: email,
+    });
+    if (insertError) {
+      console.error('Erreur Supabase (signalement, enregistrement) :', insertError);
+      return res.status(500).json({ error: 'Impossible d\'envoyer le signalement pour le moment. Réessayez.' });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Impossible d\'envoyer le signalement pour le moment. Réessayez.' });
+  }
+}
+
 export default async function handler(req, res) {
-  // POST : actions de l'administrateur (modération des commentaires, suivi fiscal des vendeurs)
+  // POST : signalement d'une annonce (ouvert à tous), sinon actions de l'administrateur
+  // (modération des commentaires, suivi fiscal des vendeurs)
   if (req.method === 'POST') {
+    if (req.body && req.body.action === 'report_listing') {
+      return reportListing(req, res);
+    }
     return handleAdminAction(req, res);
   }
 
@@ -487,4 +591,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-

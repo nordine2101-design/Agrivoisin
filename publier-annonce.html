@@ -694,6 +694,7 @@
         imageUrl: imageUrl,
         pickupHours: pickup.rows,
         quantity: quantityValue,
+        proAttest: document.getElementById('proAttest').checked,
       };
 
       const response = await fetch('/api/create-listing', {

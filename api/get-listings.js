@@ -329,6 +329,99 @@ async function adminListSellerTotals() {
   };
 }
 
+// Signalements d'annonces (règlement européen sur les services numériques) : la liste, puis la décision de l'administrateur.
+// « maintenue » = l'annonce reste en ligne ; « retiree » = l'annonce est supprimée du site.
+const REPORT_NOTE_MAX = 1000;
+const REPORTS_LISTED_MAX = 200;
+
+async function adminListReports() {
+  const { data: reports, error } = await supabase
+    .from('listing_reports')
+    .select('id, created_at, listing_id, listing_title, reason, details, reporter_email, status, handled_at, decision, admin_note')
+    .order('created_at', { ascending: false })
+    .limit(REPORTS_LISTED_MAX);
+  if (error) throw new Error('Lecture des signalements impossible : ' + error.message);
+
+  const rows = reports || [];
+  const listingIds = [...new Set(rows.map((r) => r.listing_id).filter(Boolean))];
+  let existing = new Set();
+  if (listingIds.length > 0) {
+    const { data: found, error: listingsError } = await supabase.from('listings').select('id').in('id', listingIds);
+    if (listingsError) throw new Error('Lecture des annonces impossible : ' + listingsError.message);
+    existing = new Set((found || []).map((l) => String(l.id)));
+  }
+
+  return {
+    reports: rows.map((r) => ({
+      id: r.id,
+      createdAt: r.created_at,
+      listingId: r.listing_id,
+      listingTitle: r.listing_title || null,
+      reason: r.reason,
+      reasonLabel: REPORT_REASONS[r.reason] || r.reason,
+      details: r.details,
+      email: r.reporter_email,
+      status: r.status === 'traite' ? 'traite' : 'nouveau',
+      handledAt: r.handled_at || null,
+      decision: r.decision || null,
+      adminNote: r.admin_note || null,
+      listingExists: existing.has(String(r.listing_id)),
+    })),
+  };
+}
+
+async function adminHandleReport(body, res) {
+  const reportId = typeof body.reportId === 'string' ? body.reportId.trim() : '';
+  const decision = body.decision;
+  const note = typeof body.note === 'string' ? body.note.trim() : '';
+  if (!reportId || reportId.length > 64 || (decision !== 'maintenue' && decision !== 'retiree')) {
+    return res.status(400).json({ error: 'Demande invalide.' });
+  }
+  if (note.length > REPORT_NOTE_MAX) {
+    return res.status(400).json({ error: 'Votre note est trop longue (' + REPORT_NOTE_MAX + ' caractères au plus).' });
+  }
+
+  const { data: report, error: readError } = await supabase
+    .from('listing_reports')
+    .select('id, listing_id, status')
+    .eq('id', reportId)
+    .maybeSingle();
+  if (readError) {
+    console.error('Erreur Supabase (signalement, lecture) :', readError);
+    return res.status(500).json({ error: 'Impossible de traiter ce signalement pour le moment. Réessayez.' });
+  }
+  if (!report) return res.status(404).json({ error: 'Signalement introuvable.' });
+  if (report.status === 'traite') return res.status(409).json({ error: 'Ce signalement a déjà été traité.' });
+
+  // Retirer l'annonce : elle est supprimée du site (si elle n'existe déjà plus, il n'y a rien à supprimer)
+  if (decision === 'retiree') {
+    const { error: deleteError } = await supabase.from('listings').delete().eq('id', report.listing_id);
+    if (deleteError) {
+      console.error('Erreur Supabase (retrait d\'une annonce signalée) :', deleteError);
+      if (deleteError.code === '23503') {
+        return res.status(409).json({ error: 'Cette annonce est liée à des commandes : elle ne peut pas être supprimée.' });
+      }
+      return res.status(500).json({ error: "Impossible de retirer l'annonce pour le moment. Réessayez." });
+    }
+  }
+
+  // Une annonce retirée clôt tous ses signalements en attente ; une annonce gardée ne clôt que celui-ci
+  let update = supabase
+    .from('listing_reports')
+    .update({ status: 'traite', handled_at: new Date().toISOString(), decision, admin_note: note || null })
+    .eq('status', 'nouveau');
+  update = decision === 'retiree' ? update.eq('listing_id', report.listing_id) : update.eq('id', report.id);
+  const { error: updateError } = await update;
+  if (updateError) {
+    console.error('Erreur Supabase (signalement, enregistrement de la décision) :', updateError);
+    return res.status(500).json({ error: decision === 'retiree'
+      ? "L'annonce a bien été retirée, mais la décision n'a pas pu être enregistrée. Actualisez la page."
+      : 'Impossible d\'enregistrer la décision pour le moment. Réessayez.' });
+  }
+
+  return res.status(200).json({ ok: true, decision });
+}
+
 async function handleAdminAction(req, res) {
   try {
     const admin = await requireAdmin(req, res);
@@ -342,6 +435,14 @@ async function handleAdminAction(req, res) {
 
     if (action === 'admin_list_seller_totals') {
       return res.status(200).json(await adminListSellerTotals());
+    }
+
+    if (action === 'admin_list_reports') {
+      return res.status(200).json(await adminListReports());
+    }
+
+    if (action === 'admin_handle_report') {
+      return adminHandleReport(req.body, res);
     }
 
     if (action === 'admin_set_review_hidden') {

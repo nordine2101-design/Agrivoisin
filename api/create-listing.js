@@ -82,6 +82,57 @@ function validateQuantity(value) {
   return { quantity: value };
 }
 
+// Modes de remise : retrait chez le vendeur, expédition par le vendeur, ou les deux au choix de l'acheteur
+const DELIVERY_MODES = ['retrait', 'expedition', 'les_deux'];
+
+// Frais d'expédition : des paliers selon la quantité commandée, par exemple
+// 1 à 2 unités = 5,00 €, 3 à 5 unités = 8,00 €. Ils couvrent toutes les quantités possibles, sans trou.
+// Renvoie { tiers } (paliers propres) ou { error }.
+const MAX_TIERS = 10;
+const MAX_SHIPPING_PRICE = 500;
+
+function validateShippingTiers(input, stockQuantity) {
+  if (!Array.isArray(input) || input.length === 0) {
+    return { error: "Indiquez vos frais d'expédition : au moins un palier est obligatoire." };
+  }
+  if (input.length > MAX_TIERS) {
+    return { error: "Trop de paliers de frais d'expédition : " + MAX_TIERS + ' au maximum.' };
+  }
+
+  const tiers = [];
+  for (const t of input) {
+    if (!t || typeof t !== 'object') {
+      return { error: "Palier de frais d'expédition invalide." };
+    }
+    if (!Number.isInteger(t.min) || !Number.isInteger(t.max) || t.min < 1 || t.max < t.min || t.max > MAX_QUANTITY) {
+      return { error: "Frais d'expédition : chaque palier doit aller d'une quantité de départ à une quantité de fin (nombres entiers, la fin n'est pas avant le début)." };
+    }
+    if (typeof t.price !== 'number' || !Number.isFinite(t.price) || t.price < 0 || t.price > MAX_SHIPPING_PRICE) {
+      return { error: "Frais d'expédition : le montant d'un palier doit être compris entre 0 € et " + MAX_SHIPPING_PRICE + ' €.' };
+    }
+    if (Math.round(t.price * 100) !== t.price * 100 && Math.abs(Math.round(t.price * 100) - t.price * 100) > 1e-6) {
+      return { error: "Frais d'expédition : un montant ne peut pas avoir plus de deux chiffres après la virgule." };
+    }
+    tiers.push({ min: t.min, max: t.max, price: Math.round(t.price * 100) / 100 });
+  }
+
+  tiers.sort((a, b) => a.min - b.min);
+
+  if (tiers[0].min !== 1) {
+    return { error: "Frais d'expédition : le premier palier doit commencer à 1." };
+  }
+  for (let i = 1; i < tiers.length; i++) {
+    if (tiers[i].min !== tiers[i - 1].max + 1) {
+      return { error: "Frais d'expédition : les paliers doivent se suivre sans trou ni chevauchement (un palier commence juste après la fin du précédent)." };
+    }
+  }
+  if (tiers[tiers.length - 1].max < stockQuantity) {
+    return { error: "Frais d'expédition : le dernier palier doit aller au moins jusqu'à la quantité disponible (" + stockQuantity + ').' };
+  }
+
+  return { tiers };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -102,7 +153,7 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
-    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest } = req.body;
+    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers } = req.body;
 
     // 1. Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
@@ -145,16 +196,39 @@ export default async function handler(req, res) {
       proAttestedAt = new Date().toISOString();
     }
 
-    // 3. Les horaires de retrait de cette annonce sont obligatoires, et vérifiés ici
-    const hours = validatePickupHours(pickupHours);
-    if (hours.error) {
-      return res.status(400).json({ error: hours.error });
+    // 3. Le mode de remise : retrait (par défaut), expédition, ou les deux.
+    //    L'expédition est réservée aux professionnels qui vendent une catégorie réservée aux professionnels
+    //    (produits qui se conservent), jamais aux fruits et légumes frais.
+    const mode = deliveryMode == null ? 'retrait' : deliveryMode;
+    if (!DELIVERY_MODES.includes(mode)) {
+      return res.status(400).json({ error: "Mode de remise invalide : choisissez retrait, expédition ou les deux." });
+    }
+    if (mode !== 'retrait' && !(seller.seller_type === 'professionnel' && !PARTICULIER_CATEGORIES.includes(category))) {
+      return res.status(403).json({ error: "L'expédition n'est pas possible pour cette catégorie de produits : seul le retrait est proposé." });
     }
 
     // 4. La quantité disponible est obligatoire pour une nouvelle annonce, et vérifiée ici
     const stock = validateQuantity(quantity);
     if (stock.error) {
       return res.status(400).json({ error: stock.error });
+    }
+
+    // 4 bis. Les horaires de retrait sont obligatoires dès que le retrait est proposé (retrait ou les deux)
+    let hours = { rows: [] };
+    if (mode !== 'expedition') {
+      hours = validatePickupHours(pickupHours);
+      if (hours.error) {
+        return res.status(400).json({ error: hours.error });
+      }
+    }
+
+    // 4 ter. Les frais d'expédition par paliers sont obligatoires dès que l'expédition est proposée
+    let shipping = { tiers: null };
+    if (mode !== 'retrait') {
+      shipping = validateShippingTiers(shippingTiers, stock.quantity);
+      if (shipping.error) {
+        return res.status(400).json({ error: shipping.error });
+      }
     }
 
     // 5. Créer l'annonce liée à ce vendeur
@@ -172,6 +246,8 @@ export default async function handler(req, res) {
         image_url: imageUrl,
         quantity_available: stock.quantity,
         pro_attested_at: proAttestedAt,
+        delivery_mode: mode,
+        shipping_tiers: shipping.tiers,
       })
       .select()
       .single();
@@ -181,9 +257,12 @@ export default async function handler(req, res) {
     }
 
     // 6. Ranger les horaires de retrait avec l'annonce
-    const { error: hoursError } = await supabase
-      .from('listing_pickup_hours')
-      .insert(hours.rows.map((h) => ({ ...h, listing_id: listing.id })));
+    let hoursError = null;
+    if (hours.rows.length > 0) {
+      ({ error: hoursError } = await supabase
+        .from('listing_pickup_hours')
+        .insert(hours.rows.map((h) => ({ ...h, listing_id: listing.id }))));
+    }
 
     if (hoursError) {
       console.error('Erreur Supabase (horaires de retrait) :', hoursError);

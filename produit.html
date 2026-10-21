@@ -36,6 +36,7 @@
       <button type="button" id="addToCartBtn" class="btn btn-primary" style="width:100%;">Ajouter au panier</button>
       <p id="listingStockNote" style="display:none;margin-top:12px;font-size:0.9rem;color:#6B5842;"></p>
       <a id="viewCartLink" href="panier.html" style="display:none;margin-top:14px;font-weight:700;color:var(--leaf-deep);">Voir mon panier</a>
+      <p style="margin:14px 0 0;text-align:center;"><a href="#" id="reportOpenLink" style="font-size:0.82rem;color:#8a7a62;text-decoration:underline;text-underline-offset:2px;">Signaler cette annonce</a></p>
 
       <p class="product-trust-note" style="margin-top:20px;text-align:left;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:20px;height:20px;flex-shrink:0;"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
@@ -563,6 +564,150 @@
   .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }
   .price-wrap .price { color:#C8352F; }
   .promo-pill { display:inline-block; margin:6px 0 0 0; padding:3px 10px; border-radius:999px; background:#FFE27A; color:#B45A00; font-size:0.75rem; font-weight:700; }
+
+  .report-overlay { position:fixed; inset:0; z-index:1000; background:rgba(30,40,30,0.55); align-items:center; justify-content:center; padding:16px; overflow-y:auto; }
+  .report-box { position:relative; background:#fff; border-radius:24px; box-shadow:0 20px 50px rgba(0,0,0,0.25); padding:26px; width:100%; max-width:440px; box-sizing:border-box; max-height:calc(100vh - 32px); overflow-y:auto; }
+  .report-title { font-family:var(--font-display); color:var(--leaf-deep); font-size:1.25rem; margin:0 0 8px; }
+  .report-intro { color:#6B5842; font-size:0.9rem; line-height:1.55; margin:0 0 16px; }
+  .report-label { display:block; font-size:0.8rem; font-weight:700; color:var(--leaf-deep); margin:12px 0 6px; }
+  .report-field { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #e6e0d3; border-radius:12px; font:inherit; font-size:0.95rem; background:#fff; color:#3d3a35; }
+  textarea.report-field { resize:vertical; }
+  .report-check { display:flex; align-items:flex-start; gap:8px; margin:14px 0 16px; font-size:0.85rem; line-height:1.4; color:#3d3a35; cursor:pointer; }
+  .report-check input { margin-top:3px; flex-shrink:0; }
+  .report-error { margin:0 0 12px; padding:10px 12px; border-radius:10px; background:#FDECEA; color:#C8352F; font-size:0.88rem; font-weight:600; }
+  .report-cancel { color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-decoration:none; }
 </style>
+
+<!-- ============ SIGNALER UNE ANNONCE ============ -->
+<div id="reportModal" class="report-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+  <div class="report-box">
+    <form id="reportForm" novalidate>
+      <h2 id="reportTitle" class="report-title">Signaler cette annonce</h2>
+      <p class="report-intro">Cette annonce vous paraît illégale, dangereuse ou trompeuse ? Dites-nous pourquoi : nous l'examinons et nous vous répondons par e-mail.</p>
+
+      <label class="report-label" for="reportReason">Pourquoi la signalez-vous ?</label>
+      <select id="reportReason" class="report-field">
+        <option value="">Choisissez un motif</option>
+        <option value="interdit_dangereux">Produit interdit ou dangereux</option>
+        <option value="faux_particulier">Faux « particulier » (c'est en réalité un professionnel)</option>
+        <option value="trompeuse_arnaque">Annonce trompeuse ou arnaque</option>
+        <option value="contenu_inapproprie">Photo ou texte inapproprié</option>
+        <option value="autre">Autre</option>
+      </select>
+
+      <label class="report-label" for="reportDetails">Explications</label>
+      <textarea id="reportDetails" class="report-field" rows="3" maxlength="2000" placeholder="Expliquez en quelques mots ce qui pose problème"></textarea>
+
+      <label class="report-label" for="reportEmail">Votre adresse e-mail</label>
+      <input id="reportEmail" class="report-field" type="email" maxlength="254" autocomplete="email" placeholder="vous@exemple.com">
+
+      <div style="position:absolute;left:-5000px;" aria-hidden="true"><label>Ne pas remplir <input id="reportWebsite" type="text" tabindex="-1" autocomplete="off"></label></div>
+
+      <label class="report-check"><input id="reportConfirm" type="checkbox"> <span>Je confirme que ces informations sont exactes et que je les donne de bonne foi.</span></label>
+
+      <p id="reportError" class="report-error" style="display:none;" role="alert"></p>
+
+      <button type="submit" id="reportSubmit" class="btn btn-primary" style="width:100%;">Envoyer le signalement</button>
+      <p style="text-align:center;margin:14px 0 0;"><a href="#" id="reportCancel" class="report-cancel">Annuler</a></p>
+    </form>
+
+    <div id="reportDone" style="display:none;text-align:center;">
+      <h2 class="report-title">Merci !</h2>
+      <p class="report-intro">Votre signalement a bien été envoyé. Nous l'examinons et nous vous répondons par e-mail.</p>
+      <button type="button" id="reportClose" class="btn btn-primary" style="width:100%;">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- Signaler une annonce ----------
+  (function () {
+    var modal = document.getElementById('reportModal');
+    var form = document.getElementById('reportForm');
+    var done = document.getElementById('reportDone');
+    var errorEl = document.getElementById('reportError');
+    var submitBtn = document.getElementById('reportSubmit');
+    var opener = document.getElementById('reportOpenLink');
+    var wantedId = new URLSearchParams(window.location.search).get('id');
+
+    function openModal() {
+      form.reset();
+      errorEl.style.display = 'none';
+      form.style.display = 'block';
+      done.style.display = 'none';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Envoyer le signalement';
+      modal.style.display = 'flex';
+      document.getElementById('reportReason').focus();
+    }
+    function closeModal() {
+      modal.style.display = 'none';
+      opener.focus();
+    }
+    function showError(text) {
+      errorEl.textContent = text;
+      errorEl.style.display = 'block';
+    }
+
+    opener.addEventListener('click', function (e) { e.preventDefault(); openModal(); });
+    document.getElementById('reportCancel').addEventListener('click', function (e) { e.preventDefault(); closeModal(); });
+    document.getElementById('reportClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errorEl.style.display = 'none';
+
+      var reason = document.getElementById('reportReason').value;
+      var details = document.getElementById('reportDetails').value.trim();
+      var email = document.getElementById('reportEmail').value.trim();
+      var confirmed = document.getElementById('reportConfirm').checked;
+
+      if (!reason) { showError('Choisissez pourquoi vous signalez cette annonce.'); return; }
+      if (details.length < 10) { showError('Expliquez en quelques mots ce qui pose problème (10 caractères au moins).'); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { showError('Indiquez une adresse e-mail valide pour recevoir notre réponse.'); return; }
+      if (!confirmed) { showError('Cochez la case pour confirmer que vos informations sont données de bonne foi.'); return; }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Envoi en cours...';
+
+      fetch('/api/get-listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'report_listing',
+          listingId: wantedId,
+          reason: reason,
+          details: details,
+          email: email,
+          confirm: true,
+          website: document.getElementById('reportWebsite').value
+        })
+      })
+        .then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; });
+        })
+        .then(function (r) {
+          if (r.ok) {
+            form.style.display = 'none';
+            done.style.display = 'block';
+            document.getElementById('reportClose').focus();
+          } else {
+            showError(r.data.error || "Impossible d'envoyer le signalement pour le moment. Réessayez.");
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Envoyer le signalement';
+          }
+        })
+        .catch(function () {
+          showError("Impossible d'envoyer le signalement pour le moment. Réessayez.");
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Envoyer le signalement';
+        });
+    });
+  })();
+</script>
 </body>
 </html>

@@ -34,6 +34,10 @@
         <div id="listingShipLines" style="font-size:0.9rem;line-height:1.7;"></div>
         <p id="listingShipNote" style="font-size:0.8rem;color:#6B5842;margin:8px 0 0;"></p>
       </div>
+      <div id="listingShipBadge" style="display:none;align-items:center;justify-content:center;gap:10px;margin:0 0 18px;">
+        <img src="expedition-possible%20(1).png" alt="" width="110" height="106">
+        <strong style="color:var(--leaf-deep);font-size:1.05rem;">Livraison possible</strong>
+      </div>
       <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
       <p style="margin-bottom:22px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span><span id="listingLot" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
       <p id="listingStock" style="display:none;margin:-10px 0 18px;font-weight:700;"></p>
@@ -409,6 +413,7 @@
         ? "Frais d'expédition par commande. Vous choisirez retrait ou expédition dans votre panier."
         : "Frais d'expédition par commande.";
       document.getElementById('listingShip').style.display = 'block';
+      document.getElementById('listingShipBadge').style.display = 'flex';
     }
 
     // Sans retrait, l'adresse du vendeur n'est pas communiquée : on ne l'annonce pas

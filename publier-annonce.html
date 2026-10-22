@@ -238,9 +238,9 @@
   const quantityInput = document.getElementById('quantity');
 
   let deliveryMode = 'retrait';
-  // Un palier = { max, price } : le début est déduit du palier précédent (le 1er commence à 1),
-  // et la fin du dernier palier est toujours la quantité disponible.
-  let shipRows = [{ max: null, price: '' }];
+  // Un palier = { min, max, price } : le vendeur écrit librement le début, la fin et le montant.
+  // Les paliers ne dépendent pas du stock disponible.
+  let shipRows = [{ min: '1', max: '', price: '' }];
 
   function currentQuantity() {
     const q = Number(quantityInput.value);
@@ -258,90 +258,68 @@
     return Number(value).toFixed(2).replace('.', ',') + ' €';
   }
 
-  function tierStart(index) {
-    if (index === 0) return 1;
-    const prev = shipRows[index - 1].max;
-    return Number.isInteger(prev) ? prev + 1 : null;
-  }
-
-  function tierEnd(index) {
-    return index === shipRows.length - 1 ? currentQuantity() : shipRows[index].max;
+  // Lit un nombre entier positif saisi (vide ou invalide : null)
+  function toInt(value) {
+    const n = parseInt(String(value == null ? '' : value).replace(/\D/g, ''), 10);
+    return Number.isInteger(n) && n >= 1 ? n : null;
   }
 
   // Phrase montrée à l'acheteur, mise à jour en direct
   function renderShipPreview() {
     const unit = unitInput.value;
     const parts = [];
-    shipRows.forEach(function (row, i) {
-      const start = tierStart(i);
-      const end = tierEnd(i);
+    let lastEnd = null;
+    shipRows.forEach(function (row) {
+      const start = toInt(row.min);
+      const end = toInt(row.max);
       const price = Number(String(row.price).trim().replace(',', '.'));
-      if (!Number.isInteger(start) || !Number.isInteger(end) || end < start || String(row.price).trim() === '' || !Number.isFinite(price)) return;
+      if (start === null || end === null || end < start || String(row.price).trim() === '' || !Number.isFinite(price)) return;
       const range = start === end ? start + ' ' + unitLabel(unit, start) : start + ' à ' + end + ' ' + unitLabel(unit, end);
       parts.push(formatEuro(price) + ' pour ' + range);
+      if (lastEnd === null || end > lastEnd) lastEnd = end;
     });
-    shipPreview.textContent = parts.length ? 'L\'acheteur verra : « Expédition : ' + parts.join(' · ') + ' ».' : '';
-  }
-
-  // Remet à jour les débuts de palier (sans toucher aux champs que le vendeur est en train de remplir)
-  function syncTierStarts() {
-    const rowsEls = shipTiersEl.querySelectorAll('.dm-tier');
-    rowsEls.forEach(function (el, i) {
-      const start = tierStart(i);
-      el.querySelector('.dm-min').value = Number.isInteger(start) ? start : '';
-      if (i === shipRows.length - 1) {
-        const q = currentQuantity();
-        el.querySelector('.dm-max').value = q === null ? '' : q;
-      }
-    });
-    renderShipPreview();
+    if (!parts.length) { shipPreview.textContent = ''; return; }
+    shipPreview.textContent = 'L\'acheteur verra : « Expédition : ' + parts.join(' · ') + ' ». Au-delà de '
+      + lastEnd + ' ' + unitLabel(unit, lastEnd) + ', l\'expédition n\'est pas proposée (le retrait reste possible).';
   }
 
   function updateAddState() {
-    const last = shipRows.length - 1;
-    const q = currentQuantity();
-    const start = tierStart(last);
-    const noRoom = q === null || !Number.isInteger(start) || start >= q || shipRows.length >= 10;
-    shipAddBtn.disabled = noRoom;
-    shipAddBtn.title = noRoom ? 'Plus de place : le dernier palier ne peut pas être coupé' : '';
+    const full = shipRows.length >= 10;
+    shipAddBtn.disabled = full;
+    shipAddBtn.title = full ? '10 paliers au maximum' : '';
   }
 
   function renderShip() {
-    const q = currentQuantity();
     const unit = unitInput.value;
 
-    // Si la quantité disponible a baissé, on retire les paliers qui commenceraient au-delà
-    while (q !== null && shipRows.length > 1) {
-      const start = tierStart(shipRows.length - 1);
-      if (Number.isInteger(start) && start > q) shipRows.pop(); else break;
-    }
-
-    shipHelp.textContent = 'Fixez vos frais selon le nombre de ' + unitLabel(unit, 2) + ' commandés. Vous êtes libre des montants.';
+    shipHelp.textContent = 'Écrivez vos frais selon le nombre de ' + unitLabel(unit, 2) + ' commandés. Vous êtes libre des nombres et des montants, vous pourrez les changer plus tard.';
     shipTiersEl.innerHTML = '';
 
     shipRows.forEach(function (row, i) {
-      const isLast = i === shipRows.length - 1;
       const el = document.createElement('div');
       el.className = 'dm-tier';
 
-      const unitText = unitLabel(unit, 2);
       el.innerHTML =
-        'De <input type="text" class="dm-min" readonly aria-label="Palier ' + (i + 1) + ' : de"> ' +
-        'à <input type="text" inputmode="numeric" class="dm-max" aria-label="Palier ' + (i + 1) + ' : jusqu\'à"' + (isLast ? ' readonly' : '') + '> ' +
+        'De <input type="text" inputmode="numeric" class="dm-min" aria-label="Palier ' + (i + 1) + ' : de"> ' +
+        'à <input type="text" inputmode="numeric" class="dm-max" aria-label="Palier ' + (i + 1) + ' : jusqu\'à"> ' +
         '<span class="dm-unit"></span> : ' +
         '<input type="text" inputmode="decimal" class="dm-price" placeholder="0,00" aria-label="Palier ' + (i + 1) + ' : montant en euros"> €';
-      el.querySelector('.dm-unit').textContent = unitText;
+      el.querySelector('.dm-unit').textContent = unitLabel(unit, 2);
 
+      const minInput = el.querySelector('.dm-min');
       const maxInput = el.querySelector('.dm-max');
       const priceInput = el.querySelector('.dm-price');
-      if (!isLast && Number.isInteger(row.max)) maxInput.value = row.max;
+      minInput.value = row.min;
+      maxInput.value = row.max;
       priceInput.value = row.price;
 
+      minInput.addEventListener('input', function () {
+        row.min = minInput.value.replace(/\D/g, '');
+        renderShipPreview();
+      });
       maxInput.addEventListener('input', function () {
-        const n = parseInt(maxInput.value.replace(/\D/g, ''), 10);
-        row.max = Number.isInteger(n) ? n : null;
-        syncTierStarts();
-        updateAddState();
+        row.max = maxInput.value.replace(/\D/g, '');
+        renderShipPreview();
       });
       priceInput.addEventListener('input', function () {
         row.price = priceInput.value;
@@ -364,19 +342,15 @@
       shipTiersEl.appendChild(el);
     });
 
-    syncTierStarts();
+    renderShipPreview();
     updateAddState();
   }
 
   shipAddBtn.addEventListener('click', function () {
-    const q = currentQuantity();
-    const last = shipRows.length - 1;
-    const start = tierStart(last);
-    if (q === null || !Number.isInteger(start) || start >= q) return;
-    // Le palier qui était le dernier se termine au milieu ; un nouveau dernier palier le suit
-    const middle = Math.min(q - 1, Math.max(start, Math.floor((start + q - 1) / 2)));
-    shipRows[last].max = middle;
-    shipRows.push({ max: null, price: '' });
+    if (shipRows.length >= 10) return;
+    // Le nouveau palier commence juste après la fin du précédent (le vendeur peut le changer)
+    const prevEnd = toInt(shipRows[shipRows.length - 1].max);
+    shipRows.push({ min: prevEnd === null ? '' : String(prevEnd + 1), max: '', price: '' });
     renderShip();
   });
 
@@ -404,40 +378,43 @@
   }
 
   function resetDelivery() {
-    shipRows = [{ max: null, price: '' }];
+    shipRows = [{ min: '1', max: '', price: '' }];
     setDeliveryMode('retrait');
     deliveryWrap.style.display = 'none';
   }
 
   unitInput.addEventListener('input', function () { if (deliveryMode !== 'retrait') renderShip(); });
-  quantityInput.addEventListener('input', function () { if (deliveryMode !== 'retrait') renderShip(); });
 
   // Vérifie les paliers saisis et les prépare pour l'envoi : { tiers } ou { error }
-  function collectShippingTiers(quantity) {
+  function collectShippingTiers() {
     const tiers = [];
-    let start = 1;
     for (let i = 0; i < shipRows.length; i++) {
       const row = shipRows[i];
-      const isLast = i === shipRows.length - 1;
       const label = 'Frais d\'expédition, palier ' + (i + 1) + ' : ';
-      const end = isLast ? quantity : row.max;
-      if (!Number.isInteger(end)) {
-        return { error: label + 'indiquez jusqu\'à combien de ' + unitLabel(unitInput.value, 2) + ' ce palier s\'applique.' };
+      const start = toInt(row.min);
+      const end = toInt(row.max);
+      if (start === null || end === null) {
+        return { error: label + 'indiquez de combien à combien de ' + unitLabel(unitInput.value, 2) + ' ce palier s\'applique.' };
       }
       if (end < start) {
         return { error: label + 'la fin doit être égale ou supérieure au début (' + start + ').' };
       }
-      if (!isLast && end >= quantity) {
-        return { error: label + 'la fin doit être inférieure à la quantité disponible (' + quantity + ' ' + unitLabel(unitInput.value, quantity) + '). Le dernier palier va jusqu\'à la quantité disponible.' };
+      if (end > 9999) {
+        return { error: label + 'la fin ne peut pas dépasser 9999.' };
       }
       const priceText = String(row.price).trim().replace(',', '.');
       if (!/^\d+(\.\d{1,2})?$/.test(priceText) || Number(priceText) > 500) {
         return { error: label + 'indiquez un montant en euros entre 0 et 500 (par exemple 5 ou 5,50).' };
       }
-      tiers.push({ min: start, max: end, price: Number(priceText) });
-      start = end + 1;
+      tiers.push({ min: start, max: end, price: Number(priceText), n: i + 1 });
     }
-    return { tiers };
+    const sorted = tiers.slice().sort(function (a, b) { return a.min - b.min; });
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].min <= sorted[i - 1].max) {
+        return { error: 'Frais d\'expédition : les paliers ' + sorted[i - 1].n + ' et ' + sorted[i].n + ' se chevauchent. Un palier doit commencer après la fin du précédent.' };
+      }
+    }
+    return { tiers: sorted.map(function (t) { return { min: t.min, max: t.max, price: t.price }; }) };
   }
 
   function fillCategories(sellerType) {
@@ -907,7 +884,7 @@
     // Les frais d'expédition par paliers sont vérifiés avant l'envoi de la photo
     let shipping = { tiers: undefined };
     if (mode !== 'retrait') {
-      shipping = collectShippingTiers(quantityValue);
+      shipping = collectShippingTiers();
       if (shipping.error) {
         errorEl.textContent = 'Erreur : ' + shipping.error;
         errorEl.style.display = 'block';

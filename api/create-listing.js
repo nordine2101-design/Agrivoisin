@@ -86,12 +86,14 @@ function validateQuantity(value) {
 const DELIVERY_MODES = ['retrait', 'expedition', 'les_deux'];
 
 // Frais d'expédition : des paliers selon la quantité commandée, par exemple
-// 1 à 2 unités = 5,00 €, 3 à 5 unités = 8,00 €. Ils couvrent toutes les quantités possibles, sans trou.
+// 1 à 2 unités = 5,00 €, 3 à 5 unités = 8,00 €. Le vendeur les écrit librement : ils ne dépendent pas du stock.
+// Seule règle : deux paliers ne se chevauchent pas. Au-delà du dernier palier (ou entre deux paliers), l'expédition
+// n'est pas proposée pour cette quantité (le retrait reste possible).
 // Renvoie { tiers } (paliers propres) ou { error }.
 const MAX_TIERS = 10;
 const MAX_SHIPPING_PRICE = 500;
 
-function validateShippingTiers(input, stockQuantity) {
+function validateShippingTiers(input) {
   if (!Array.isArray(input) || input.length === 0) {
     return { error: "Indiquez vos frais d'expédition : au moins un palier est obligatoire." };
   }
@@ -118,16 +120,10 @@ function validateShippingTiers(input, stockQuantity) {
 
   tiers.sort((a, b) => a.min - b.min);
 
-  if (tiers[0].min !== 1) {
-    return { error: "Frais d'expédition : le premier palier doit commencer à 1." };
-  }
   for (let i = 1; i < tiers.length; i++) {
-    if (tiers[i].min !== tiers[i - 1].max + 1) {
-      return { error: "Frais d'expédition : les paliers doivent se suivre sans trou ni chevauchement (un palier commence juste après la fin du précédent)." };
+    if (tiers[i].min <= tiers[i - 1].max) {
+      return { error: "Frais d'expédition : deux paliers ne peuvent pas se chevaucher (un palier commence après la fin du précédent)." };
     }
-  }
-  if (tiers[tiers.length - 1].max < stockQuantity) {
-    return { error: "Frais d'expédition : le dernier palier doit aller au moins jusqu'à la quantité disponible (" + stockQuantity + ').' };
   }
 
   return { tiers };
@@ -225,7 +221,7 @@ export default async function handler(req, res) {
     // 4 ter. Les frais d'expédition par paliers sont obligatoires dès que l'expédition est proposée
     let shipping = { tiers: null };
     if (mode !== 'retrait') {
-      shipping = validateShippingTiers(shippingTiers, stock.quantity);
+      shipping = validateShippingTiers(shippingTiers);
       if (shipping.error) {
         return res.status(400).json({ error: shipping.error });
       }

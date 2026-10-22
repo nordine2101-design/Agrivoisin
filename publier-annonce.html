@@ -1134,13 +1134,17 @@
 
 <style>
   .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
-  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
-  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel { background:#F4FAEC; border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#C9E8A0; color:#2E6B2F; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-form-box { max-width:560px; margin:0 auto; }
-  .my-form-box .auth-form > label { align-self:flex-start; background:var(--carrot); color:var(--white); padding:5px 16px; border-radius:999px; font-size:0.9rem; }
-  #listingSubmitBtn { background:#A02B19; color:#fff; border:1.5px solid #A02B19; box-shadow:0 4px 14px rgba(160,43,25,0.35); }
-  #listingSubmitBtn:hover:not(:disabled) { background:#A02B19; color:#fff; }
+  .my-form-box .auth-form > label { align-self:flex-start; background:#4C9F50; color:#fff; padding:5px 16px; border-radius:999px; font-size:0.9rem; }
+  .my-form-box .auth-form > label:nth-of-type(3n+2) { background:#7FB83F; }
+  .my-form-box .auth-form > label:nth-of-type(3n+3) { background:#2E8B57; }
+  .my-form-box .auth-form > input:not([type=checkbox]), .my-form-box .auth-form > select { border-color:#9FC49A; }
+  .my-form-box .auth-form #category { border-radius:999px; border:1.5px solid #9FC49A; padding:12px 20px; font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background-color:#fff; }
+  #listingSubmitBtn { background:#2E8B57; color:#fff; border:1.5px solid #2E8B57; box-shadow:0 4px 14px rgba(46,139,87,0.35); }
+  #listingSubmitBtn:hover:not(:disabled) { background:#2E8B57; color:#fff; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
   .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
   .pickup-section { margin-top:20px; padding-top:6px; border-top:1px solid #eee; }
@@ -1171,7 +1175,7 @@
 
   /* Mode de remise et frais d'expédition */
   .dm-wrap { display:flex; flex-direction:column; gap:6px; }
-  .dm-wrap > label.dm-pill { align-self:flex-start; background:var(--carrot); color:var(--white); padding:5px 16px; border-radius:999px; font-size:0.9rem; }
+  .dm-wrap > label.dm-pill { align-self:flex-start; background:#4C9F50; color:#fff; padding:5px 16px; border-radius:999px; font-size:0.9rem; }
   .dm-modes { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
   .dm-mode { flex:1; min-width:140px; box-sizing:border-box; border:2px solid #e6e0d3; border-radius:14px; padding:12px; text-align:left; font-size:0.9rem; background:#fff; cursor:pointer; }
   .dm-mode b { display:block; color:var(--leaf-deep); margin-bottom:2px; }
@@ -1191,7 +1195,7 @@
 
   /* Unité de vente : pots, bouteilles, au poids */
   .un-wrap { display:flex; flex-direction:column; gap:6px; }
-  .un-wrap > label.un-pill { align-self:flex-start; background:var(--carrot); color:var(--white); padding:5px 16px; border-radius:999px; font-size:0.9rem; }
+  .un-wrap > label.un-pill { align-self:flex-start; background:#4C9F50; color:#fff; padding:5px 16px; border-radius:999px; font-size:0.9rem; }
   .un-box { background:var(--cream-soft); border-radius:14px; padding:14px; text-align:left; margin-top:6px; }
   .un-modes { display:flex; gap:10px; flex-wrap:wrap; }
   .un-mode { flex:1; min-width:140px; box-sizing:border-box; border:2px solid #e6e0d3; border-radius:14px; padding:12px; text-align:left; font-size:0.9rem; background:#fff; cursor:pointer; }

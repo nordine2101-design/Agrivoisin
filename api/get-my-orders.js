@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, total_amount, created_at, service_fee_cents')
+      .select('id, total_amount, created_at, service_fee_cents, shipping_address')
       .eq('buyer_id', buyerId)
       .order('created_at', { ascending: false });
 
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('id, order_id, seller_id, listing_id, price_at_purchase, listings(title, unit, image_url, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
+      .select('id, order_id, seller_id, listing_id, price_at_purchase, delivery_mode, listings(title, unit, image_url, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
       .in('order_id', orderIds);
 
     if (itemsError) throw itemsError;
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, refunded_cents')
+      .select('order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, refunded_cents, shipping_cents, shipped_at, tracking_number')
       .in('order_id', orderIds);
 
     if (payoutsError) {
@@ -109,6 +109,8 @@ export default async function handler(req, res) {
             unit: it.listings ? (String(it.listings.unit == null ? '' : it.listings.unit).trim() || 'kg') : 'unité',
             quantity: 1,
             amountCents: cents,
+            // Vrai si cet article est expédié (pas de retrait chez le vendeur)
+            shipped: it.delivery_mode === 'expedition',
             pickup_hours: (it.listings && it.listings.listing_pickup_hours) || [],
           });
         } else {
@@ -125,10 +127,28 @@ export default async function handler(req, res) {
         // dès que le paiement est versé (ou suspendu), elle disparaît et n'est plus jamais renvoyée
         const addressStillVisible = payoutRow && payoutRow.status === 'en_attente';
 
+        // Expédition : les frais payés pour ce vendeur, l'état du colis et l'adresse de livraison de l'acheteur
+        // (la sienne, donnée seulement tant que l'argent est retenu)
+        const shippingCents = payoutRow ? Number(payoutRow.shipping_cents) || 0 : 0;
+        const hasPickupItem = s.items.some((x) => !x.shipped);
+        const buyerAddress = order.shipping_address && typeof order.shipping_address === 'object' ? order.shipping_address : null;
+        const delivery = shippingCents > 0
+          ? {
+              shippingAmount: shippingCents / 100,
+              shippedAt: payoutRow.shipped_at || null,
+              trackingNumber: payoutRow.tracking_number || null,
+              address: addressStillVisible && buyerAddress
+                ? { name: buyerAddress.name || '', address: buyerAddress.address || '', address2: buyerAddress.address2 || '', postalCode: buyerAddress.postal_code || '', city: buyerAddress.city || '', country: buyerAddress.country || 'France', phone: buyerAddress.phone || '' }
+                : null,
+            }
+          : null;
+
         return {
           ...s,
           items: s.items.map(({ amountCents, ...item }) => ({ ...item, amount: amountCents / 100 })),
-          sellerAddress: addressStillVisible ? (addressesById[s.sellerId] || null) : null,
+          // L'adresse du vendeur ne sert que s'il reste au moins un article à retirer chez lui
+          sellerAddress: addressStillVisible && hasPickupItem ? (addressesById[s.sellerId] || null) : null,
+          delivery,
           review: existingReview || null,
           // null pour les anciennes commandes (payées avant l'argent retenu)
           payout: payoutRow

@@ -133,6 +133,9 @@
     return pluralWord(u);
   }
 
+  // Une commande expédiée : l'argent rejoint le compte de paiement 14 jours après l'envoi du colis
+  const SHIPPED_RELEASE_DAYS = 14;
+
   // Les frais de service mensuel d'un vendeur actif (le serveur les prélève une seule fois par mois)
   const MONTHLY_FEE_EUROS = 2;
 
@@ -221,7 +224,7 @@
   });
 
   // État de l'argent pour cette vente
-  function renderMoneyBox(payout) {
+  function renderMoneyBox(payout, shipment) {
     // Anciennes ventes (avant l'argent retenu) : rien à afficher
     if (!payout) return '';
 
@@ -237,6 +240,11 @@
     }
     if (payout.status === 'en_cours') {
       return '<div class="money-box">Versement en cours de traitement...</div>';
+    }
+
+    // Commande à expédier, colis pas encore parti : pas de date tant que le colis n'est pas parti
+    if (shipment && !shipment.shippedAt) {
+      return '<div class="money-box">L\'argent est gardé par Agrivoisin. Une fois le colis parti, il rejoint votre compte de paiement ' + SHIPPED_RELEASE_DAYS + ' jours plus tard (ou dès que l\'acheteur confirme la réception), puis votre banque lors du virement mensuel (à partir du 05 de chaque mois).</div>';
     }
 
     // En attente : l'argent est gardé par Agrivoisin
@@ -255,7 +263,10 @@
     const m = payout && payout.money;
     if (!m) return '';
 
-    const total = Number(sale.totalAmount) || 0;
+    // Le pourcentage se calcule sur les articles (les frais d'expédition n'ont pas de commission en pourcentage)
+    const total = Number(sale.goodsAmount != null ? sale.goodsAmount : sale.totalAmount) || 0;
+    const shipment = sale.shipment;
+    const flatFee = Number(m.flatFee) > 0 ? Number(m.flatFee) : 0;
     const percent = total > 0 ? Math.round((Number(m.commission) / total) * 100) : null;
     const commissionLabel = 'Commission Agrivoisin' + (percent != null ? ' (' + percent + ' %)' : '');
     const line = (label, value, className) =>
@@ -266,6 +277,7 @@
       // Ancienne vente sans montant reçu enregistré : rien d'inventé
       if (m.received == null) return '';
       let html = line(commissionLabel, '− ' + formatAmount(m.commission));
+      if (flatFee > 0) html += line('Forfait expédition', '− ' + formatAmount(flatFee));
       html += line('Frais de carte', '− ' + formatAmount(m.cardFee));
       if (Number(m.monthlyFee) > 0) {
         html += line('Frais de service du mois', '− ' + formatAmount(m.monthlyFee));
@@ -278,7 +290,13 @@
       // Les chiffres EXACTS : les vrais frais de carte relevés chez Stripe dès le paiement.
       // S'ils ne sont pas connus (ventes d'avant ce changement), on n'affiche rien à leur place.
       const cardFeeKnown = m.cardFee != null && m.saleAmount != null;
-      let html = line(commissionLabel, '− ' + formatAmount(m.commission));
+      let html = '';
+      if (shipment) {
+        html += line('Produits', formatAmount(sale.goodsAmount));
+        html += line('Frais d\'expédition', formatAmount(shipment.shippingAmount));
+      }
+      html += line(commissionLabel, '− ' + formatAmount(m.commission));
+      if (flatFee > 0) html += line('Forfait expédition', '− ' + formatAmount(flatFee));
       let notes = '';
 
       if (cardFeeKnown) {
@@ -303,26 +321,132 @@
     return '';
   }
 
+  // 0612345678 -> 06 12 34 56 78
+  function formatPhone(phone) {
+    const digits = String(phone == null ? '' : phone).replace(/\D/g, '');
+    return /^0\d{9}$/.test(digits) ? digits.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : String(phone == null ? '' : phone);
+  }
+
+  function badge(text, className) {
+    return ' <span class="ship-badge ' + className + '">' + escapeHtml(text) + '</span>';
+  }
+
+  // L'adresse de livraison de l'acheteur (seulement tant que le colis n'est pas parti) et le bouton « colis parti »
+  function renderShipActions(sale) {
+    const sh = sale.shipment;
+    const payout = sale.payout;
+    if (!sh || sh.shippedAt || !payout || payout.status !== 'en_attente') return '';
+    let html = '';
+    const a = sh.address;
+    if (a) {
+      html += '<div class="ship-addr"><div class="t">Adresse de livraison de l\'acheteur</div><strong>' + escapeHtml(a.name) + '</strong><br>' +
+        escapeHtml(a.address) + '<br>' +
+        (a.address2 ? escapeHtml(a.address2) + '<br>' : '') +
+        escapeHtml(a.postalCode + ' ' + a.city + ', ' + a.country) + '<br>' +
+        'Téléphone : ' + escapeHtml(formatPhone(a.phone)) + '</div>';
+    }
+    html += '<div class="ship-action" data-order="' + escapeHtml(sale.orderId) + '">' +
+      '<label>Numéro de suivi (facultatif)</label>' +
+      '<input type="text" class="ship-tracking" maxlength="40" placeholder="Par exemple : 6A12345678901" autocomplete="off">' +
+      '<button type="button" class="btn btn-primary ship-btn">J\'ai expédié le colis</button>' +
+      '<p>Cliquez seulement quand le colis est remis au transporteur.</p>' +
+      '<p class="ship-error" style="display:none;"></p></div>';
+    return html;
+  }
+
   function renderSale(sale) {
+    const sh = sale.shipment;
     let itemsHtml = '';
+    const shippedParts = [];
     (sale.items || []).forEach((item) => {
       const qty = Number(item.quantity) || 1;
       const unit = String(item.unit == null ? '' : item.unit).trim() || 'unité';
       const calc = qty + ' × 1 ' + unit + ' = ' + qty + ' ' + unitLabel(unit, qty) +
         (item.amount != null ? ', soit ' + formatAmount(item.amount) : '');
       itemsHtml += '<div class="sale-item"><strong>' + escapeHtml(item.title) + '</strong> : ' + escapeHtml(calc) + '</div>';
+      if (item.shipped) shippedParts.push(qty + ' ' + unitLabel(unit, qty));
     });
+    if (sh) {
+      itemsHtml += '<div class="sale-item">Expédition' + (shippedParts.length ? ' (' + escapeHtml(shippedParts.join(' + ')) + ')' : '') +
+        ' : ' + escapeHtml(formatAmount(sh.shippingAmount)) + '</div>';
+    }
+
+    // L'étiquette à côté de la date : ce qu'il y a à faire, ou comment la commande est remise
+    let tag = badge('Retrait', 'ship-pick');
+    if (sh) {
+      if (sh.shippedAt) tag = badge('Colis parti', 'ship-sent');
+      else if (sale.payout && sale.payout.status === 'en_attente') tag = badge('À expédier', 'ship-todo');
+      else tag = '';
+    }
+
+    // Colis parti, argent encore retenu : la date d'envoi, le suivi et le jour où l'argent rejoint le compte de paiement
+    let shippedHtml = '';
+    let moneyBox = renderMoneyBox(sale.payout, sh);
+    if (sh && sh.shippedAt && sale.payout && sale.payout.status === 'en_attente') {
+      const when = sale.payout.autoReleaseAt ? new Date(sale.payout.autoReleaseAt) : null;
+      shippedHtml = '<div class="ship-done">Colis expédié le ' + escapeHtml(formatDate(sh.shippedAt)) + '.' +
+        (sh.trackingNumber ? ' Suivi : ' + escapeHtml(sh.trackingNumber) : '') + '<br>' +
+        'L\'argent rejoint votre compte de paiement ' +
+        (when && when.getTime() > Date.now() ? 'le ' + escapeHtml(formatDate(sale.payout.autoReleaseAt)) : 'très prochainement') +
+        ' (ou dès que l\'acheteur confirme la réception), puis votre banque lors du virement mensuel à partir du 05.</div>';
+      moneyBox = '';
+    } else if (sh && sh.shippedAt && sh.trackingNumber) {
+      shippedHtml = '<div class="ship-done">Colis expédié le ' + escapeHtml(formatDate(sh.shippedAt)) + '. Suivi : ' + escapeHtml(sh.trackingNumber) + '</div>';
+    }
 
     return (
       '<div class="sale-card">' +
-      '<div class="sale-head"><span class="sale-date">Vente du ' + escapeHtml(formatDate(sale.createdAt)) + '</span>' +
+      '<div class="sale-head"><span class="sale-date">Vente du ' + escapeHtml(formatDate(sale.createdAt)) + tag + '</span>' +
       '<span class="sale-total">' + escapeHtml(formatAmount(sale.totalAmount)) + '</span></div>' +
       itemsHtml +
-      renderMoneyBox(sale.payout) +
+      renderShipActions(sale) +
+      shippedHtml +
+      moneyBox +
       renderMoneyDetail(sale) +
       '</div>'
     );
   }
+
+  // Le vendeur déclare « colis parti » : un seul clic compte, puis la liste est relue
+  salesContainer.addEventListener('click', async (event) => {
+    const button = event.target.closest('.ship-btn');
+    if (!button) return;
+    const box = button.closest('.ship-action');
+    const errorEl = box.querySelector('.ship-error');
+    errorEl.style.display = 'none';
+
+    if (!window.confirm('Confirmez-vous que le colis est bien remis au transporteur ?')) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      errorEl.textContent = 'Session expirée, reconnectez-vous.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Envoi...';
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({
+          action: 'mark_shipped',
+          orderId: box.getAttribute('data-order'),
+          trackingNumber: box.querySelector('.ship-tracking').value,
+        }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
+      await init();
+    } catch (err) {
+      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.style.display = 'block';
+      button.disabled = false;
+      button.textContent = 'J\'ai expédié le colis';
+    }
+  });
 
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -399,6 +523,20 @@
   .tax-box .btn:disabled { opacity:0.5; cursor:not-allowed; }
   .tax-done { text-align:left; border:1px solid #cfe3cf; background:#f6f9f5; border-radius:12px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:#4C7A50; line-height:1.5; }
   .tax-done a { color:var(--leaf-deep); font-weight:700; }
+  .ship-badge { display:inline-block; font-family:var(--font-body, inherit); font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  .ship-todo { background:#FFE9C7; color:#B45A00; }
+  .ship-sent { background:#DDEFDB; color:#3E6B42; }
+  .ship-pick { background:#EEE9DD; color:#6B5842; }
+  .ship-addr { background:#fff; border:2px solid #9FC49A; border-radius:10px; padding:10px 12px; margin-top:10px; font-size:0.88rem; line-height:1.55; }
+  .ship-addr .t { font-size:0.72rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px; }
+  .ship-action { margin-top:10px; background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:12px; }
+  .ship-action label { display:block; font-size:0.78rem; font-weight:700; color:var(--leaf-deep); margin:0 0 4px; }
+  .ship-action input { width:100%; box-sizing:border-box; padding:9px; border:1px solid #ddd; border-radius:8px; font:inherit; font-size:0.9rem; margin-bottom:10px; }
+  .ship-action .btn { width:100%; }
+  .ship-action .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .ship-action p { font-size:0.8rem; color:#6B5842; margin:8px 0 0; line-height:1.45; }
+  .ship-action p.ship-error { color:#C8352F; font-weight:700; }
+  .ship-done { margin-top:10px; background:#f6f9f5; border:1px solid #cfe3cf; border-radius:10px; padding:10px; font-size:0.85rem; line-height:1.5; color:#4C7A50; }
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
   .money-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }

@@ -130,13 +130,59 @@
     if (items.length === 0 || items.some((item) => item.quantity == null)) {
       return '<div class="order-item-line">' + escapeHtml((seller.products || []).join(', ')) + '</div>';
     }
-    return items.map((item) => {
+    const lines = items.map((item) => {
       const qty = Number(item.quantity) || 1;
       const unit = String(item.unit == null ? '' : item.unit).trim() || 'unité';
       const calc = qty + ' × 1 ' + unit + ' = ' + qty + ' ' + unitLabel(unit, qty) +
         (item.amount != null ? ', soit ' + formatAmount(item.amount) : '');
       return '<div class="order-item-line"><strong>' + escapeHtml(item.title) + '</strong> : ' + escapeHtml(calc) + '</div>';
     }).join('');
+
+    // Les frais d'expédition de ce vendeur, avec ce qui est expédié (quantité et unité)
+    if (!seller.delivery) return lines;
+    const shippedParts = items.filter((item) => item.shipped).map((item) => {
+      const qty = Number(item.quantity) || 1;
+      return qty + ' ' + unitLabel(item.unit, qty);
+    });
+    return lines + '<div class="order-item-line">Expédition' + (shippedParts.length ? ' (' + escapeHtml(shippedParts.join(' + ')) + ')' : '') +
+      ' : ' + escapeHtml(formatAmount(seller.delivery.shippingAmount)) + '</div>';
+  }
+
+  // L'étiquette à côté du vendeur : comment la commande est remise
+  function deliveryBadge(seller) {
+    const d = seller.delivery;
+    const pickup = (seller.items || []).some((item) => !item.shipped);
+    if (!d) return ' <span class="ship-badge ship-pick">Retrait chez le vendeur</span>';
+    if (d.shippedAt) return ' <span class="ship-badge ship-sent">Colis parti</span>';
+    return ' <span class="ship-badge ship-todo">Expédition · En préparation</span>' + (pickup ? ' <span class="ship-badge ship-pick">+ retrait chez le vendeur</span>' : '');
+  }
+
+  // 0612345678 -> 06 12 34 56 78
+  function formatPhone(phone) {
+    const digits = String(phone == null ? '' : phone).replace(/\D/g, '');
+    return /^0\d{9}$/.test(digits) ? digits.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : String(phone == null ? '' : phone);
+  }
+
+  // Adresse de livraison de l'acheteur (la sienne) et état du colis
+  function renderDeliverySection(seller) {
+    const d = seller.delivery;
+    if (!d) return '';
+    let html = '';
+    const a = d.address;
+    if (a) {
+      html += '<div class="deliver-addr"><div class="deliver-addr-title">Livraison à</div>' +
+        escapeHtml(a.name) + '<br>' + escapeHtml(a.address) + '<br>' +
+        (a.address2 ? escapeHtml(a.address2) + '<br>' : '') +
+        escapeHtml(a.postalCode + ' ' + a.city + ', ' + a.country) + '<br>' +
+        'Téléphone : ' + escapeHtml(formatPhone(a.phone)) + '</div>';
+    }
+    if (d.shippedAt) {
+      html += '<div class="ship-done">Colis expédié le ' + escapeHtml(formatDate(d.shippedAt)) + '.' +
+        (d.trackingNumber ? ' Suivi : ' + escapeHtml(d.trackingNumber) : '') + '</div>';
+    } else if (seller.payout && seller.payout.status === 'en_attente') {
+      html += '<div class="ship-wait">Le vendeur prépare votre colis. Vous verrez ici quand il sera parti.</div>';
+    }
+    return html;
   }
 
   // Les frais de service payés par l'acheteur : une seule ligne par commande, à la fin du ticket.
@@ -278,6 +324,9 @@
     return '<div class="payout-box payout-problem"><p>Problème signalé : le paiement est suspendu. Agrivoisin examine la situation.</p></div>';
   }
 
+  // Une commande expédiée : l'argent est versé 14 jours après l'envoi du colis
+  const SHIPPED_RELEASE_DAYS = 14;
+
   function renderPayoutSection(orderId, seller) {
     const payout = seller.payout;
     // Anciennes commandes (avant l'argent retenu) : rien à afficher
@@ -301,11 +350,17 @@
     const startsAt = payout.pickupStartAt ? new Date(payout.pickupStartAt) : null;
     const reportLocked = !!(startsAt && !Number.isNaN(startsAt.getTime()) && startsAt.getTime() > Date.now());
 
+    // Colis pas encore parti : pas de date, et pas de bouton « J'ai bien reçu » (rien n'a pu être reçu)
+    const notShippedYet = !!(seller.delivery && !seller.delivery.shippedAt);
+    const intro = notShippedYet
+      ? 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + SHIPPED_RELEASE_DAYS + ' jours après l\'envoi du colis, ou dès que vous confirmez la réception.'
+      : 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + when + ', ou dès que vous confirmez la réception.';
+
     return `
       <div class="payout-box" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(seller.sellerId)}">
-        <p>Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ${when}, ou dès que vous confirmez la réception.</p>
+        <p>${intro}</p>
         <div class="payout-actions">
-          <button type="button" class="btn btn-primary payout-confirm-btn">J'ai bien reçu ma commande</button>
+          ${notShippedYet ? '' : '<button type="button" class="btn btn-primary payout-confirm-btn">J\'ai bien reçu ma commande</button>'}
           <button type="button" class="btn btn-ghost payout-report-btn"${reportLocked ? ' disabled data-locked="1"' : ''}>Signaler un problème</button>
         </div>
         ${reportLocked ? `<p class="payout-report-hint">Vous pourrez signaler un problème à partir du ${escapeHtml(formatParisMoment(payout.pickupStartAt))}.</p>` : ''}
@@ -355,8 +410,7 @@
       // L'adresse du vendeur disparaît tout de suite de l'écran (et le serveur ne la renverra plus)
       const sellerBlock = box.closest('.order-seller-block');
       if (sellerBlock) {
-        const addressEl = sellerBlock.querySelector('.seller-address');
-        if (addressEl) addressEl.remove();
+        sellerBlock.querySelectorAll('.seller-address, .deliver-addr, .ship-wait').forEach((el) => el.remove());
       }
 
       box.outerHTML = data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml();
@@ -381,11 +435,13 @@
       const confirmBtn = box.querySelector('.payout-confirm-btn');
       const reportBtn = box.querySelector('.payout-report-btn');
 
-      confirmBtn.addEventListener('click', () => {
-        if (window.confirm("Confirmez-vous avoir bien reçu votre commande ? Le vendeur sera payé tout de suite, et cette action ne peut pas être annulée.")) {
-          sendPayoutAction(box, 'confirm');
-        }
-      });
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+          if (window.confirm("Confirmez-vous avoir bien reçu votre commande ? Le vendeur sera payé tout de suite, et cette action ne peut pas être annulée.")) {
+            sendPayoutAction(box, 'confirm');
+          }
+        });
+      }
 
       const actionsEl = box.querySelector('.payout-actions');
       const formEl = box.querySelector('.payout-report-form');
@@ -669,10 +725,11 @@
         order.sellers.forEach((seller) => {
           sellersHtml += `
             <div class="order-seller-block">
-              <p><strong>${escapeHtml(sellerLabel(seller))}</strong></p>
+              <p><strong>${escapeHtml(sellerLabel(seller))}</strong>${deliveryBadge(seller)}</p>
               ${renderTicketLines(seller)}
+              ${renderDeliverySection(seller)}
               ${renderAddressSection(seller)}
-              ${renderPickupSection(seller.items)}
+              ${renderPickupSection((seller.items || []).filter((item) => !item.shipped))}
               ${renderPayoutSection(order.orderId, seller)}
               <div class="review-slot">${seller.review ? renderExistingReview(seller.review, false) : (reviewAllowed(seller) ? renderStrawberryPicker(order.orderId, seller.sellerId) : '')}</div>
             </div>
@@ -751,6 +808,14 @@
   .payout-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
   .seller-address { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
   .seller-address-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .ship-badge { display:inline-block; font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px; vertical-align:middle; font-family:var(--font-body); }
+  .ship-todo { background:#FFE9C7; color:#B45A00; }
+  .ship-sent { background:#DDEFDB; color:#3E6B42; }
+  .ship-pick { background:#EEE9DD; color:#6B5842; }
+  .deliver-addr { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
+  .deliver-addr-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .ship-done { margin:8px 0; background:#f6f9f5; border:1px solid #cfe3cf; border-radius:10px; padding:8px 10px; font-size:0.85rem; line-height:1.5; color:#4C7A50; }
+  .ship-wait { margin:8px 0; background:#FFF6E8; border:1px solid #F0C48A; border-radius:10px; padding:8px 10px; font-size:0.85rem; line-height:1.5; color:#8a5a12; }
   .pickup-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; }
   .pickup-box-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
   .pickup-set { font-size:0.85rem; line-height:1.6; margin-top:3px; }

@@ -321,6 +321,12 @@
       const sellerIsPro = item.sellers && item.sellers.seller_type === 'professionnel';
       const sellerTypeHtml = `<span class="seller-type-disc">${sellerIsPro ? 'Professionnel' : 'Particulier'}</span>`;
 
+      // Annonce qui peut être expédiée (expédition seule, ou expédition et retrait) : le lapin « Expédition possible »
+      const canShip = item.delivery_mode === 'expedition' || item.delivery_mode === 'les_deux';
+      const shipHtml = canShip
+        ? '<img class="ship-sticker" src="expedition-possible.png" alt="Expédition possible" width="130" height="117" loading="lazy">'
+        : '';
+
       // Note moyenne du vendeur : « 3,5 × [fraise] · 12 avis ». Moins de 3 avis : « Nouveau vendeur ».
       const rating = item.seller_rating;
       const ratingCount = rating && Number(rating.count) ? Number(rating.count) : 0;
@@ -366,6 +372,7 @@
           ${freshnessHtml}
           ${stockBadge(item)}
           <p class="seller">${escapeHtml(locationText)}</p>
+          ${shipHtml}
           ${ratingHtml}
           <div class="produce-card-footer">
             ${priceHtml}
@@ -493,6 +500,7 @@
 <script src="script.js"></script>
 
 <style>
+  .produce-card-body img.ship-sticker { display:block; width:130px; height:auto; margin:4px 0 4px -6px; }
   .seller-type-disc { display:block; background:#fff; color:#C8352F; font-size:0.8rem; font-weight:700; padding:7px 15px 6px 14px; border-radius:0 18px 0 12px; box-shadow:inset 0 0 0 2px #C8352F; position:absolute; top:0; right:0; z-index:2; }
   .produce-card-body p.stock-badge { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
   .produce-card-body p.stock-badge.stock-out { color:#C8352F; }

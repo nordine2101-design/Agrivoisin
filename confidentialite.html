@@ -13,7 +13,7 @@
 <section class="page-header">
   <div class="container">
     <div style="text-align:left;margin-bottom:12px;">
-      <a href="index.html" class="btn btn-ghost">Retour</a>
+      <a href="index.html" id="backLink" class="btn btn-ghost">Retour</a>
     </div>
 
     <article class="legal-doc">
@@ -165,5 +165,21 @@
   .todo { background:#FFE27A; padding:1px 6px; border-radius:6px; font-weight:600; }
   @media (max-width: 640px) { .legal-doc { padding:26px 20px 30px; border-radius:20px; } .legal-doc h1 { font-size:1.55rem; } }
 </style>
+<script>
+  // Le bouton Retour ramène à la page d'où l'on vient (par exemple la création de compte, avec ce qui était déjà écrit)
+  (function () {
+    var back = document.getElementById('backLink');
+    if (!back) return;
+    back.addEventListener('click', function (e) {
+      try {
+        var ref = document.referrer ? new URL(document.referrer) : null;
+        if (ref && ref.origin === window.location.origin && window.history.length > 1) {
+          e.preventDefault();
+          window.history.back();
+        }
+      } catch (err) {}
+    });
+  })();
+</script>
 </body>
 </html>

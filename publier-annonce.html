@@ -53,12 +53,29 @@
       <label for="price">Prix (€)</label>
       <input type="number" step="0.01" id="price" placeholder="Ex : 3.50" required>
 
-      <label for="unit">Unité</label>
+      <label for="unit" id="unitLabelEl">Unité</label>
       <input type="text" id="unit" placeholder="Ex : kg, botte, barquette" value="kg">
 
-      <label for="quantity">Quantité disponible</label>
+      <div id="unitPicker" class="un-wrap" style="display:none;">
+        <label class="un-pill" id="unitPickerLabel">Unité de vente</label>
+        <div class="un-box">
+          <div class="un-modes" role="radiogroup" aria-labelledby="unitPickerLabel">
+            <div class="un-mode" data-umode="pots" role="radio" tabindex="0" aria-checked="true"><b>Pots de…</b><span>Confiture, miel, compote…</span></div>
+            <div class="un-mode" data-umode="bouteilles" role="radio" tabindex="0" aria-checked="false"><b>Bouteilles de…</b><span>Jus, sirop…</span></div>
+            <div class="un-mode" data-umode="poids" role="radio" tabindex="0" aria-checked="false"><b>Au poids</b><span>Au kilo ou au gramme.</span></div>
+          </div>
+          <div class="un-free">
+            <span id="unitSizeLabel">Poids d'un pot :</span>
+            <input type="text" inputmode="decimal" id="unitSize" placeholder="Ex : 500" autocomplete="off" aria-labelledby="unitSizeLabel">
+            <select id="unitSizeUnit" aria-label="Unité"></select>
+          </div>
+          <p class="un-result" id="unitResult"></p>
+        </div>
+      </div>
+
+      <label for="quantity" id="quantityLabelEl">Quantité disponible</label>
       <input type="number" id="quantity" min="1" max="9999" step="1" placeholder="Ex : 5" required>
-      <p style="font-size:0.85em;color:#888;margin-top:-8px;">Le nombre d'unités que vous avez à vendre, dans l'unité choisie ci-dessus (par exemple 5 si vous avez 5 kg). Quand il n'y en a plus, l'annonce s'affiche « Épuisé ».</p>
+      <p id="quantityHint" style="font-size:0.85em;color:#888;margin-top:-8px;">Le nombre d'unités que vous avez à vendre, dans l'unité choisie ci-dessus (par exemple 5 si vous avez 5 kg). Quand il n'y en a plus, l'annonce s'affiche « Épuisé ».</p>
 
       <label for="photoFile">Photo de votre récolte</label>
       <input type="file" id="photoFile" accept="image/*">
@@ -242,6 +259,121 @@
   // Les paliers ne dépendent pas du stock disponible.
   let shipRows = [{ min: '1', max: '', price: '' }];
 
+  // ---------- Unité de vente des produits en pots, en bouteilles ou au poids (professionnels) ----------
+
+  const unitPicker = document.getElementById('unitPicker');
+  const unitLabelEl = document.getElementById('unitLabelEl');
+  const unitSizeInput = document.getElementById('unitSize');
+  const unitSizeUnit = document.getElementById('unitSizeUnit');
+  const unitSizeLabel = document.getElementById('unitSizeLabel');
+  const unitResult = document.getElementById('unitResult');
+  const quantityLabelEl = document.getElementById('quantityLabelEl');
+  const quantityHint = document.getElementById('quantityHint');
+  const priceInput = document.getElementById('price');
+  const QUANTITY_HINT_DEFAULT = quantityHint.textContent;
+
+  const UNIT_MODES = {
+    pots: { noun: 'pot', sizeLabel: 'Poids d\'un pot :', units: ['g', 'kg'], needsSize: true },
+    bouteilles: { noun: 'bouteille', sizeLabel: 'Volume d\'une bouteille :', units: ['cl', 'l', 'ml'], needsSize: true },
+    poids: { noun: null, sizeLabel: 'Vendu au :', units: ['kg', 'g'], needsSize: false },
+  };
+  let unitMode = 'pots';
+  let unitPickerOn = false;
+
+  // Lit le choix du vendeur : { value } (par exemple « pot de 350g ») ou { error }
+  function readUnitPicker() {
+    const m = UNIT_MODES[unitMode];
+    const u = unitSizeUnit.value;
+    if (!m.needsSize) return { value: u };
+    const raw = unitSizeInput.value.trim().replace(',', '.');
+    if (!/^\d+(\.\d{1,2})?$/.test(raw) || Number(raw) <= 0 || Number(raw) > 9999) {
+      return { error: (unitMode === 'pots' ? 'Indiquez le poids d\'un pot' : 'Indiquez le volume d\'une bouteille') + ' : un nombre supérieur à 0 (par exemple 500).' };
+    }
+    return { value: m.noun + ' de ' + String(Number(raw)).replace('.', ',') + u };
+  }
+
+  // Met à jour le champ d'unité caché, le texte de la quantité et l'aperçu
+  function applyUnit() {
+    const m = UNIT_MODES[unitMode];
+    const r = readUnitPicker();
+    unitInput.value = r.value || m.noun || 'kg';
+
+    if (unitMode === 'poids') {
+      quantityLabelEl.textContent = 'Quantité disponible';
+    } else {
+      quantityLabelEl.textContent = 'Nombre de ' + m.noun + 's disponibles';
+    }
+    quantityHint.textContent = 'Le nombre de ' + unitLabel(unitInput.value, 2) + ' que vous avez à vendre. Quand il n\'y en a plus, l\'annonce s\'affiche « Épuisé ».';
+
+    const price = Number(String(priceInput.value).replace(',', '.'));
+    if (r.error) {
+      unitResult.textContent = 'Indiquez ' + (unitMode === 'pots' ? 'le poids d\'un pot' : 'le volume d\'une bouteille') + ' pour voir ce que vos acheteurs verront.';
+    } else if (priceInput.value !== '' && Number.isFinite(price) && price > 0) {
+      unitResult.textContent = 'Vos acheteurs verront : « ' + formatEuro(price) + ' / ' + unitInput.value + ' »';
+    } else {
+      unitResult.textContent = 'Vos acheteurs verront l\'unité : « ' + unitInput.value + ' »';
+    }
+    if (deliveryMode !== 'retrait') renderShip();
+  }
+
+  function setUnitMode(mode) {
+    unitMode = mode;
+    const m = UNIT_MODES[mode];
+    document.querySelectorAll('.un-mode').forEach(function (card) {
+      card.setAttribute('aria-checked', card.dataset.umode === mode ? 'true' : 'false');
+    });
+    unitSizeLabel.textContent = m.sizeLabel;
+    unitSizeInput.style.display = m.needsSize ? '' : 'none';
+    unitSizeInput.value = '';
+    unitSizeUnit.innerHTML = '';
+    m.units.forEach(function (u) {
+      const opt = document.createElement('option');
+      opt.value = u;
+      opt.textContent = u;
+      unitSizeUnit.appendChild(opt);
+    });
+    if (unitPickerOn) applyUnit();
+  }
+
+  document.querySelectorAll('.un-mode').forEach(function (card) {
+    card.addEventListener('click', function () { setUnitMode(card.dataset.umode); });
+    card.addEventListener('keydown', function (e) {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setUnitMode(card.dataset.umode); }
+    });
+  });
+  unitSizeInput.addEventListener('input', applyUnit);
+  unitSizeUnit.addEventListener('change', applyUnit);
+  priceInput.addEventListener('input', function () { if (unitPickerOn) applyUnit(); });
+
+  // Le sélecteur n'existe que pour un professionnel dont la catégorie est réservée aux professionnels ;
+  // sinon, le champ « Unité » habituel (kg, botte, barquette…) reste en place
+  function updateUnitPicker() {
+    const on = deliveryAvailable();
+    if (on === unitPickerOn) return;
+    unitPickerOn = on;
+    unitPicker.style.display = on ? '' : 'none';
+    unitInput.style.display = on ? 'none' : '';
+    unitLabelEl.style.display = on ? 'none' : '';
+    if (on) {
+      applyUnit();
+    } else {
+      unitInput.value = 'kg';
+      quantityLabelEl.textContent = 'Quantité disponible';
+      quantityHint.textContent = QUANTITY_HINT_DEFAULT;
+    }
+  }
+
+  function resetUnitPicker() {
+    unitPickerOn = false;
+    unitPicker.style.display = 'none';
+    unitInput.style.display = '';
+    unitLabelEl.style.display = '';
+    unitInput.value = 'kg';
+    quantityLabelEl.textContent = 'Quantité disponible';
+    quantityHint.textContent = QUANTITY_HINT_DEFAULT;
+    setUnitMode('pots');
+  }
+
   function currentQuantity() {
     const q = Number(quantityInput.value);
     return Number.isInteger(q) && q >= 1 && q <= 9999 ? q : null;
@@ -372,6 +504,7 @@
   });
 
   function updateDelivery() {
+    updateUnitPicker();
     const available = deliveryAvailable();
     deliveryWrap.style.display = available ? '' : 'none';
     if (!available) setDeliveryMode('retrait');
@@ -384,6 +517,7 @@
   }
 
   unitInput.addEventListener('input', function () { if (deliveryMode !== 'retrait') renderShip(); });
+  setUnitMode('pots');
 
   // Vérifie les paliers saisis et les prépare pour l'envoi : { tiers } ou { error }
   function collectShippingTiers() {
@@ -870,6 +1004,17 @@
       return;
     }
 
+    // L'unité de vente (pots, bouteilles, au poids) : vérifiée avant tout
+    if (unitPickerOn) {
+      const chosen = readUnitPicker();
+      if (chosen.error) {
+        errorEl.textContent = 'Erreur : ' + chosen.error;
+        errorEl.style.display = 'block';
+        return;
+      }
+      unitInput.value = chosen.value;
+    }
+
     // Le mode de remise (seulement pour un pro, produit qui se conserve) : sans cela, c'est le retrait comme avant
     const mode = deliveryAvailable() ? deliveryMode : 'retrait';
 
@@ -969,6 +1114,7 @@
       photoPreviewWrap.style.display = 'none';
       document.getElementById('proAttestWrap').style.display = 'none';
       resetDelivery();
+      resetUnitPicker();
       buildPickupDays();
       renderPickupPreview();
 
@@ -1042,6 +1188,21 @@
   .dm-remove { margin-left:auto; background:none; border:none; cursor:pointer; font-family:inherit; color:#C8352F; font-weight:600; font-size:0.8rem; padding:4px 0; }
   .dm-add { background:none; border:none; cursor:pointer; font-family:inherit; margin-top:10px; padding:4px 0; color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-align:left; align-self:flex-start; }
   .dm-add:disabled { opacity:0.4; cursor:not-allowed; }
+
+  /* Unité de vente : pots, bouteilles, au poids */
+  .un-wrap { display:flex; flex-direction:column; gap:6px; }
+  .un-wrap > label.un-pill { align-self:flex-start; background:var(--carrot); color:var(--white); padding:5px 16px; border-radius:999px; font-size:0.9rem; }
+  .un-box { background:var(--cream-soft); border-radius:14px; padding:14px; text-align:left; margin-top:6px; }
+  .un-modes { display:flex; gap:10px; flex-wrap:wrap; }
+  .un-mode { flex:1; min-width:140px; box-sizing:border-box; border:2px solid #e6e0d3; border-radius:14px; padding:12px; text-align:left; font-size:0.9rem; background:#fff; cursor:pointer; }
+  .un-mode b { display:block; color:var(--leaf-deep); margin-bottom:2px; }
+  .un-mode[aria-checked="true"] { border-color:var(--leaf-deep); background:#F1F7EC; }
+  .un-mode[aria-checked="true"] b::before { content:"\2713\00a0"; }
+  .un-mode:focus-visible { outline:3px solid rgba(131,193,61,0.55); outline-offset:2px; }
+  .un-free { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px; font-size:0.9rem; color:var(--soil); font-weight:600; }
+  .auth-form .un-free input { width:90px; padding:7px 10px; border:1px solid #e6e0d3; border-radius:8px; font:inherit; font-weight:400; box-sizing:border-box; }
+  .auth-form .un-free select { width:auto; padding:7px 10px; border:1px solid #e6e0d3; border-radius:8px; font:inherit; font-weight:400; background:#fff; }
+  .un-result { margin:10px 0 0; padding:10px 12px; border-radius:10px; background:#fff; font-size:0.9rem; color:var(--soil); text-align:left; }
 </style>
 </body>
 </html>

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mes favoris — Agrivoisin</title>
+<meta name="description" content="Retrouvez les annonces que vous avez mises de côté sur Agrivoisin.">
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ MES FAVORIS ============ -->
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
+      <a href="annonces.html" class="btn btn-ghost">Retour</a>
+      <h1>Mes favoris</h1>
+    </div>
+    <p class="my-intro">Retrouvez les annonces que vous avez mises de côté et commandez-les quand vous voulez.</p>
+
+    <p id="loadingMessage" style="margin-top:16px;color:#6B5842;text-align:center;">Chargement de vos favoris...</p>
+    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;">Vous devez être connecté pour voir vos favoris. <a href="connexion.html">Se connecter</a></p>
+    <p id="emptyMessage" style="display:none;margin-top:16px;color:#6B5842;text-align:center;">Vous n'avez pas encore de favoris. Cliquez sur la banane d'une annonce pour la retrouver ici. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a></p>
+    <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;"></p>
+    <p id="favSummary" class="fav-summary" style="display:none;"></p>
+
+    <div id="favContainer" class="produce-grid"></div>
+  </div>
+
+  <div class="my-video"></div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="cgv.html">Conditions générales</a></li>
+          <li><a href="confidentialite.html">Confidentialité</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const loadingMessage = document.getElementById('loadingMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const emptyMessage = document.getElementById('emptyMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const favSummary = document.getElementById('favSummary');
+  const container = document.getElementById('favContainer');
+
+  let buyerLocation = null;
+  let favUserId = null;
+
+  // Protège l'affichage : un titre ou un nom saisi par un vendeur n'est jamais interprété comme du code
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  const LOW_STOCK_THRESHOLD = 5;
+
+  // null = sans limite (les anciennes annonces, publiées avant la quantité)
+  function stockOf(item) {
+    return item.quantity_available == null ? null : Number(item.quantity_available);
+  }
+
+  // Une quantité s'écrit toujours avec son unité : « 3 kg », « 1 botte », « 3 bottes », « 2 bocaux »
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  // Met un mot au pluriel : « botte » -> « bottes », « bocal » -> « bocaux », « kg » reste « kg »
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'kg';
+    if (count <= 1) return u;
+    // « botte de radis » -> « bottes de radis », « pot de 500g » -> « pots de 500g »
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u; // autre unité en plusieurs mots : on n'y touche pas
+    return pluralWord(u);
+  }
+
+  function stockBadge(item) {
+    const stock = stockOf(item);
+    if (stock === null) return '';
+    if (stock <= 0) return '<p class="stock-badge stock-out">Épuisé</p>';
+    if (stock <= LOW_STOCK_THRESHOLD) {
+      return '<p class="stock-badge">Plus que ' + stock + ' ' + escapeHtml(unitLabel(item.unit, stock)) + '</p>';
+    }
+    return '';
+  }
+
+  // Combien d'unités de cette annonce l'acheteur a déjà dans son panier
+  function unitsInCart(listingId) {
+    const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+    return cart.filter((c) => String(c.listingId) === String(listingId)).length;
+  }
+
+  function freshnessInfo(harvestDate) {
+    if (!harvestDate) return null;
+    const harvest = new Date(harvestDate + 'T00:00:00');
+    const now = new Date();
+    const hoursSince = (now - harvest) / (1000 * 60 * 60);
+
+    if (hoursSince < 24) {
+      return { stars: 3, label: 'Très frais' };
+    } else if (hoursSince < 48) {
+      return { stars: 2, label: 'Frais' };
+    } else {
+      return { stars: 1, label: 'Fraîcheur minimale' };
+    }
+  }
+
+  // La fraîcheur s'affiche avec le flocon de neige d'Agrivoisin, répété 1, 2 ou 3 fois (à la place des étoiles).
+  // Le texte qui suit (« Très frais »…) dit la même chose : l'image seule est décorative.
+  function freshnessIconsHtml(count) {
+    let html = '';
+    for (let i = 0; i < count; i++) {
+      html += '<img src="flocon.png" alt="" class="freshness-icon">';
+    }
+    return html;
+  }
+
+  function haversineDistance(lat1, lon1, lat2, lon2) {
+    const toRad = (v) => (v * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function getDistanceForListing(item) {
+    if (!buyerLocation || !item.sellers || item.sellers.latitude == null || item.sellers.longitude == null) {
+      return null;
+    }
+    return haversineDistance(buyerLocation.lat, buyerLocation.lng, item.sellers.latitude, item.sellers.longitude);
+  }
+
+  function loadBuyerLocation() {
+    const saved = localStorage.getItem('agrivoisin_buyer_location');
+    if (saved) {
+      try {
+        buyerLocation = JSON.parse(saved);
+        
+      } catch (e) {
+        buyerLocation = null;
+      }
+    }
+  }
+
+
+  // « 1 annonce en favori » / « 3 annonces en favori »
+  function updateSummary() {
+    const n = container.querySelectorAll('.produce-card').length;
+    if (n === 0) {
+      favSummary.style.display = 'none';
+      emptyMessage.style.display = 'block';
+      return;
+    }
+    emptyMessage.style.display = 'none';
+    favSummary.textContent = n + (n > 1 ? ' annonces en favoris' : ' annonce en favori');
+    favSummary.style.display = 'block';
+  }
+
+  function showError(text) {
+    errorMessage.textContent = text;
+    errorMessage.style.display = 'block';
+  }
+
+  function renderFavorites(items) {
+    container.innerHTML = '';
+    items.forEach((item) => {
+      const card = document.createElement('div');
+      card.className = 'produce-card';
+
+      const freshness = freshnessInfo(item.harvest_date);
+      const freshnessHtml = freshness
+        ? `<p class="freshness-badge" title="${freshness.label}"><span class="freshness-icons">${freshnessIconsHtml(freshness.stars)}</span><span class="freshness-label">${freshness.label}</span></p>`
+        : '';
+
+      const distance = getDistanceForListing(item);
+      let locationText = item.sellers && item.sellers.city ? item.sellers.city : 'Vendeur Agrivoisin';
+      if (distance !== null) {
+        locationText += ' · à ' + (distance < 1 ? Math.round(distance * 1000) + ' m' : distance.toFixed(1).replace('.', ',') + ' km');
+      }
+
+      // Disque « Particulier » / « Professionnel » en haut à droite de la photo (un vendeur sans type connu est un particulier)
+      const sellerIsPro = item.sellers && item.sellers.seller_type === 'professionnel';
+      const sellerTypeHtml = `<span class="seller-type-disc">${sellerIsPro ? 'Professionnel' : 'Particulier'}</span>`;
+
+      // Annonce qui peut être expédiée (expédition seule, ou expédition et retrait) : le lapin « Expédition possible »
+      const canShip = item.delivery_mode === 'expedition' || item.delivery_mode === 'les_deux';
+      const shipHtml = canShip
+        ? '<img class="ship-sticker" src="expedition-possible%20(1).png" alt="Expédition possible" width="130" height="125" loading="lazy">'
+        : '';
+
+      // Note moyenne du vendeur : « 3,5 × [fraise] · 12 avis ». Moins de 3 avis : « Nouveau vendeur ».
+      const rating = item.seller_rating;
+      const ratingCount = rating && Number(rating.count) ? Number(rating.count) : 0;
+      const ratingHtml = (!rating || rating.average == null || ratingCount < 3)
+        ? '<p class="card-rating card-rating-new">Nouveau vendeur</p>'
+        : `<p class="card-rating" role="img" aria-label="Note moyenne du vendeur : ${Number(rating.average).toFixed(1).replace('.', ',')} fraises sur 4, ${ratingCount} avis"><span aria-hidden="true">${Number(rating.average).toFixed(1).replace('.', ',')} ×</span><img src="fraise-mascotte.png" alt="" class="card-rating-icon"><span class="card-rating-count" aria-hidden="true">· ${ratingCount} avis</span></p>`;
+
+      // Stock : le bouton « + » est grisé si l'annonce est épuisée ou si le panier contient déjà tout ce qui reste
+      const stock = stockOf(item);
+      const noMore = stock !== null && unitsInCart(item.id) >= stock;
+      const buttonNote = stock !== null && stock <= 0 ? 'Épuisé' : 'Vous avez déjà pris tout le stock disponible';
+
+      // Promotion en cours : l'ancien prix est barré, le prix promotionnel est le prix payé
+      const unitText = escapeHtml(item.unit || 'kg');
+      const priceNow = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + unitText;
+      const hasPromo = item.original_price != null;
+      const priceHtml = hasPromo
+        ? `<span class="price-wrap"><span class="price-old">${Number(item.original_price).toFixed(2).replace('.', ',')} €/${unitText}</span><span class="price">${priceNow}</span></span>`
+        : `<span class="price">${priceNow}</span>`;
+      const promoEnd = hasPromo && item.promo_ends_at ? String(item.promo_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
+      const promoPill = hasPromo
+        ? (item.promo_clearance
+          ? `<span class="promo-pill">Déstockage ${escapeHtml(item.promo_label || '')} · jusqu\'à épuisement du stock</span>`
+          : item.promo_day
+          ? `<span class="promo-pill">Offre du jour ${escapeHtml(item.promo_label || '')} · aujourd\'hui seulement</span>`
+          : `<span class="promo-pill">Promo ${escapeHtml(item.promo_label || '')}${promoEnd ? ' · jusqu\'au ' + promoEnd : ''}</span>`)
+        : '';
+
+      // Lot en cours (par exemple 3 kg pour 7,00 €) : le prix à l'unité reste le prix normal
+      const lotEnd = item.lot_quantity != null && item.lot_ends_at ? String(item.lot_ends_at).split('-').reverse().slice(0, 2).join('/') : '';
+      const lotPill = item.lot_quantity != null && item.lot_price != null
+        ? `<span class="promo-pill">Lot : ${escapeHtml(item.lot_quantity)} ${escapeHtml(unitLabel(item.unit, Number(item.lot_quantity)))} pour ${Number(item.lot_price).toFixed(2).replace('.', ',')} €${lotEnd ? ' · jusqu\'au ' + lotEnd : ''}</span>`
+        : '';
+
+      const isFav = true;
+      card.innerHTML = `
+        <a href="produit.html?id=${escapeHtml(item.id)}" class="produce-card-image" style="display:block;position:relative;">
+          ${sellerTypeHtml}
+          <img src="${escapeHtml(item.image_url || 'agrivoisin-logo-final.png')}" alt="${escapeHtml(item.title)}">
+        </a>
+        <div class="produce-card-body">
+          <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${promoPill}${lotPill}
+          <div class="title-row">
+            <h4><a href="produit.html?id=${escapeHtml(item.id)}">${escapeHtml(item.title)}</a></h4>
+            <button type="button" class="fav-btn${isFav ? ' is-fav' : ''}" data-listing-id="${escapeHtml(item.id)}" aria-pressed="${isFav ? 'true' : 'false'}" aria-label="${isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">
+              <img class="fav-off" src="favori-banane-trans.png" alt="" width="40" height="40"><img class="fav-on" src="favori-banane-epluchee.png" alt="" width="40" height="40">
+            </button>
+          </div>
+          ${freshnessHtml}
+          ${stockBadge(item)}
+          <p class="seller">${escapeHtml(locationText)}</p>
+          ${shipHtml}
+          ${ratingHtml}
+          <div class="produce-card-footer">
+            ${priceHtml}
+            <button class="icon-btn" aria-label="${noMore ? buttonNote : 'Ajouter au panier'}" ${noMore ? 'disabled title="' + buttonNote + '"' : ''} data-stock="${stock === null ? '' : stock}" data-stripe-account="${escapeHtml(item.sellers ? item.sellers.stripe_account_id : '')}" data-listing-id="${escapeHtml(item.id)}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+
+    container.querySelectorAll('.icon-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        const card = btn.closest('.produce-card');
+        const name = card.querySelector('h4').textContent;
+        const price = card.querySelector('.price').textContent;
+        const stripeAccountId = btn.dataset.stripeAccount;
+        const listingId = btn.dataset.listingId;
+        const stock = btn.dataset.stock === '' ? null : Number(btn.dataset.stock);
+        const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+
+        // Jamais plus d'unités dans le panier qu'il n'en reste en stock
+        const alreadyInCart = cart.filter((c) => String(c.listingId) === String(listingId)).length;
+        if (stock !== null && alreadyInCart >= stock) {
+          btn.disabled = true;
+          return;
+        }
+
+        cart.push({ name, price, stripeAccountId, listingId });
+        localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
+        const cartCountEl = document.querySelector('.cart-count');
+        if (cartCountEl) cartCountEl.textContent = cart.length;
+
+        // Le panier contient maintenant tout ce qui reste : on grise le bouton
+        if (stock !== null && alreadyInCart + 1 >= stock) {
+          btn.disabled = true;
+          btn.title = 'Vous avez déjà pris tout le stock disponible';
+          btn.setAttribute('aria-label', 'Vous avez déjà pris tout le stock disponible');
+        }
+      });
+    });
+    updateSummary();
+  }
+
+  // Un clic sur la banane retire l'annonce des favoris
+  container.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.fav-btn');
+    if (!btn || btn.dataset.busy === '1') return;
+    const card = btn.closest('.produce-card');
+    btn.dataset.busy = '1';
+    errorMessage.style.display = 'none';
+    try {
+      const { error } = await supabaseClient.from('favorites').delete().eq('user_id', favUserId).eq('listing_id', btn.dataset.listingId);
+      if (error) throw error;
+      card.remove();
+      updateSummary();
+    } catch (err) {
+      console.error('Erreur favoris :', err);
+      btn.dataset.busy = '0';
+      showError("Impossible de retirer ce favori pour le moment. Réessayez.");
+    }
+  });
+
+  async function init() {
+    loadBuyerLocation();
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      loadingMessage.style.display = 'none';
+      if (!session) {
+        notLoggedMessage.style.display = 'block';
+        return;
+      }
+      favUserId = session.user.id;
+
+      const [favRes, listRes] = await Promise.all([
+        supabaseClient.from('favorites').select('listing_id, created_at').eq('user_id', favUserId).order('created_at', { ascending: false }),
+        fetch('/api/get-listings').then((r) => r.json()),
+      ]);
+      if (favRes.error) throw favRes.error;
+
+      const byId = new Map((listRes.listings || []).map((l) => [String(l.id), l]));
+      // Les plus récemment ajoutées d'abord ; une annonce retirée de la vente n'est plus affichée
+      const items = (favRes.data || []).map((f) => byId.get(String(f.listing_id))).filter(Boolean);
+      renderFavorites(items);
+    } catch (err) {
+      console.error(err);
+      loadingMessage.style.display = 'none';
+      showError("Impossible de charger vos favoris pour le moment. Réessayez dans un instant.");
+    }
+  }
+
+  init();
+</script>
+
+<style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#FFF44F 0%,#FFE135 60%,#FFB627 100%); }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; }
+  .my-topbar { position:relative; display:flex; justify-content:center; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-topbar .btn { position:absolute; left:0; top:50%; transform:translateY(-50%); }
+  .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
+  .fav-summary { font-weight:700; color:var(--leaf-deep); margin:0 0 16px; padding:12px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; }
+
+  .my-panel .produce-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; }
+  @media (max-width: 640px) { .my-panel .produce-grid { grid-template-columns:1fr; } }
+  .produce-card { position:relative; border-top:5px solid #FFE135; box-shadow:0 4px 14px rgba(160,110,0,0.18); }
+  .produce-card-body { position:relative; }
+  .produce-card-body .tag { background:#FFF44F; color:#5E4A00; }
+  .produce-card-body img.ship-sticker { display:block; width:130px; height:auto; margin:4px 0 4px -6px; }
+  .seller-type-disc { display:block; background:#fff; color:#A87500; font-size:0.8rem; font-weight:700; padding:7px 15px 6px 14px; border-radius:0 18px 0 12px; box-shadow:inset 0 0 0 2px #F2C500; position:absolute; top:0; right:0; z-index:2; }
+  .produce-card-body p.stock-badge { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
+  .produce-card-body p.stock-badge.stock-out { color:#C8352F; }
+  .produce-card-body p.freshness-badge { display:flex; flex-direction:column; align-items:flex-start; }
+  .freshness-icons { display:flex; gap:2px; }
+  .freshness-label { color:#4169E1; }
+  .freshness-icon { width:56px; height:56px; object-fit:contain; flex-shrink:0; }
+  .card-rating { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin:2px 0 8px; font-size:0.9rem; font-weight:700; color:var(--leaf-deep); }
+  .card-rating-icon { width:22px; height:22px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
+  .card-rating-count { font-size:0.8rem; font-weight:400; color:#6B5842; }
+  .card-rating-new { font-size:0.8rem; color:#6B5842; }
+  .icon-btn { background:#FFE135; color:#5E4A00; }
+  .produce-card-body h4, .produce-card-body h4 a { color:#4E3E00; }
+  .produce-card-body .seller { color:#7A6414; }
+  .price { color:#B07800; }
+  .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .price-wrap { display:inline-flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }
+  .price-wrap .price { color:#C8352F; }
+  .promo-pill { display:inline-block; margin:6px 0 0 0; padding:3px 10px; border-radius:999px; background:#FFE27A; color:#B45A00; font-size:0.75rem; font-weight:700; }
+
+  /* La banane (toujours épluchée ici) : angle haut droit sous la photo */
+  .title-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-right:44px; }
+  .title-row h4 { margin:0; min-width:0; }
+  .fav-btn { position:absolute; top:4px; right:8px; width:44px; height:44px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
+  .fav-btn img { position:absolute; left:50%; top:50%; width:38px; height:38px; object-fit:contain; transform:translate(-50%,-50%); pointer-events:none; }
+  .fav-btn .fav-off { display:none; }
+  .fav-btn:focus-visible { outline:2px solid #D97D45; outline-offset:2px; border-radius:12px; }
+</style>
+</body>
+</html>

@@ -149,7 +149,7 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
-    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers } = req.body;
+    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers, multiParcel } = req.body;
 
     // 1. Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
@@ -227,6 +227,10 @@ export default async function handler(req, res) {
       }
     }
 
+    // 4 quater. Le vendeur accepte-t-il d'envoyer plusieurs colis quand la commande dépasse son dernier palier ?
+    //    Cela n'a de sens que si l'expédition est proposée.
+    const acceptsMultiParcel = mode !== 'retrait' && multiParcel === true;
+
     // 5. Créer l'annonce liée à ce vendeur
     const { data: listing, error: listingError } = await supabase
       .from('listings')
@@ -244,6 +248,7 @@ export default async function handler(req, res) {
         pro_attested_at: proAttestedAt,
         delivery_mode: mode,
         shipping_tiers: shipping.tiers,
+        multi_parcel: acceptsMultiParcel,
       })
       .select()
       .single();

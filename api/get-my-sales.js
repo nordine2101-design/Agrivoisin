@@ -401,7 +401,7 @@ export default async function handler(req, res) {
             amountCents: 0,
             shipped: it.delivery_mode === 'expedition',
             tiers: it.listings && Array.isArray(it.listings.shipping_tiers) ? it.listings.shipping_tiers : [],
-            multi: !!(it.listings && it.listings.multi_parcel === true),
+            multi: true, // plusieurs colis toujours possibles
           };
         }
         const cents = Math.round(Number(it.price_at_purchase || 0) * 100);

@@ -596,11 +596,12 @@
   .card-rating-new { font-size:0.8rem; color:#6B5842; }
   .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
 
-  /* Favoris : la banane épluchée, à droite de la ligne du titre */
+  /* Favoris : la banane épluchée, dans l'angle haut droit sous la photo */
   .title-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .title-row h4 { margin:0; min-width:0; }
-  .fav-btn { flex-shrink:0; width:44px; height:44px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
-  .fav-btn { position:relative; }
+  .produce-card-body { position:relative; }
+  .title-row { padding-right:44px; }
+  .fav-btn { position:absolute; top:4px; right:8px; width:44px; height:44px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
   .fav-btn img { position:absolute; left:50%; top:50%; width:38px; height:38px; object-fit:contain; transform:translate(-50%,-50%); transition:opacity .25s ease, transform .25s ease; pointer-events:none; }
   .fav-btn .fav-off { opacity:.6; }
   .fav-btn .fav-on { opacity:0; transform:translate(-50%,-50%) scale(.8); }

@@ -104,13 +104,15 @@
 
 <script src="script.js"></script>
 <script>
-  // Si on vient de « Mes annonces » ou de la boutique d'un vendeur, le bouton Retour y ramène
+  // Si on vient de « Mes annonces », de « Mes favoris » ou de la boutique d'un vendeur, le bouton Retour y ramène
   (function () {
     try {
       var ref = document.referrer ? new URL(document.referrer) : null;
       if (ref && ref.origin === window.location.origin) {
         if (/\/mes-annonces(\.html)?$/.test(ref.pathname)) {
           document.getElementById('backLink').href = 'mes-annonces.html';
+        } else if (/\/favoris(\.html)?$/.test(ref.pathname)) {
+          document.getElementById('backLink').href = 'favoris.html';
         } else if (/\/vendeur(\.html)?$/.test(ref.pathname) && /^\?listing=[A-Za-z0-9-]+$/.test(ref.search)) {
           document.getElementById('backLink').href = 'vendeur.html' + ref.search;
         }

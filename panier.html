@@ -166,6 +166,8 @@
   .cart-ship-fee { margin-top:4px; font-weight:700; color:var(--leaf-deep); }
   .cart-ship-fee span { font-weight:400; }
   .cart-ship-sub { font-size:0.8rem; color:#6B5842; margin-top:2px; }
+  .cart-ship-sub strong { color:var(--soil); }
+  .cart-parcels { margin-top:6px; padding:8px 12px; border-radius:10px; background:#fff; font-size:0.9rem; line-height:1.7; }
   .addr-box { margin:0 0 20px; padding:18px; border-radius:16px; background:var(--white); border:2px solid #9FC49A; }
   .addr-box label { display:block; font-size:0.8rem; font-weight:700; color:var(--leaf-deep); margin:0 0 4px; }
   .addr-box input { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #e6e0d3; border-radius:12px; font:inherit; font-size:0.95rem; margin:0 0 10px; background:#fff; color:#3d3a35; }
@@ -243,6 +245,67 @@
     return item.listingId ? 'id:' + item.listingId : 'nom:' + item.name + '|' + item.price;
   }
 
+  // Découpe d'une commande en colis pour l'expédition (même calcul que sur le serveur, qui reste seul juge du prix).
+  // Chaque colis doit tomber dans un palier du vendeur. Si le vendeur n'accepte pas plusieurs colis, il n'y en a qu'un seul ;
+  // sinon on choisit la découpe la moins chère (à prix égal : le moins de colis, puis des colis de tailles proches).
+  // Renvoie { feeCents, parcels: [quantités], parcelCents: [prix de chaque colis] } ou null si aucune découpe n'est possible.
+  function planParcels(tiers, quantity, allowMulti) {
+    const list = (Array.isArray(tiers) ? tiers : [])
+      .map((t) => ({ min: Number(t.min), max: Number(t.max), cents: Math.round(Number(t.price) * 100) }))
+      .filter((t) => Number.isInteger(t.min) && Number.isInteger(t.max) && t.min >= 1 && t.max >= t.min && Number.isFinite(t.cents) && t.cents >= 0);
+    const priceOf = (size) => {
+      let best = null;
+      list.forEach((t) => {
+        if (size >= t.min && size <= t.max && (best === null || t.cents < best)) best = t.cents;
+      });
+      return best;
+    };
+    const result = (parcels) => ({ feeCents: parcels.reduce((a, n) => a + priceOf(n), 0), parcels, parcelCents: parcels.map(priceOf) });
+    if (!Number.isInteger(quantity) || quantity < 1) return null;
+
+    const single = priceOf(quantity);
+    if (!allowMulti || quantity > 500) return single === null ? null : result([quantity]);
+
+    const cost = [0];
+    const count = [0];
+    const prev = [0];
+    for (let q = 1; q <= quantity; q++) {
+      cost[q] = Infinity;
+      count[q] = Infinity;
+      prev[q] = 0;
+      for (let p = 1; p <= q; p++) {
+        const pr = priceOf(p);
+        if (pr === null || cost[q - p] === Infinity) continue;
+        const c = cost[q - p] + pr;
+        const n = count[q - p] + 1;
+        if (c < cost[q] || (c === cost[q] && n < count[q])) {
+          cost[q] = c;
+          count[q] = n;
+          prev[q] = p;
+        }
+      }
+    }
+    if (cost[quantity] === Infinity) return null;
+
+    const k = count[quantity];
+    const base = Math.floor(quantity / k);
+    const extra = quantity - base * k;
+    const balanced = [];
+    for (let i = 0; i < k; i++) balanced.push(base + (i < extra ? 1 : 0));
+    const balancedPrices = balanced.map(priceOf);
+    if (balancedPrices.every((x) => x !== null) && balancedPrices.reduce((a, b) => a + b, 0) === cost[quantity]) {
+      return result(balanced.sort((a, b) => b - a));
+    }
+
+    const parcels = [];
+    let rest = quantity;
+    while (rest > 0) {
+      parcels.push(prev[rest]);
+      rest -= prev[rest];
+    }
+    return result(parcels.sort((a, b) => b - a));
+  }
+
   // Regroupe les unités du panier par annonce : une seule ligne « Tomates · 2 kg »
   function groupCart(cart) {
     const groups = [];
@@ -266,6 +329,7 @@
           sample: item,
           deliveryMode: info && (info.delivery_mode === 'expedition' || info.delivery_mode === 'les_deux') ? info.delivery_mode : 'retrait',
           tiers: info && Array.isArray(info.shipping_tiers) ? info.shipping_tiers : [],
+          multi: !!(info && info.multi_parcel === true),
           // L'annonce n'apparaît plus sur le site (épuisée, supprimée, vendeur incomplet) : elle n'est plus achetable
           unavailable: !!(listingInfoLoaded && item.listingId && !info),
         };
@@ -481,11 +545,10 @@
       let shipProblem = '';
       if (g.choice === 'expedition') {
         anyShip = true;
-        const tier = g.tiers.find((t) => g.qty >= Number(t.min) && g.qty <= Number(t.max));
-        if (tier) {
-          const cents = Math.round(Number(tier.price) * 100);
-          shipCents += cents;
-          shipParts.push(formatEuros(cents));
+        const plan = planParcels(g.tiers, g.qty, g.multi);
+        if (plan) {
+          shipCents += plan.feeCents;
+          shipParts.push(formatEuros(plan.feeCents));
         } else {
           shipProblem = "Les frais d'expédition ne sont pas disponibles pour cette quantité : modifiez la quantité ou choisissez le retrait.";
         }
@@ -526,8 +589,29 @@
         if (g.choice === 'expedition') {
           const feeEl = document.createElement('div');
           feeEl.className = 'cart-ship-fee';
+          const plan = planParcels(g.tiers, g.qty, g.multi);
           const tier = g.tiers.find((t) => g.qty >= Number(t.min) && g.qty <= Number(t.max));
-          if (tier) {
+          if (plan && plan.parcels.length > 1) {
+            // Plusieurs colis : chaque colis avec son contenu et son prix, puis le total
+            const intro = document.createElement('div');
+            intro.className = 'cart-ship-sub';
+            intro.appendChild(document.createTextNode('\uD83D\uDCE6 Votre commande sera envoyée en '));
+            const nb = document.createElement('strong');
+            nb.textContent = plan.parcels.length + ' colis';
+            intro.appendChild(nb);
+            intro.appendChild(document.createTextNode(' :'));
+            box.appendChild(intro);
+            const listEl = document.createElement('div');
+            listEl.className = 'cart-parcels';
+            plan.parcels.forEach((n, i) => {
+              const line = document.createElement('div');
+              line.textContent = 'Colis ' + (i + 1) + ' : ' + n + ' ' + unitLabel(g.unit, n) + ' · ' + formatEuros(plan.parcelCents[i]);
+              listEl.appendChild(line);
+            });
+            box.appendChild(listEl);
+            feeEl.textContent = "Frais d'expédition : " + formatEuros(plan.feeCents);
+            box.appendChild(feeEl);
+          } else if (tier) {
             const min = Number(tier.min);
             const max = Number(tier.max);
             const range = min === max ? min + ' ' + unitLabel(g.unit, min) : min + ' à ' + max + ' ' + unitLabel(g.unit, max);
@@ -604,7 +688,7 @@
         throw new Error('liste des annonces indisponible');
       }
       data.listings.forEach((l) => {
-        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price, lot_quantity: l.lot_quantity, lot_price: l.lot_price, delivery_mode: l.delivery_mode, shipping_tiers: l.shipping_tiers };
+        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price, lot_quantity: l.lot_quantity, lot_price: l.lot_price, delivery_mode: l.delivery_mode, shipping_tiers: l.shipping_tiers, multi_parcel: l.multi_parcel };
       });
       listingInfoLoaded = true;
       renderCart();

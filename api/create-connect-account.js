@@ -124,6 +124,75 @@ const PSEUDO_REQUIRED_ERROR = 'Choisissez un pseudo : il est obligatoire pour ve
 const PSEUDO_TAKEN_ERROR = 'Ce pseudo est déjà pris. Choisissez-en un autre.';
 const PSEUDO_CHECK_ERROR = 'Impossible de vérifier le pseudo pour le moment. Réessayez dans quelques instants.';
 
+// --- Vérification du numéro SIRET d'un professionnel ---
+// 1) la clé de contrôle (algorithme de Luhn) : détecte une faute de frappe ;
+// 2) le registre officiel des entreprises (API publique et gratuite de l'État) : le numéro existe-t-il, et l'établissement est-il toujours en activité ?
+// Si le registre ne répond pas (panne, lenteur), on n'empêche pas l'inscription : seule la clé de contrôle compte alors.
+function siretKeyIsValid(siret) {
+  if (!/^\d{14}$/.test(siret)) return false;
+  let sum = 0;
+  for (let i = 0; i < 14; i += 1) {
+    let digit = Number(siret[i]);
+    if (i % 2 === 0) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+  }
+  if (sum % 10 === 0) return true;
+  // Cas particulier connu : les établissements de La Poste (SIREN 356 000 000) suivent une autre règle
+  if (siret.startsWith('356000000')) {
+    const total = siret.split('').reduce((acc, d) => acc + Number(d), 0);
+    return total % 5 === 0;
+  }
+  return false;
+}
+
+async function checkSiret(siret) {
+  if (!siretKeyIsValid(siret)) {
+    return { ok: false, status: 400, error: "Ce numéro SIRET n'est pas valide : vérifiez que vous avez bien recopié les 14 chiffres." };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(
+      'https://recherche-entreprises.api.gouv.fr/search?q=' + encodeURIComponent(siret) + '&per_page=5',
+      { signal: controller.signal, headers: { Accept: 'application/json' } }
+    );
+    if (!response.ok) {
+      console.error('Registre des entreprises : réponse', response.status, '(SIRET non vérifié)');
+      return { ok: true };
+    }
+    const data = await response.json();
+    const results = Array.isArray(data && data.results) ? data.results : [];
+
+    let company = null;
+    let place = null;
+    results.forEach((r) => {
+      const list = [].concat(r.matching_etablissements || [], r.siege ? [r.siege] : []);
+      const found = list.find((e) => e && String(e.siret) === siret);
+      if (found && !place) {
+        company = r;
+        place = found;
+      }
+    });
+
+    if (!place) {
+      return { ok: false, status: 400, error: "Ce numéro SIRET n'existe pas dans le registre officiel des entreprises. Vérifiez-le, ou écrivez-nous depuis la page Contact si vous venez de créer votre entreprise." };
+    }
+    if (place.etat_administratif === 'F' || (company && company.etat_administratif === 'C')) {
+      return { ok: false, status: 400, error: "Ce numéro SIRET correspond à un établissement fermé ou à une entreprise qui a cessé son activité. Vous ne pouvez pas vous inscrire comme professionnel avec." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error('Registre des entreprises injoignable (SIRET non vérifié) :', err && err.message);
+    return { ok: true };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // --- Informations fiscales du vendeur (déclaration DAC7 à l'administration fiscale) ---
 // Date de naissance (majeur), numéro fiscal (13 chiffres) ou, à défaut, lieu de naissance.
 // Un professionnel indique aussi sa raison sociale (et son numéro de TVA s'il en a un).
@@ -266,6 +335,10 @@ export default async function handler(req, res) {
       siret = String(siretRaw == null ? '' : siretRaw).replace(/[\s.]/g, '');
       if (!/^\d{14}$/.test(siret)) {
         return res.status(400).json({ error: 'Le numéro SIRET doit comporter 14 chiffres.' });
+      }
+      const siretCheck = await checkSiret(siret);
+      if (!siretCheck.ok) {
+        return res.status(siretCheck.status).json({ error: siretCheck.error });
       }
     }
 

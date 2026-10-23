@@ -31,6 +31,75 @@ function unitLabel(unit, count) {
   return pluralWord(u);
 }
 
+// Découpe d'une commande en colis pour l'expédition.
+// Chaque colis doit tomber dans un palier du vendeur (c'est le prix de ce palier qui est compté pour ce colis).
+// Si le vendeur n'accepte pas plusieurs colis, il n'y en a qu'un seul. S'il les accepte, on choisit la découpe la moins chère
+// (à prix égal : le moins de colis possible, puis des colis de tailles les plus proches).
+// Renvoie { feeCents, parcels: [quantités] } ou null si aucune découpe n'est possible.
+// IMPORTANT : le même calcul est fait dans panier.html (pour l'affichage) ; le serveur reste seul juge du prix.
+function planParcels(tiers, quantity, allowMulti) {
+  const list = (Array.isArray(tiers) ? tiers : [])
+    .map((t) => ({ min: Number(t.min), max: Number(t.max), cents: Math.round(Number(t.price) * 100) }))
+    .filter((t) => Number.isInteger(t.min) && Number.isInteger(t.max) && t.min >= 1 && t.max >= t.min && Number.isFinite(t.cents) && t.cents >= 0);
+  const priceOf = (size) => {
+    let best = null;
+    list.forEach((t) => {
+      if (size >= t.min && size <= t.max && (best === null || t.cents < best)) best = t.cents;
+    });
+    return best;
+  };
+  if (!Number.isInteger(quantity) || quantity < 1) return null;
+
+  const single = priceOf(quantity);
+  if (!allowMulti) return single === null ? null : { feeCents: single, parcels: [quantity] };
+  if (quantity > 500) return single === null ? null : { feeCents: single, parcels: [quantity] };
+
+  const cost = [0];
+  const count = [0];
+  const prev = [0];
+  for (let q = 1; q <= quantity; q++) {
+    cost[q] = Infinity;
+    count[q] = Infinity;
+    prev[q] = 0;
+    for (let p = 1; p <= q; p++) {
+      const pr = priceOf(p);
+      if (pr === null || cost[q - p] === Infinity) continue;
+      const c = cost[q - p] + pr;
+      const n = count[q - p] + 1;
+      if (c < cost[q] || (c === cost[q] && n < count[q])) {
+        cost[q] = c;
+        count[q] = n;
+        prev[q] = p;
+      }
+    }
+  }
+  if (cost[quantity] === Infinity) return null;
+
+  // Des colis de tailles les plus proches possible, si cela ne coûte pas plus cher
+  const k = count[quantity];
+  const base = Math.floor(quantity / k);
+  const extra = quantity - base * k;
+  const balanced = [];
+  for (let i = 0; i < k; i++) balanced.push(base + (i < extra ? 1 : 0));
+  const balancedPrices = balanced.map(priceOf);
+  if (balancedPrices.every((x) => x !== null) && balancedPrices.reduce((a, b) => a + b, 0) === cost[quantity]) {
+    return { feeCents: cost[quantity], parcels: balanced.sort((a, b) => b - a) };
+  }
+
+  const parcels = [];
+  let rest = quantity;
+  while (rest > 0) {
+    parcels.push(prev[rest]);
+    rest -= prev[rest];
+  }
+  return { feeCents: cost[quantity], parcels: parcels.sort((a, b) => b - a) };
+}
+
+// Texte des colis, avec l'unité : « Colis 1 : 4 pots de 500g · Colis 2 : 4 pots de 500g »
+function parcelsText(parcels, unit) {
+  return parcels.map((n, i) => `Colis ${i + 1} : ${n} ${unitLabel(unit, n)}`).join(' · ');
+}
+
 // L'adresse de livraison de l'acheteur (expédition) : on ne se fie jamais au navigateur, tout est vérifié ici.
 // Renvoie { address } (adresse propre) ou { error }.
 function cleanText(value, max) {
@@ -150,7 +219,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, delivery_mode, shipping_tiers, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
+      .select('id, title, price, unit, quantity_available, delivery_mode, shipping_tiers, multi_parcel, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
       .in('id', listingIds);
 
     if (listingsError) {
@@ -229,6 +298,7 @@ export default async function handler(req, res) {
     // l'acheteur). Les frais viennent des paliers de l'annonce, selon la quantité commandée (relue plus haut, jamais crue sur parole).
     const choices = delivery && typeof delivery === 'object' && delivery.choices && typeof delivery.choices === 'object' ? delivery.choices : {};
     const shippingFees = {};
+    const shippingParcels = {};
     const shippingLines = [];
     for (const key of Object.keys(requested)) {
       const listing = listingsById[key];
@@ -237,17 +307,17 @@ export default async function handler(req, res) {
       if (!shipped) continue;
 
       const quantity = requested[key];
-      const tiers = Array.isArray(listing.shipping_tiers) ? listing.shipping_tiers : [];
-      const tier = tiers.find((t) => quantity >= Number(t.min) && quantity <= Number(t.max));
       const title = String(listing.title || 'cette annonce').slice(0, 60);
-      if (!tier || !Number.isFinite(Number(tier.price)) || Number(tier.price) < 0) {
+      // Un seul colis, ou plusieurs si le vendeur l'a accepté : la découpe la moins chère est choisie ici, par le serveur
+      const plan = planParcels(listing.shipping_tiers, quantity, listing.multi_parcel === true);
+      if (!plan) {
         return res.status(400).json({
           error: `Les frais d'expédition de « ${title} » ne sont pas disponibles pour ${quantity} ${unitLabel(listing.unit, quantity)}. Modifiez la quantité ou choisissez le retrait.`,
         });
       }
-      const feeCents = Math.round(Number(tier.price) * 100);
-      shippingFees[key] = feeCents;
-      shippingLines.push({ listing, quantity, feeCents });
+      shippingFees[key] = plan.feeCents;
+      shippingParcels[key] = plan.parcels;
+      shippingLines.push({ listing, quantity, feeCents: plan.feeCents, parcels: plan.parcels });
     }
 
     let shippingAddress = null;
@@ -352,14 +422,16 @@ export default async function handler(req, res) {
     });
 
     // Les frais d'expédition : une ligne par annonce expédiée (un frais à 0 € n'a pas de ligne de paiement)
-    shippingLines.forEach(({ listing, quantity, feeCents }) => {
+    shippingLines.forEach(({ listing, quantity, feeCents, parcels }) => {
       if (feeCents <= 0) return;
       lineItems.push({
         price_data: {
           currency: 'eur',
           product_data: {
             name: `Expédition — ${listing.title || 'Récolte Agrivoisin'}`.slice(0, 120),
-            description: `Frais d'expédition pour ${quantity} ${unitLabel(listing.unit, quantity)}`,
+            description: (parcels.length > 1
+              ? `Frais d'expédition en ${parcels.length} colis — ${parcelsText(parcels, listing.unit)}`
+              : `Frais d'expédition pour ${quantity} ${unitLabel(listing.unit, quantity)}`).slice(0, 450),
           },
           unit_amount: feeCents,
         },
@@ -393,7 +465,7 @@ export default async function handler(req, res) {
       .insert({
         buyer_id: buyerId,
         lines: cartLines,
-        shipping: shippingAddress ? { address: shippingAddress, fees: shippingFees } : null,
+        shipping: shippingAddress ? { address: shippingAddress, fees: shippingFees, parcels: shippingParcels } : null,
       })
       .select('id')
       .single();

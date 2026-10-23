@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ma vitrine — Agrivoisin</title>
+<meta name="description" content="Présentez votre boutique aux acheteurs d'Agrivoisin : nom, présentation, logo et photo de couverture.">
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ MA VITRINE ============ -->
+<section class="page-header my-page shop-edit-page">
+  <div class="my-panel">
+    <div class="my-topbar">
+      <a href="mes-annonces.html" class="btn btn-ghost">Retour</a>
+      <h1>Ma vitrine</h1>
+    </div>
+
+    <p class="auth-subtitle" id="pageSubtitle">C'est la page de présentation de votre boutique, que les acheteurs voient en cliquant sur votre nom.</p>
+
+    <p id="loadingMessage" style="text-align:center;color:#6B5842;">Chargement de votre vitrine...</p>
+    <p id="notLoggedMessage" style="display:none;text-align:center;">Vous devez être connecté pour modifier votre vitrine. <a href="connexion.html?retour=ma-vitrine.html" style="font-weight:700;">Se connecter</a></p>
+    <div id="notSellerSection" style="display:none;text-align:center;">
+      <p style="margin-bottom:14px;">Vous n'avez pas encore de compte vendeur.</p>
+      <a href="vendre.html" class="btn btn-primary">Devenir vendeur</a>
+    </div>
+    <p id="notProMessage" style="display:none;text-align:center;">La vitrine est réservée aux vendeurs professionnels.</p>
+    <p id="loadError" style="display:none;text-align:center;color:#C8352F;"></p>
+
+    <div class="my-form-box">
+    <form class="auth-form" id="shopForm" style="display:none;" novalidate>
+      <label for="shopName">Nom de la boutique</label>
+      <input type="text" id="shopName" maxlength="60" placeholder="Ex : Les Confitures de Marie" autocomplete="off">
+
+      <label for="shopDescription">Présentation</label>
+      <textarea id="shopDescription" rows="5" maxlength="600" placeholder="Parlez de votre exploitation, de vos produits, de votre façon de travailler…"></textarea>
+      <p class="shop-hint" id="descCounter">0 / 600 caractères</p>
+
+      <label for="shopLogoFile">Logo (image carrée)</label>
+      <input type="file" id="shopLogoFile" accept="image/jpeg,image/png,image/webp">
+      <div class="shop-img-row" id="logoRow" style="display:none;">
+        <img id="logoPreview" class="shop-logo-preview" alt="Aperçu du logo">
+        <button type="button" class="shop-img-remove" id="logoRemove">Retirer le logo</button>
+      </div>
+
+      <label for="shopCoverFile">Photo de couverture (image large)</label>
+      <input type="file" id="shopCoverFile" accept="image/jpeg,image/png,image/webp">
+      <div class="shop-img-row" id="coverRow" style="display:none;">
+        <img id="coverPreview" class="shop-cover-preview" alt="Aperçu de la couverture">
+        <button type="button" class="shop-img-remove" id="coverRemove">Retirer la couverture</button>
+      </div>
+      <p class="shop-hint">Images JPG, PNG ou WebP, 5 Mo au maximum.</p>
+
+      <p id="formError" class="shop-error" style="display:none;"></p>
+      <p id="formSuccess" class="shop-success" style="display:none;"></p>
+
+      <button type="submit" class="btn btn-primary" id="saveBtn">Enregistrer ma vitrine</button>
+      <p class="shop-view" id="viewWrap" style="display:none;"><a id="viewLink" href="#">Voir ma vitrine</a></p>
+      <p class="shop-hint" id="viewHint" style="display:none;text-align:center;">Publiez une annonce pour pouvoir voir votre vitrine : elle s'ouvre depuis une annonce.</p>
+    </form>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="cgv.html">Conditions générales</a></li>
+          <li><a href="confidentialite.html">Confidentialité</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  const BUCKET = 'shop-images';
+  const MAX_BYTES = 5 * 1024 * 1024;
+  const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+
+  const el = (id) => document.getElementById(id);
+  const form = el('shopForm');
+  const nameInput = el('shopName');
+  const descInput = el('shopDescription');
+  const descCounter = el('descCounter');
+  const formError = el('formError');
+  const formSuccess = el('formSuccess');
+  const saveBtn = el('saveBtn');
+
+  // Pour chaque image : l'adresse déjà enregistrée, le fichier choisi (pas encore envoyé), et ses éléments à l'écran
+  const images = {
+    logo: { url: '', file: null, preview: null, input: el('shopLogoFile'), img: el('logoPreview'), row: el('logoRow') },
+    cover: { url: '', file: null, preview: null, input: el('shopCoverFile'), img: el('coverPreview'), row: el('coverRow') },
+  };
+
+  function showError(text) {
+    formSuccess.style.display = 'none';
+    formError.textContent = text;
+    formError.style.display = 'block';
+  }
+
+  function showSuccess(text) {
+    formError.style.display = 'none';
+    formSuccess.textContent = text;
+    formSuccess.style.display = 'block';
+  }
+
+  function updateCounter() {
+    descCounter.textContent = descInput.value.length + ' / 600 caractères';
+  }
+
+  // Affiche l'aperçu d'une image : celle qui vient d'être choisie, sinon celle déjà enregistrée
+  function refreshImage(kind) {
+    const item = images[kind];
+    const src = item.preview || item.url;
+    if (src) {
+      item.img.src = src;
+      item.row.style.display = 'flex';
+    } else {
+      item.img.removeAttribute('src');
+      item.row.style.display = 'none';
+    }
+  }
+
+  function setupImage(kind) {
+    const item = images[kind];
+    item.input.addEventListener('change', function () {
+      const file = item.input.files[0];
+      if (item.preview) {
+        URL.revokeObjectURL(item.preview);
+        item.preview = null;
+      }
+      item.file = null;
+      if (file) {
+        if (!EXTENSIONS[file.type]) {
+          item.input.value = '';
+          showError('Choisissez une image au format JPG, PNG ou WebP.');
+          refreshImage(kind);
+          return;
+        }
+        if (file.size > MAX_BYTES) {
+          item.input.value = '';
+          showError('Cette image est trop lourde (5 Mo au maximum).');
+          refreshImage(kind);
+          return;
+        }
+        formError.style.display = 'none';
+        item.file = file;
+        item.preview = URL.createObjectURL(file);
+      }
+      refreshImage(kind);
+    });
+
+    // « Retirer » : annule le fichier choisi et enlève l'image enregistrée
+    el(kind + 'Remove').addEventListener('click', function () {
+      if (item.preview) URL.revokeObjectURL(item.preview);
+      item.preview = null;
+      item.file = null;
+      item.url = '';
+      item.input.value = '';
+      refreshImage(kind);
+    });
+  }
+
+  setupImage('logo');
+  setupImage('cover');
+  descInput.addEventListener('input', updateCounter);
+
+  // Envoie une image dans le dossier de ce vendeur et renvoie son adresse publique
+  async function uploadImage(kind, userId) {
+    const item = images[kind];
+    const path = userId + '/' + kind + '-' + Date.now() + '.' + EXTENSIONS[item.file.type];
+    const { error } = await supabaseClient.storage.from(BUCKET).upload(path, item.file, { contentType: item.file.type });
+    if (error) throw new Error("Erreur lors de l'envoi de l'image : " + error.message);
+    const { data } = supabaseClient.storage.from(BUCKET).getPublicUrl(path);
+    return { url: data.publicUrl, path: path };
+  }
+
+  async function callShop(session, body) {
+    const response = await fetch('/api/create-connect-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify(body),
+    });
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    return { ok: response.ok, status: response.status, data: data };
+  }
+
+  function showViewLink(listingId) {
+    if (listingId) {
+      el('viewLink').href = 'vendeur.html?listing=' + encodeURIComponent(listingId);
+      el('viewWrap').style.display = 'block';
+      el('viewHint').style.display = 'none';
+    } else {
+      el('viewWrap').style.display = 'none';
+      el('viewHint').style.display = 'block';
+    }
+  }
+
+  async function init() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    el('loadingMessage').style.display = 'none';
+
+    if (!session) {
+      el('pageSubtitle').style.display = 'none';
+      el('notLoggedMessage').style.display = 'block';
+      return;
+    }
+
+    el('loadingMessage').style.display = 'block';
+    try {
+      const result = await callShop(session, { action: 'get_shop' });
+      el('loadingMessage').style.display = 'none';
+
+      if (result.status === 403) {
+        el('pageSubtitle').style.display = 'none';
+        el('notProMessage').style.display = 'block';
+        return;
+      }
+      if (!result.ok) {
+        if (result.data.error && result.data.error.indexOf('vendeur') !== -1 && result.status === 400) {
+          el('pageSubtitle').style.display = 'none';
+          el('notSellerSection').style.display = 'block';
+          return;
+        }
+        throw new Error(result.data.error || 'Erreur');
+      }
+
+      const shop = result.data.shop || {};
+      nameInput.value = shop.name || '';
+      descInput.value = shop.description || '';
+      images.logo.url = shop.logoUrl || '';
+      images.cover.url = shop.coverUrl || '';
+      refreshImage('logo');
+      refreshImage('cover');
+      updateCounter();
+      showViewLink(result.data.previewListingId);
+      form.style.display = 'flex';
+    } catch (err) {
+      console.error(err);
+      el('loadingMessage').style.display = 'none';
+      el('loadError').textContent = 'Impossible de charger votre vitrine pour le moment. Réessayez dans quelques instants.';
+      el('loadError').style.display = 'block';
+    }
+  }
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    formError.style.display = 'none';
+    formSuccess.style.display = 'none';
+
+    const name = nameInput.value.replace(/\s+/g, ' ').trim();
+    if (name.length < 2) {
+      showError('Indiquez le nom de votre boutique (2 caractères au moins).');
+      nameInput.focus();
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Enregistrement...';
+    const uploaded = [];
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) throw new Error('Session expirée, reconnectez-vous.');
+
+      let logoUrl = images.logo.url;
+      let coverUrl = images.cover.url;
+      if (images.logo.file) {
+        const up = await uploadImage('logo', session.user.id);
+        uploaded.push(up.path);
+        logoUrl = up.url;
+      }
+      if (images.cover.file) {
+        const up = await uploadImage('cover', session.user.id);
+        uploaded.push(up.path);
+        coverUrl = up.url;
+      }
+
+      const result = await callShop(session, {
+        action: 'save_shop',
+        name: name,
+        description: descInput.value,
+        logoUrl: logoUrl,
+        coverUrl: coverUrl,
+      });
+      if (!result.ok) throw new Error(result.data.error || 'Une erreur est survenue. Réessayez.');
+
+      // C'est enregistré : les images choisies deviennent les images de la vitrine
+      const shop = result.data.shop || {};
+      ['logo', 'cover'].forEach(function (kind) {
+        const item = images[kind];
+        if (item.preview) URL.revokeObjectURL(item.preview);
+        item.preview = null;
+        item.file = null;
+        item.input.value = '';
+        item.url = kind === 'logo' ? (shop.logoUrl || '') : (shop.coverUrl || '');
+        refreshImage(kind);
+      });
+      nameInput.value = shop.name || name;
+      showSuccess('Votre vitrine est enregistrée.');
+    } catch (err) {
+      // Les images envoyées pour rien sont supprimées
+      if (uploaded.length) {
+        try { await supabaseClient.storage.from(BUCKET).remove(uploaded); } catch (e) {}
+      }
+      showError(err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Enregistrer ma vitrine';
+    }
+  });
+
+  init();
+</script>
+
+<style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-panel { background:#F7F2FC; border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#DCCBF3; color:#5B3A8E; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-form-box { max-width:560px; margin:0 auto; }
+  .shop-edit-page, body { background:linear-gradient(180deg,#E6DBF7 0%,#F1EAFB 55%,#FAF7FD 100%); }
+  .my-form-box .auth-form > label { align-self:flex-start; background:#8E6BC4; color:#fff; padding:5px 16px; border-radius:999px; font-size:0.9rem; }
+  .my-form-box .auth-form > label:nth-of-type(3n+2) { background:#A583D6; }
+  .my-form-box .auth-form > label:nth-of-type(3n+3) { background:#7452AA; }
+  .my-form-box .auth-form > input:not([type=checkbox]) { border:1.5px solid #C4AEE6; }
+  .my-form-box .auth-form > textarea { width:100%; box-sizing:border-box; border:1.5px solid #C4AEE6; border-radius:12px; padding:12px 14px; font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background:#fff; resize:vertical; min-height:110px; }
+  .my-form-box a { color:#5B3A8E; font-weight:700; }
+  .my-panel p.shop-hint { font-size:0.82rem; color:#888; margin:-6px 0 0; text-align:left; }
+  .shop-img-row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:-6px; }
+  .shop-logo-preview { width:84px; height:84px; object-fit:cover; border-radius:50%; border:2px solid #C4AEE6; background:#fff; }
+  .shop-cover-preview { width:100%; max-width:320px; height:110px; object-fit:cover; border-radius:12px; border:2px solid #C4AEE6; background:#fff; }
+  .shop-img-remove { background:none; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:#C8352F; font-weight:600; padding:4px 0; }
+  .my-panel p.shop-error { font-size:0.9rem; color:#C8352F; font-weight:700; margin:0; text-align:left; }
+  .my-panel p.shop-success { font-size:0.9rem; color:#3E6B42; font-weight:700; margin:0; text-align:left; }
+  .my-form-box .auth-form > textarea:focus, .my-form-box .auth-form > input:focus { outline:none; border-color:#8E6BC4; }
+  .my-panel p.shop-view { text-align:center; margin:0; }
+  @media (max-width: 640px) { .my-panel { padding:20px 16px 26px; border-radius:20px; } .my-panel h1 { font-size:1.2rem; padding:6px 16px; } }
+</style>
+
+</body>
+</html>

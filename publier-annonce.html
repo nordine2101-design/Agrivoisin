@@ -97,10 +97,6 @@
           <div id="shipTiers"></div>
           <button type="button" id="shipAdd" class="dm-add">+ Ajouter un palier</button>
           <p class="dm-hint" id="shipPreview" style="margin-top:10px;"></p>
-          <label class="dm-multi">
-            <input type="checkbox" id="multiParcel">
-            <span><b>Plusieurs colis si besoin.</b> Si la commande dépasse mon dernier palier, j'accepte d'envoyer plusieurs colis (l'acheteur paie les frais de chaque colis).</span>
-          </label>
         </div>
       </div>
 
@@ -415,8 +411,7 @@
       if (lastEnd === null || end > lastEnd) lastEnd = end;
     });
     if (!parts.length) { shipPreview.textContent = ''; return; }
-    shipPreview.textContent = 'L\'acheteur verra : « Expédition : ' + parts.join(' · ') + ' ». Au-delà de '
-      + lastEnd + ' ' + unitLabel(unit, lastEnd) + ', l\'expédition n\'est pas proposée (le retrait reste possible).';
+    shipPreview.textContent = 'L\'acheteur verra : « Expédition : ' + parts.join(' · ') + ' ».';
   }
 
   function updateAddState() {
@@ -1090,7 +1085,6 @@
         proAttest: document.getElementById('proAttest').checked,
         deliveryMode: mode,
         shippingTiers: shipping.tiers,
-        multiParcel: mode !== 'retrait' && document.getElementById('multiParcel').checked,
       };
 
       const response = await fetch('/api/create-listing', {
@@ -1197,8 +1191,6 @@
   .dm-remove { margin-left:auto; background:none; border:none; cursor:pointer; font-family:inherit; color:#C8352F; font-weight:600; font-size:0.8rem; padding:4px 0; }
   .dm-add { background:none; border:none; cursor:pointer; font-family:inherit; margin-top:10px; padding:4px 0; color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-align:left; align-self:flex-start; }
   .dm-add:disabled { opacity:0.4; cursor:not-allowed; }
-  .dm-multi { display:flex; align-items:flex-start; gap:10px; background:#fff; border:2px solid #9FC49A; border-radius:12px; padding:10px 12px; margin-top:12px; font-size:0.88rem; line-height:1.4; text-align:left; cursor:pointer; }
-  .auth-form .dm-multi input { width:auto; margin:3px 0 0; padding:0; flex-shrink:0; accent-color:var(--leaf-deep); }
 
   /* Unité de vente : pots, bouteilles, au poids */
   .un-wrap { display:flex; flex-direction:column; gap:6px; }

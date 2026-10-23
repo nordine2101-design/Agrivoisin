@@ -263,6 +263,126 @@ function cleanTaxInfo(sellerType, siret, raw) {
   };
 }
 
+// --- Vitrine d'un vendeur professionnel (nom, présentation, logo, photo de couverture) ---
+const SHOP_BUCKET = 'shop-images';
+const SHOP_NAME_MAX = 60;
+const SHOP_DESCRIPTION_MAX = 600;
+
+// Texte simple : sans caractères de contrôle, espaces nettoyés
+function cleanShopText(value, keepLineBreaks) {
+  let text = String(value == null ? '' : value).replace(/\r\n?/g, '\n');
+  text = text.replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, ' ');
+  if (keepLineBreaks) {
+    text = text.replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n');
+  } else {
+    text = text.replace(/\s+/g, ' ');
+  }
+  return text.trim();
+}
+
+// Une image de vitrine n'est acceptée que si elle est rangée dans le dossier de CE vendeur (jamais une adresse extérieure)
+function shopImagePrefix(userId) {
+  return String(process.env.SUPABASE_URL || '').replace(/\/+$/, '') + '/storage/v1/object/public/' + SHOP_BUCKET + '/' + userId + '/';
+}
+
+function cleanShopImage(value, userId) {
+  const url = String(value == null ? '' : value).trim();
+  if (!url) return { ok: true, url: null };
+  const prefix = shopImagePrefix(userId);
+  const fileName = url.startsWith(prefix) ? url.slice(prefix.length) : null;
+  if (!fileName || fileName.length > 120 || fileName.includes('..') || !/^[A-Za-z0-9._-]+$/.test(fileName)) {
+    return { ok: false };
+  }
+  return { ok: true, url };
+}
+
+// Supprime une ancienne image remplacée (sans bloquer l'enregistrement si cela échoue)
+async function removeShopImage(url, userId) {
+  try {
+    const prefix = shopImagePrefix(userId);
+    if (!url || !String(url).startsWith(prefix)) return;
+    await supabase.storage.from(SHOP_BUCKET).remove([userId + '/' + String(url).slice(prefix.length)]);
+  } catch (err) {
+    console.error('Suppression de l\'ancienne image de vitrine impossible :', err && err.message);
+  }
+}
+
+async function handleShop(action, body, res, userId) {
+  const { data: seller, error: sellerError } = await supabase
+    .from('sellers')
+    .select('id, seller_type, shop_name, shop_description, shop_cover_url, shop_logo_url')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (sellerError) {
+    console.error('Erreur Supabase (vitrine) :', sellerError);
+    return res.status(500).json({ error: 'Impossible de lire votre vitrine pour le moment. Réessayez dans quelques instants.' });
+  }
+  if (!seller) {
+    return res.status(400).json({ error: "Aucun compte vendeur trouvé pour ce compte. Devenez d'abord vendeur." });
+  }
+  if (seller.seller_type !== 'professionnel') {
+    return res.status(403).json({ error: 'La vitrine est réservée aux vendeurs professionnels.' });
+  }
+
+  const shopOf = (row) => ({
+    name: row.shop_name || '',
+    description: row.shop_description || '',
+    logoUrl: row.shop_logo_url || '',
+    coverUrl: row.shop_cover_url || '',
+  });
+
+  if (action === 'get_shop') {
+    // Une annonce de ce vendeur, pour lui permettre de voir sa vitrine (la vitrine s'ouvre depuis une annonce)
+    const { data: listing } = await supabase
+      .from('listings')
+      .select('id')
+      .eq('seller_id', seller.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return res.status(200).json({ shop: shopOf(seller), previewListingId: listing ? listing.id : null });
+  }
+
+  // save_shop
+  const name = cleanShopText(body.name, false);
+  if (name.length < 2 || name.length > SHOP_NAME_MAX) {
+    return res.status(400).json({ error: 'Le nom de la boutique doit comporter de 2 à ' + SHOP_NAME_MAX + ' caractères.' });
+  }
+  const description = cleanShopText(body.description, true);
+  if (description.length > SHOP_DESCRIPTION_MAX) {
+    return res.status(400).json({ error: 'La présentation est trop longue (' + SHOP_DESCRIPTION_MAX + ' caractères au maximum).' });
+  }
+  const logo = cleanShopImage(body.logoUrl, userId);
+  const cover = cleanShopImage(body.coverUrl, userId);
+  if (!logo.ok || !cover.ok) {
+    return res.status(400).json({ error: "L'une des images n'est pas valide. Choisissez-la de nouveau." });
+  }
+
+  const { error: updateError } = await supabase
+    .from('sellers')
+    .update({
+      shop_name: name,
+      shop_description: description || null,
+      shop_logo_url: logo.url,
+      shop_cover_url: cover.url,
+    })
+    .eq('id', seller.id);
+  if (updateError) {
+    console.error('Erreur Supabase (enregistrement de la vitrine) :', updateError);
+    return res.status(500).json({ error: "Impossible d'enregistrer votre vitrine pour le moment. Réessayez dans quelques instants." });
+  }
+
+  // Les images remplacées ou retirées sont supprimées de l'espace de stockage
+  if (seller.shop_logo_url && seller.shop_logo_url !== logo.url) await removeShopImage(seller.shop_logo_url, userId);
+  if (seller.shop_cover_url && seller.shop_cover_url !== cover.url) await removeShopImage(seller.shop_cover_url, userId);
+
+  return res.status(200).json({
+    shop: { name, description, logoUrl: logo.url || '', coverUrl: cover.url || '' },
+  });
+}
+
 const TAX_SAVE_ERROR = "Impossible d'enregistrer vos informations fiscales pour le moment. Réessayez dans quelques instants.";
 
 export default async function handler(req, res) {
@@ -324,6 +444,11 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
+
+    // La vitrine d'un vendeur professionnel : lire ou enregistrer (ce n'est pas une inscription de vendeur)
+    if (req.body.action === 'get_shop' || req.body.action === 'save_shop') {
+      return await handleShop(req.body.action, req.body, res, userId);
+    }
 
     // 0 bis. Particulier ou professionnel ? (sans réponse : particulier, comme avant)
     const sellerType = sellerTypeRaw == null || sellerTypeRaw === '' ? 'particulier' : sellerTypeRaw;

@@ -358,16 +358,25 @@
     const sh = sale.shipment;
     let itemsHtml = '';
     const shippedParts = [];
+    const parcelList = [];
     (sale.items || []).forEach((item) => {
       const qty = Number(item.quantity) || 1;
       const unit = String(item.unit == null ? '' : item.unit).trim() || 'unité';
       const calc = qty + ' × 1 ' + unit + ' = ' + qty + ' ' + unitLabel(unit, qty) +
         (item.amount != null ? ', soit ' + formatAmount(item.amount) : '');
       itemsHtml += '<div class="sale-item"><strong>' + escapeHtml(item.title) + '</strong> : ' + escapeHtml(calc) + '</div>';
-      if (item.shipped) shippedParts.push(qty + ' ' + unitLabel(unit, qty));
+      if (item.shipped) {
+        shippedParts.push(qty + ' ' + unitLabel(unit, qty));
+        // Un colis par entrée : la découpe calculée par le serveur, ou une seule quantité
+        const split = Array.isArray(item.parcels) && item.parcels.length > 1 ? item.parcels : [qty];
+        split.forEach((n) => parcelList.push(Number(n) + ' ' + unitLabel(unit, Number(n))));
+      }
     });
     if (sh) {
-      itemsHtml += '<div class="sale-item">Expédition' + (shippedParts.length ? ' (' + escapeHtml(shippedParts.join(' + ')) + ')' : '') +
+      const detail = parcelList.length > 1
+        ? ' en ' + parcelList.length + ' colis (' + escapeHtml(parcelList.map((t, i) => 'Colis ' + (i + 1) + ' : ' + t).join(' · ')) + ')'
+        : (shippedParts.length ? ' (' + escapeHtml(shippedParts.join(' + ')) + ')' : '');
+      itemsHtml += '<div class="sale-item">Expédition' + detail +
         ' : ' + escapeHtml(formatAmount(sh.shippingAmount)) + '</div>';
     }
 

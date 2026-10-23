@@ -13,6 +13,65 @@ const SHIPPED_RELEASE_DAYS = 14;
 // Forfait d'Agrivoisin par commande expédiée (déjà compris dans la commission enregistrée)
 const SHIPPING_FLAT_FEE_CENTS = 50;
 
+// Découpe d'une commande expédiée en colis : le même calcul que celui du paiement (api/create-checkout-session.js).
+// Chaque colis tombe dans un palier du vendeur ; s'il accepte plusieurs colis, on prend la découpe la moins chère
+// (à prix égal : le moins de colis, puis des colis de tailles proches). Renvoie la liste des quantités, ou null.
+function planParcels(tiers, quantity, allowMulti) {
+  const list = (Array.isArray(tiers) ? tiers : [])
+    .map((t) => ({ min: Number(t.min), max: Number(t.max), cents: Math.round(Number(t.price) * 100) }))
+    .filter((t) => Number.isInteger(t.min) && Number.isInteger(t.max) && t.min >= 1 && t.max >= t.min && Number.isFinite(t.cents) && t.cents >= 0);
+  const priceOf = (size) => {
+    let best = null;
+    list.forEach((t) => {
+      if (size >= t.min && size <= t.max && (best === null || t.cents < best)) best = t.cents;
+    });
+    return best;
+  };
+  if (!Number.isInteger(quantity) || quantity < 1) return null;
+
+  const single = priceOf(quantity);
+  if (!allowMulti || quantity > 500) return single === null ? null : [quantity];
+
+  const cost = [0];
+  const count = [0];
+  const prev = [0];
+  for (let q = 1; q <= quantity; q++) {
+    cost[q] = Infinity;
+    count[q] = Infinity;
+    prev[q] = 0;
+    for (let p = 1; p <= q; p++) {
+      const pr = priceOf(p);
+      if (pr === null || cost[q - p] === Infinity) continue;
+      const c = cost[q - p] + pr;
+      const n = count[q - p] + 1;
+      if (c < cost[q] || (c === cost[q] && n < count[q])) {
+        cost[q] = c;
+        count[q] = n;
+        prev[q] = p;
+      }
+    }
+  }
+  if (cost[quantity] === Infinity) return null;
+
+  const k = count[quantity];
+  const base = Math.floor(quantity / k);
+  const extra = quantity - base * k;
+  const balanced = [];
+  for (let i = 0; i < k; i++) balanced.push(base + (i < extra ? 1 : 0));
+  const balancedPrices = balanced.map(priceOf);
+  if (balancedPrices.every((x) => x !== null) && balancedPrices.reduce((a, b) => a + b, 0) === cost[quantity]) {
+    return balanced.sort((a, b) => b - a);
+  }
+
+  const parcels = [];
+  let rest = quantity;
+  while (rest > 0) {
+    parcels.push(prev[rest]);
+    rest -= prev[rest];
+  }
+  return parcels.sort((a, b) => b - a);
+}
+
 // Le vendeur déclare que le colis est parti (avec, s'il le souhaite, un numéro de suivi)
 async function markShipped(req, res, seller) {
   const body = req.body || {};
@@ -271,7 +330,7 @@ export default async function handler(req, res) {
     // Les articles vendus par CE vendeur (jamais l'identité de l'acheteur)
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('order_id, listing_id, price_at_purchase, delivery_mode, listings(title, unit)')
+      .select('order_id, listing_id, price_at_purchase, delivery_mode, listings(title, unit, shipping_tiers, multi_parcel)')
       .eq('seller_id', seller.id);
 
     if (itemsError) throw itemsError;
@@ -341,6 +400,8 @@ export default async function handler(req, res) {
             quantity: 0,
             amountCents: 0,
             shipped: it.delivery_mode === 'expedition',
+            tiers: it.listings && Array.isArray(it.listings.shipping_tiers) ? it.listings.shipping_tiers : [],
+            multi: !!(it.listings && it.listings.multi_parcel === true),
           };
         }
         const cents = Math.round(Number(it.price_at_purchase || 0) * 100);
@@ -419,6 +480,13 @@ export default async function handler(req, res) {
           unit: l.unit,
           quantity: l.quantity,
           amount: l.amountCents / 100,
+          shipped: l.shipped,
+          // Si la commande part en plusieurs colis : la quantité de chaque colis (sinon rien)
+          parcels: (() => {
+            if (!l.shipped) return null;
+            const plan = planParcels(l.tiers, l.quantity, l.multi);
+            return plan && plan.length > 1 ? plan : null;
+          })(),
         })),
         goodsAmount: totalCents / 100,
         totalAmount: (totalCents + shippingCents) / 100,

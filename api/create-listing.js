@@ -227,9 +227,9 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4 quater. Le vendeur accepte-t-il d'envoyer plusieurs colis quand la commande dépasse son dernier palier ?
-    //    Cela n'a de sens que si l'expédition est proposée.
-    const acceptsMultiParcel = mode !== 'retrait' && multiParcel === true;
+    // 4 quater. Plusieurs colis : toujours possible quand l'expédition est proposée (l'acheteur paie les frais de chaque colis).
+    //    Le vendeur n'a pas de case à cocher : aucun frein à la vente.
+    const acceptsMultiParcel = mode !== 'retrait';
 
     // 5. Créer l'annonce liée à ce vendeur
     const { data: listing, error: listingError } = await supabase

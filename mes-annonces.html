@@ -16,7 +16,10 @@
     <div class="my-topbar">
       <a href="index.html" class="btn btn-ghost">Retour</a>
       <h1>Mes annonces</h1>
-      <a href="mes-ventes.html" id="salesLink" class="btn btn-primary" style="display:none;">Mes ventes</a>
+      <span class="my-topbar-actions">
+        <a href="ma-vitrine.html" id="shopLink" class="btn btn-ghost" style="display:none;">Ma vitrine</a>
+        <a href="mes-ventes.html" id="salesLink" class="btn btn-primary" style="display:none;">Mes ventes</a>
+      </span>
     </div>
 
     <div id="notLoggedSection" style="display:none;">
@@ -47,6 +50,7 @@
 </section>
 
 <style>
+  .my-topbar-actions { display:flex; gap:8px; align-items:center; }
   .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
   .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
@@ -601,6 +605,7 @@
 
       document.getElementById('salesLink').style.display = 'inline-block';
       isPro = data.sellerType === 'professionnel';
+      if (isPro) document.getElementById('shopLink').style.display = 'inline-block';
       allListings = data.listings || [];
       sellerSection.style.display = 'block';
       renderAll();

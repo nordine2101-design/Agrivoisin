@@ -308,8 +308,8 @@ export default async function handler(req, res) {
 
       const quantity = requested[key];
       const title = String(listing.title || 'cette annonce').slice(0, 60);
-      // Un seul colis, ou plusieurs si le vendeur l'a accepté : la découpe la moins chère est choisie ici, par le serveur
-      const plan = planParcels(listing.shipping_tiers, quantity, listing.multi_parcel === true);
+      // Un ou plusieurs colis, sans limite : la découpe la moins chère est choisie ici, par le serveur
+      const plan = planParcels(listing.shipping_tiers, quantity, true);
       if (!plan) {
         return res.status(400).json({
           error: `Les frais d'expédition de « ${title} » ne sont pas disponibles pour ${quantity} ${unitLabel(listing.unit, quantity)}. Modifiez la quantité ou choisissez le retrait.`,

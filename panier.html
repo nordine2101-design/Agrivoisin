@@ -246,8 +246,8 @@
   }
 
   // Découpe d'une commande en colis pour l'expédition (même calcul que sur le serveur, qui reste seul juge du prix).
-  // Chaque colis doit tomber dans un palier du vendeur. Si le vendeur n'accepte pas plusieurs colis, il n'y en a qu'un seul ;
-  // sinon on choisit la découpe la moins chère (à prix égal : le moins de colis, puis des colis de tailles proches).
+  // Chaque colis doit tomber dans un palier du vendeur. Plusieurs colis sont toujours possibles :
+  // on choisit la découpe la moins chère (à prix égal : le moins de colis, puis des colis de tailles proches).
   // Renvoie { feeCents, parcels: [quantités], parcelCents: [prix de chaque colis] } ou null si aucune découpe n'est possible.
   function planParcels(tiers, quantity, allowMulti) {
     const list = (Array.isArray(tiers) ? tiers : [])
@@ -329,7 +329,7 @@
           sample: item,
           deliveryMode: info && (info.delivery_mode === 'expedition' || info.delivery_mode === 'les_deux') ? info.delivery_mode : 'retrait',
           tiers: info && Array.isArray(info.shipping_tiers) ? info.shipping_tiers : [],
-          multi: !!(info && info.multi_parcel === true),
+          multi: true, // plusieurs colis toujours possibles : l'acheteur paie les frais de chaque colis
           // L'annonce n'apparaît plus sur le site (épuisée, supprimée, vendeur incomplet) : elle n'est plus achetable
           unavailable: !!(listingInfoLoaded && item.listingId && !info),
         };

@@ -106,6 +106,7 @@
         <h5>Informations</h5>
         <ul>
           <li><a href="cgv.html">Conditions générales</a></li>
+          <li><a href="conditions-vendeurs.html">Conditions vendeurs professionnels</a></li>
           <li><a href="confidentialite.html">Confidentialité</a></li>
           <li><a href="contact.html">Contact</a></li>
         </ul>
@@ -176,7 +177,7 @@
 
     const value = document.createElement('span');
     value.setAttribute('aria-hidden', 'true');
-    value.textContent = average + ' \u00D7';
+    value.textContent = average + ' ×';
 
     const icon = document.createElement('img');
     icon.src = 'fraise-mascotte.png';
@@ -186,7 +187,7 @@
     const reviews = document.createElement('span');
     reviews.className = 'seller-rating-count';
     reviews.setAttribute('aria-hidden', 'true');
-    reviews.textContent = '\u00B7 ' + count + ' avis';
+    reviews.textContent = '· ' + count + ' avis';
 
     el.appendChild(value);
     el.appendChild(icon);
@@ -213,7 +214,7 @@
       stars.setAttribute('aria-label', 'Note : ' + rating + ' fraise' + (rating > 1 ? 's' : '') + ' sur 4');
       const starsValue = document.createElement('span');
       starsValue.setAttribute('aria-hidden', 'true');
-      starsValue.textContent = rating + ' \u00D7';
+      starsValue.textContent = rating + ' ×';
       const starsIcon = document.createElement('img');
       starsIcon.src = 'fraise-mascotte.png';
       starsIcon.alt = '';
@@ -226,7 +227,7 @@
       let whoText = 'Acheteur vérifié';
       const date = review.created_at ? new Date(review.created_at) : null;
       if (date && !Number.isNaN(date.getTime())) {
-        whoText += ' \u00B7 ' + date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+        whoText += ' · ' + date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
       }
       who.textContent = whoText;
 

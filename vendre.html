@@ -286,6 +286,9 @@
     document.getElementById('particulierOffer').style.display = isPro ? 'none' : 'block';
     siretInput.required = isPro;
     legalNameInput.required = isPro;
+    // La case des conditions vendeurs professionnels : visible et obligatoire pour un professionnel seulement
+    document.getElementById('proTermsLabel').style.display = isPro ? 'flex' : 'none';
+    document.getElementById('acceptProTerms').required = isPro;
   }
   sellerForm.querySelectorAll('input[name="sellerType"]').forEach((radio) => {
     radio.addEventListener('change', refreshSellerType);

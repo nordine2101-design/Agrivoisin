@@ -152,6 +152,7 @@
         <h5>Informations</h5>
         <ul>
           <li><a href="cgv.html">Conditions générales</a></li>
+          <li><a href="conditions-vendeurs.html">Conditions vendeurs professionnels</a></li>
           <li><a href="confidentialite.html">Confidentialité</a></li>
           <li><a href="contact.html">Contact</a></li>
         </ul>
@@ -461,7 +462,7 @@
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'dm-remove';
-        remove.textContent = '\u2715 Retirer';
+        remove.textContent = '✕ Retirer';
         remove.setAttribute('aria-label', 'Retirer le palier ' + (i + 1));
         remove.addEventListener('click', function () {
           shipRows.splice(i, 1);

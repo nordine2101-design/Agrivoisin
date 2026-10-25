@@ -35,8 +35,8 @@
         <p id="listingShipNote" style="font-size:0.8rem;color:#6B5842;margin:8px 0 0;"></p>
       </div>
       <div id="listingShipBadge" style="display:none;align-items:center;justify-content:center;gap:10px;margin:0 0 18px;">
-        <img src="expedition-possible%20(1).png" alt="" width="110" height="106">
-        <strong style="color:var(--leaf-deep);font-size:1.05rem;">Livraison possible</strong>
+        <img src="expedition-possible%20(1).png" alt="" width="180" height="173">
+        <strong style="color:var(--leaf-deep);font-size:1.5rem;">Livraison possible</strong>
       </div>
       <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
       <p style="margin-bottom:22px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span><span id="listingLot" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
@@ -237,11 +237,11 @@
   }
 
   // Ce que veut dire chaque niveau de fraîcheur : montré dans un encadré quand on survole (ou touche) les flocons.
-  // L'espace insécable (\u00A0) colle le « h » à son chiffre : « 24 h » ne se coupe jamais en fin de ligne.
+  // L'espace insécable ( ) colle le « h » à son chiffre : « 24 h » ne se coupe jamais en fin de ligne.
   const FRESHNESS_LEVELS = [
-    { stars: 3, label: 'Très frais', text: 'Récolté il y a moins de 24\u00A0h' },
-    { stars: 2, label: 'Frais', text: 'Récolté entre 24 et 48\u00A0h' },
-    { stars: 1, label: 'Fraîcheur minimale', text: 'Récolté il y a plus de 48\u00A0h' },
+    { stars: 3, label: 'Très frais', text: 'Récolté il y a moins de 24 h' },
+    { stars: 2, label: 'Frais', text: 'Récolté entre 24 et 48 h' },
+    { stars: 1, label: 'Fraîcheur minimale', text: 'Récolté il y a plus de 48 h' },
   ];
 
   // L'encadré : les trois niveaux, celui de l'annonce est mis en valeur
@@ -301,7 +301,7 @@
     const value = document.createElement('span');
     value.className = 'seller-rating-value';
     value.setAttribute('aria-hidden', 'true');
-    value.textContent = average + ' \u00D7';
+    value.textContent = average + ' ×';
 
     const icon = document.createElement('img');
     icon.src = 'fraise-mascotte.png';
@@ -311,7 +311,7 @@
     const reviews = document.createElement('span');
     reviews.className = 'seller-rating-count';
     reviews.setAttribute('aria-hidden', 'true');
-    reviews.textContent = '\u00B7 ' + count + ' avis';
+    reviews.textContent = '· ' + count + ' avis';
 
     el.appendChild(value);
     el.appendChild(icon);

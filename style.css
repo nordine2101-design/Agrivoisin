@@ -310,6 +310,21 @@ h1, h2, h3, h4 {
   color: var(--white);
 }
 
+/* Bouton « Retour » : vert clair avec écriture blanche, identique sur toutes les pages */
+.btn-back {
+  background: #7CCB86;
+  color: var(--white);
+  border: 1.5px solid #7CCB86;
+}
+
+.btn-back:hover {
+  background: var(--white);
+  border-color: #7CCB86;
+  color: #3E9B4D;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 203, 134, 0.5);
+}
+
 .btn-outline-light {
   background: rgba(255, 255, 255, 0.85);
   color: var(--leaf-deep);

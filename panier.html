@@ -14,7 +14,7 @@
 <section class="page-header my-page">
   <div class="my-panel">
     <div class="my-topbar">
-      <a href="index.html" class="btn btn-ghost">Retour</a>
+      <a href="index.html" class="btn btn-ghost btn-back">Retour</a>
       <h1 id="cartTitle">Mon panier</h1>
     </div>
     <p id="cartSubtitle">Vérifiez votre commande avant de passer au paiement sécurisé.</p>
@@ -596,7 +596,7 @@
             // Plusieurs colis : chaque colis avec son contenu et son prix, puis le total
             const intro = document.createElement('div');
             intro.className = 'cart-ship-sub';
-            intro.appendChild(document.createTextNode('\uD83D\uDCE6 Votre commande sera envoyée en '));
+            intro.appendChild(document.createTextNode('📦 Votre commande sera envoyée en '));
             const nb = document.createElement('strong');
             nb.textContent = plan.parcels.length + ' colis';
             intro.appendChild(nb);

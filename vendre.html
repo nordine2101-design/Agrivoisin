@@ -99,6 +99,10 @@
 
         <label for="sellerVat">Numéro de TVA (si vous en avez un)</label>
         <input type="text" id="sellerVat" placeholder="Ex : FR12345678901" maxlength="20" autocomplete="off" style="width:100%;box-sizing:border-box;">
+
+        <label for="sellerPhone">Téléphone de l'entreprise</label>
+        <input type="tel" id="sellerPhone" placeholder="Ex : 04 78 00 00 00" inputmode="tel" maxlength="20" autocomplete="off" style="width:100%;box-sizing:border-box;">
+        <p style="font-size:0.8rem;color:#6B5842;margin:4px 0 0;">Il sera affiché sur votre page vendeur, avec votre e-mail et l'adresse de l'entreprise.</p>
       </div>
 
       <label for="sellerPseudo">Votre pseudo (affiché aux acheteurs)</label>
@@ -224,6 +228,7 @@
 
   const siretBlock = document.getElementById('siretBlock');
   const siretInput = document.getElementById('sellerSiret');
+  const phoneInput = document.getElementById('sellerPhone');
   const pseudoInput = document.getElementById('sellerPseudo');
   const legalNameInput = document.getElementById('sellerLegalName');
   const vatInput = document.getElementById('sellerVat');
@@ -285,6 +290,7 @@
     siretBlock.style.display = isPro ? 'block' : 'none';
     document.getElementById('particulierOffer').style.display = isPro ? 'none' : 'block';
     siretInput.required = isPro;
+    phoneInput.required = isPro;
     legalNameInput.required = isPro;
     // La case des conditions vendeurs professionnels : visible et obligatoire pour un professionnel seulement
     document.getElementById('proTermsLabel').style.display = isPro ? 'flex' : 'none';
@@ -310,6 +316,15 @@
       errorEl.textContent = 'Erreur : le numéro SIRET doit comporter 14 chiffres.';
       errorEl.style.display = 'block';
       siretInput.focus();
+      return;
+    }
+
+    const phone = sellerType === 'professionnel' ? phoneInput.value.trim() : '';
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (sellerType === 'professionnel' && (!/^[0-9+\s.()-]+$/.test(phone) || phoneDigits.length < 9 || phoneDigits.length > 15)) {
+      errorEl.textContent = "Erreur : indiquez un numéro de téléphone valide pour l'entreprise.";
+      errorEl.style.display = 'block';
+      phoneInput.focus();
       return;
     }
 
@@ -351,7 +366,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ email, city, postalCode, address, sellerType, siret, pseudo, tax }),
+        body: JSON.stringify({ email, city, postalCode, address, sellerType, siret, phone, pseudo, tax }),
       });
 
       const data = await response.json();

@@ -18,12 +18,12 @@ function todayInParis() {
 const SHOW_PRO_ADDRESS = true;
 
 // Vitrine d'un vendeur professionnel : le nom de la boutique, sa présentation, ses images,
-// et ses informations légales (SIRET, e-mail de contact, et adresse de l'entreprise si l'interrupteur ci-dessus est sur true).
+// et ses informations légales (SIRET, e-mail et téléphone de contact, et adresse de l'entreprise si l'interrupteur ci-dessus est sur true).
 // Elle n'est jamais envoyée pour un particulier, et jamais avec la liste des annonces.
 async function loadShop(sellerId) {
   const { data, error } = await supabase
     .from('sellers')
-    .select('shop_name, shop_description, shop_cover_url, shop_logo_url, address, siret, city, email')
+    .select('shop_name, shop_description, shop_cover_url, shop_logo_url, address, siret, city, email, phone')
     .eq('id', sellerId)
     .maybeSingle();
   if (error || !data) return null;
@@ -37,6 +37,7 @@ async function loadShop(sellerId) {
     city: clean(data.city),
     siret: clean(data.siret),
     email: clean(data.email),
+    phone: clean(data.phone),
   };
 }
 

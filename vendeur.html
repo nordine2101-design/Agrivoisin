@@ -408,6 +408,7 @@
     addLegalRow(list, 'SIRET', shop.siret ? formatSiret(shop.siret) : '');
     addLegalRow(list, 'Adresse de l\'entreprise', shop.address);
     addLegalRow(list, 'Ville', shop.city || seller.city);
+    addLegalRow(list, 'E-mail', shop.email);
     document.getElementById('shopLegal').style.display = 'block';
 
     document.getElementById('shopHero').style.display = 'block';

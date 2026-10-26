@@ -51,6 +51,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:20px;height:20px;flex-shrink:0;"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
         <span>L'adresse du vendeur vous sera communiquée automatiquement après confirmation du paiement.</span>
       </p>
+
+      <p id="listingLegal" style="display:none;margin:18px 0 0;font-size:0.8rem;line-height:1.5;color:#6B5842;text-align:left;border-top:1px solid #e6e0d3;padding-top:12px;">
+        <strong id="listingLegalName"></strong><br>
+        Ce vendeur professionnel s'engage à ne proposer que des produits conformes à la réglementation de l'Union européenne.<br>
+        <a id="listingLegalLink" href="#" style="color:var(--leaf-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px;">Informations légales du vendeur</a>
+      </p>
     </div>
   </div>
   <div style="position:relative;width:440px;min-height:533px;align-self:stretch;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
@@ -379,6 +385,13 @@
     }
 
     renderSellerRating(item.seller_rating);
+
+    // Vendeur professionnel : son nom, son engagement et le lien vers ses informations légales
+    if (item.sellers && item.sellers.seller_type === 'professionnel') {
+      document.getElementById('listingLegalName').textContent = item.seller_legal_name || (item.sellers.pseudo || 'Vendeur professionnel');
+      document.getElementById('listingLegalLink').href = 'vendeur.html?listing=' + encodeURIComponent(item.id);
+      document.getElementById('listingLegal').style.display = 'block';
+    }
 
     // Mode de remise choisi par le vendeur : retrait (par défaut, anciennes annonces), expédition, ou les deux
     const deliveryMode = item.delivery_mode === 'expedition' || item.delivery_mode === 'les_deux' ? item.delivery_mode : 'retrait';

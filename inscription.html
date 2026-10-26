@@ -133,6 +133,11 @@
         <span>Je suis professionnel : j'ai lu et j'accepte les <a href="conditions-vendeurs.html" style="text-decoration:underline;">conditions vendeurs professionnels</a>.</span>
       </label>
 
+      <label id="proPledgeLabel" style="display:none;align-items:flex-start;gap:10px;margin:6px 0 6px;font-weight:400;font-size:0.92rem;line-height:1.5;cursor:pointer;">
+        <input type="checkbox" id="acceptProPledge" style="width:auto;margin:4px 0 0;flex-shrink:0;">
+        <span>Je m'engage à ne proposer que des produits conformes à la réglementation de l'Union européenne.</span>
+      </label>
+
       <button type="submit" class="btn btn-primary auth-submit" id="signupBtn">Créer mon compte</button>
     </form>
 
@@ -303,6 +308,8 @@
     // La case des conditions vendeurs professionnels : visible et obligatoire pour un vendeur professionnel seulement
     document.getElementById('proTermsLabel').style.display = isPro ? 'flex' : 'none';
     document.getElementById('acceptProTerms').required = isPro;
+    document.getElementById('proPledgeLabel').style.display = isPro ? 'flex' : 'none';
+    document.getElementById('acceptProPledge').required = isPro;
   }
   signupForm.querySelectorAll('input[name="sellerType"]').forEach((radio) => {
     radio.addEventListener('change', refreshSellerType);
@@ -500,7 +507,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + accessToken,
         },
-        body: JSON.stringify({ email, city, postalCode, address: sellerAddress, sellerType, siret, phone, pseudo, tax }),
+        body: JSON.stringify({ email, city, postalCode, address: sellerAddress, sellerType, siret, phone, pledge: sellerType === 'professionnel' && document.getElementById('acceptProPledge').checked, pseudo, tax }),
       });
 
       const stripeData = await response.json();

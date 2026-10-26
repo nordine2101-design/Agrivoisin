@@ -23,6 +23,10 @@
     <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;">Vous devez être connecté pour voir vos favoris. <a href="connexion.html">Se connecter</a></p>
     <p id="emptyMessage" style="display:none;margin-top:16px;color:#6B5842;text-align:center;">Vous n'avez pas encore de favoris. Cliquez sur la banane d'une annonce pour la retrouver ici. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a></p>
     <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;"></p>
+    <div class="fav-tabs" role="tablist" aria-label="Type de vendeur">
+      <button type="button" class="fav-tab is-active" id="tabPro" role="tab" aria-selected="true"><img src="favori-banane-epluchee.png" alt="" width="40" height="40"><span>Favoris pro</span></button>
+      <button type="button" class="fav-tab" id="tabPart" role="tab" aria-selected="false"><img src="cerise-pleine.png" alt="" width="40" height="40"><span>Favoris particuliers</span></button>
+    </div>
     <p id="favSummary" class="fav-summary" style="display:none;"></p>
 
     <div id="favContainer" class="produce-grid"></div>
@@ -201,10 +205,26 @@
 
 
   // « 1 annonce en favori » / « 3 annonces en favori »
+  let activeKind = 'pro';
+  function applyTab() {
+    container.querySelectorAll('.produce-card').forEach((c) => { c.style.display = c.dataset.kind === activeKind ? '' : 'none'; });
+    document.getElementById('tabPro').classList.toggle('is-active', activeKind === 'pro');
+    document.getElementById('tabPart').classList.toggle('is-active', activeKind === 'part');
+    document.getElementById('tabPro').setAttribute('aria-selected', activeKind === 'pro');
+    document.getElementById('tabPart').setAttribute('aria-selected', activeKind === 'part');
+  }
+  document.getElementById('tabPro').addEventListener('click', () => { activeKind = 'pro'; updateSummary(); });
+  document.getElementById('tabPart').addEventListener('click', () => { activeKind = 'part'; updateSummary(); });
+
   function updateSummary() {
-    const n = container.querySelectorAll('.produce-card').length;
+    applyTab();
+    const n = container.querySelectorAll('.produce-card[data-kind="' + activeKind + '"]').length;
     if (n === 0) {
       favSummary.style.display = 'none';
+      emptyMessage.textContent = activeKind === 'pro'
+        ? "Vous n'avez pas encore de favori chez un professionnel. Cliquez sur la banane d'une annonce pour la retrouver ici. "
+        : "Vous n'avez pas encore de favori chez un particulier. Cliquez sur la cerise d'une annonce pour la retrouver ici. ";
+      emptyMessage.insertAdjacentHTML('beforeend', '<a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>');
       emptyMessage.style.display = 'block';
       return;
     }
@@ -223,6 +243,7 @@
     items.forEach((item) => {
       const card = document.createElement('div');
       card.className = 'produce-card';
+      card.dataset.kind = (item.sellers && item.sellers.seller_type === 'professionnel') ? 'pro' : 'part';
 
       const freshness = freshnessInfo(item.harvest_date);
       const freshnessHtml = freshness
@@ -290,7 +311,7 @@
           <div class="title-row">
             <h4><a href="produit.html?id=${escapeHtml(item.id)}">${escapeHtml(item.title)}</a></h4>
             <button type="button" class="fav-btn${isFav ? ' is-fav' : ''}" data-listing-id="${escapeHtml(item.id)}" aria-pressed="${isFav ? 'true' : 'false'}" aria-label="${isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">
-              <img class="fav-off" src="favori-banane-trans.png" alt="" width="40" height="40"><img class="fav-on" src="favori-banane-epluchee.png" alt="" width="40" height="40">
+              <img class="fav-off" src="${sellerIsPro ? 'favori-banane-trans.png' : 'cerise-trans.png'}" alt="" width="40" height="40"><img class="fav-on" src="${sellerIsPro ? 'favori-banane-epluchee.png' : 'cerise-pleine.png'}" alt="" width="40" height="40">
             </button>
           </div>
           ${freshnessHtml}
@@ -402,6 +423,11 @@
   .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
   .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
+  .fav-tabs { display:flex; gap:12px; flex-wrap:wrap; margin:0 0 16px; }
+  .fav-tab { display:inline-flex; align-items:center; gap:6px; padding:5px 18px 5px 10px; border-radius:999px; border:1.5px solid #D97D45; background:#fff; font-family:inherit; font-size:0.95rem; font-weight:700; color:#C4590F; cursor:pointer; }
+  .fav-tab img { width:40px; height:40px; object-fit:contain; }
+  .fav-tab:hover { background:#FFF3E8; }
+  .fav-tab.is-active { background:#FFE27A; box-shadow:inset 0 0 0 1.5px #D97D45; }
   .fav-summary { font-weight:700; color:var(--leaf-deep); margin:0 0 16px; padding:12px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; }
 
   .my-panel .produce-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; }

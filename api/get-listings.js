@@ -574,12 +574,83 @@ async function reportListing(req, res) {
   }
 }
 
+// Messages du formulaire Contact : enregistrés dans la table contact_messages, que seul le serveur peut lire.
+const CONTACT_REASONS = [
+  'Question sur une commande',
+  'Question sur mon compte',
+  'Réclamation vendeur',
+  'Mes données personnelles',
+  'Autre',
+];
+const CONTACT_MESSAGE_MIN = 10;
+const CONTACT_MESSAGE_MAX = 3000;
+const CONTACT_MAX_PER_EMAIL_PER_HOUR = 5;
+const CONTACT_ERROR = 'Impossible d\'envoyer votre message pour le moment. Réessayez.';
+
+async function contactMessage(req, res) {
+  try {
+    const body = req.body || {};
+
+    // Champ piège : un humain ne le voit pas, un robot le remplit. On répond « ok » sans rien enregistrer.
+    if (typeof body.website === 'string' && body.website.trim() !== '') {
+      return res.status(200).json({ ok: true });
+    }
+
+    const reason = typeof body.reason === 'string' ? body.reason : '';
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+
+    if (!CONTACT_REASONS.includes(reason)) {
+      return res.status(400).json({ error: 'Choisissez le motif de votre message.' });
+    }
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      return res.status(400).json({ error: 'Indiquez une adresse e-mail valide pour recevoir notre réponse.' });
+    }
+    if (message.length < CONTACT_MESSAGE_MIN) {
+      return res.status(400).json({ error: 'Écrivez votre message (' + CONTACT_MESSAGE_MIN + ' caractères au moins).' });
+    }
+    if (message.length > CONTACT_MESSAGE_MAX) {
+      return res.status(400).json({ error: 'Votre message est trop long (' + CONTACT_MESSAGE_MAX + ' caractères au plus).' });
+    }
+
+    // Limite contre les abus : par adresse e-mail, sur la dernière heure
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { data: recent, error: recentError } = await supabase
+      .from('contact_messages')
+      .select('email')
+      .eq('email', email)
+      .gte('created_at', since)
+      .limit(100);
+    if (recentError) {
+      console.error('Erreur Supabase (contact, lecture récente) :', recentError);
+      return res.status(500).json({ error: CONTACT_ERROR });
+    }
+    if ((recent || []).length >= CONTACT_MAX_PER_EMAIL_PER_HOUR) {
+      return res.status(429).json({ error: 'Trop de messages en peu de temps. Réessayez plus tard.' });
+    }
+
+    const { error: insertError } = await supabase.from('contact_messages').insert({ reason, email, message });
+    if (insertError) {
+      console.error('Erreur Supabase (contact, enregistrement) :', insertError);
+      return res.status(500).json({ error: CONTACT_ERROR });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: CONTACT_ERROR });
+  }
+}
+
 export default async function handler(req, res) {
   // POST : signalement d'une annonce (ouvert à tous), sinon actions de l'administrateur
   // (modération des commentaires, suivi fiscal des vendeurs)
   if (req.method === 'POST') {
     if (req.body && req.body.action === 'report_listing') {
       return reportListing(req, res);
+    }
+    if (req.body && req.body.action === 'contact_message') {
+      return contactMessage(req, res);
     }
     return handleAdminAction(req, res);
   }

@@ -39,6 +39,32 @@ async function loadShop(sellerId) {
   };
 }
 
+// Nom affiché pour un vendeur professionnel : le nom de sa boutique, sinon sa raison sociale.
+// Renvoie une table { identifiant du vendeur -> nom }. Une panne de lecture ne doit jamais empêcher d'afficher les annonces.
+async function loadProNames(sellerIds) {
+  const names = new Map();
+  if (sellerIds.length === 0) return names;
+  const clean = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+  try {
+    const { data } = await supabase.from('sellers').select('id, shop_name').in('id', sellerIds);
+    (data || []).forEach((row) => {
+      const name = clean(row.shop_name);
+      if (name) names.set(row.id, name);
+    });
+    const missing = sellerIds.filter((id) => !names.has(id));
+    if (missing.length > 0) {
+      const { data: taxRows } = await supabase.from('seller_tax_info').select('seller_id, legal_name').in('seller_id', missing);
+      (taxRows || []).forEach((row) => {
+        const name = clean(row.legal_name);
+        if (name) names.set(row.seller_id, name);
+      });
+    }
+  } catch (nameError) {
+    console.error('Lecture des noms des vendeurs professionnels impossible :', nameError);
+  }
+  return names;
+}
+
 // Applique la promotion en cours (réservée aux vendeurs professionnels, début et fin inclus).
 // Les champs de promotion ne sont jamais envoyés tels quels au navigateur.
 function withCurrentPrice(item) {
@@ -751,9 +777,20 @@ export default async function handler(req, res) {
       console.error('Lecture des avis impossible :', ratingError);
     }
 
+    // Le nom du vendeur professionnel accompagne son annonce (jamais pour un particulier)
+    const proIds = [...new Set(visibleListings
+      .filter((item) => item.sellers && item.sellers.seller_type === 'professionnel')
+      .map((item) => item.seller_id)
+      .filter(Boolean))];
+    const proNames = await loadProNames(proIds);
+
     const listingsWithRating = visibleListings.map(({ seller_id, ...item }) => {
       const rating = ratings.get(seller_id);
-      return { ...item, seller_rating: rating ? { average: rating.average, count: rating.count } : { average: null, count: 0 } };
+      return {
+        ...item,
+        seller_rating: rating ? { average: rating.average, count: rating.count } : { average: null, count: 0 },
+        seller_legal_name: proNames.get(seller_id) || null,
+      };
     });
 
     res.status(200).json({ listings: listingsWithRating });

@@ -67,6 +67,7 @@
   <div class="container">
     <div id="realListingsContainer" class="produce-grid listings-grid"></div>
     <p id="noListingsMessage" style="display:none;text-align:center;margin-top:24px;">Aucune annonce ne correspond à votre recherche pour le moment.</p>
+    <nav id="pager" class="pager" aria-label="Pages d'annonces" style="display:none;"></nav>
   </div>
 </section>
 
@@ -91,6 +92,10 @@
   let currentSearch = '';
   let buyerLocation = null;
 
+  // Nombre d'annonces affichées par page
+  const PAGE_SIZE = 30;
+  let currentPage = Math.max(1, parseInt(new URLSearchParams(location.search).get('page'), 10) || 1);
+
   const chipsContainer = document.getElementById('categoryChips');
   const container = document.getElementById('realListingsContainer');
   const noListingsMessage = document.getElementById('noListingsMessage');
@@ -101,6 +106,7 @@
   const buyerCityDisplay = document.getElementById('buyerCityDisplay');
   const typeParticulier = document.getElementById('typeParticulier');
   const typeProfessionnel = document.getElementById('typeProfessionnel');
+  const pager = document.getElementById('pager');
 
   CATEGORIES.forEach((cat) => {
     const btn = document.createElement('button');
@@ -255,6 +261,7 @@
 
       buyerLocation = { city, lat: data.latitude, lng: data.longitude };
       localStorage.setItem('agrivoisin_buyer_location', JSON.stringify(buyerLocation));
+      goToFirstPage();
       renderListings();
     } catch (err) {
       alert('Erreur : ' + err.message);
@@ -262,6 +269,46 @@
       buyerCityBtn.textContent = 'Valider';
       buyerCityBtn.disabled = false;
     }
+  });
+
+  // Numéros à afficher : 1 … 4 5 6 … 12 (la page courante au milieu)
+  function pageNumbers(total) {
+    const set = new Set([1, total, currentPage - 1, currentPage, currentPage + 1]);
+    const list = [...set].filter((n) => n >= 1 && n <= total).sort((x, y) => x - y);
+    const out = [];
+    list.forEach((n, i) => {
+      if (i > 0 && n - list[i - 1] > 1) out.push('…');
+      out.push(n);
+    });
+    return out;
+  }
+
+  function renderPager(total) {
+    if (total <= 1) {
+      pager.style.display = 'none';
+      pager.innerHTML = '';
+      return;
+    }
+    let html = '<button type="button" class="pager-btn" data-page="' + (currentPage - 1) + '"' + (currentPage === 1 ? ' disabled' : '') + '>Précédent</button>';
+    pageNumbers(total).forEach((n) => {
+      html += n === '…'
+        ? '<span class="pager-dots">…</span>'
+        : '<button type="button" class="pager-btn pager-num' + (n === currentPage ? ' is-current' : '') + '" data-page="' + n + '"' + (n === currentPage ? ' aria-current="page"' : '') + ' aria-label="Page ' + n + '">' + n + '</button>';
+    });
+    html += '<button type="button" class="pager-btn" data-page="' + (currentPage + 1) + '"' + (currentPage === total ? ' disabled' : '') + '>Suivant</button>';
+    pager.innerHTML = html;
+    pager.style.display = 'flex';
+  }
+
+  pager.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pager-btn');
+    if (!btn || btn.disabled) return;
+    currentPage = Number(btn.dataset.page);
+    // Le numéro de page reste dans l'adresse : en revenant d'une annonce, on retrouve sa page
+    try { history.replaceState(null, '', currentPage > 1 ? '?page=' + currentPage : location.pathname); } catch (err) {}
+    renderListings();
+    const grid = document.getElementById('realListingsContainer');
+    grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   function renderListings() {
@@ -300,9 +347,16 @@
 
     if (filtered.length === 0) {
       noListingsMessage.style.display = 'block';
+      pager.style.display = 'none';
       return;
     }
     noListingsMessage.style.display = 'none';
+
+    // Une page = PAGE_SIZE annonces ; on ne montre que celles de la page courante
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    if (currentPage > totalPages) currentPage = totalPages;
+    renderPager(totalPages);
+    filtered = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
     filtered.forEach((item) => {
       const card = document.createElement('div');
@@ -426,6 +480,12 @@
     });
   }
 
+  // Quand on change un filtre, un tri ou la recherche, on repart de la page 1
+  function goToFirstPage() {
+    currentPage = 1;
+    try { history.replaceState(null, '', location.pathname); } catch (err) {}
+  }
+
   // ---------- Favoris ----------
   const supabaseClient = window.supabase.createClient(
     'https://eipksfszadhratfvavvs.supabase.co',
@@ -506,21 +566,24 @@
     chipsContainer.querySelectorAll('.chip').forEach((c) => c.classList.remove('chip-active'));
     btn.classList.add('chip-active');
     currentCategory = btn.dataset.category;
+    goToFirstPage();
     renderListings();
   });
 
   // Un clic sélectionne le type (bouton orange), un deuxième clic le désélectionne
   [typeParticulier, typeProfessionnel].forEach((box) => {
-    box.addEventListener('change', renderListings);
+    box.addEventListener('change', () => { goToFirstPage(); renderListings(); });
   });
 
   sortSelect.addEventListener('change', () => {
     currentSort = sortSelect.value;
+    goToFirstPage();
     renderListings();
   });
 
   searchInput.addEventListener('input', () => {
     currentSearch = normalizeText(searchInput.value.trim());
+    goToFirstPage();
     renderListings();
   });
 
@@ -620,6 +683,21 @@
   .type-check input { position:absolute; opacity:0; width:1px; height:1px; margin:0; pointer-events:none; }
   .type-check:has(input:checked) { background:#D97D45; border-color:#D97D45; color:#fff; }
   .type-check:has(input:focus-visible) { outline:2px solid #D97D45; outline-offset:2px; }
+
+  /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone) */
+  .listings-grid { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 900px) { .listings-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .listings-grid { grid-template-columns: 1fr; } }
+
+  /* Pages d'annonces : Précédent, numéros, Suivant */
+  .pager { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:36px; }
+  .pager-btn { padding:9px 18px; border-radius:999px; border:1.5px solid #3AA5E3; background:#fff; font-family:inherit; font-size:0.95rem; font-weight:700; color:#1F8FD6; cursor:pointer; }
+  .pager-btn:hover:not(:disabled) { background:#EAF6FD; }
+  .pager-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .pager-num { min-width:42px; padding:9px 12px; }
+  .pager-num.is-current { background:#3AA5E3; border-color:#3AA5E3; color:#fff; }
+  .pager-dots { color:#1F8FD6; font-weight:700; padding:0 2px; }
+  .pager-btn:focus-visible { outline:2px solid #3AA5E3; outline-offset:2px; }
 
   .price-wrap { display:inline-flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
   .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }

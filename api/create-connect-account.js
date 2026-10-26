@@ -477,6 +477,16 @@ export default async function handler(req, res) {
       }
     }
 
+    // Engagement du professionnel : ne proposer que des produits conformes à la réglementation de l'Union européenne.
+    // La date de l'engagement est conservée.
+    let pledgeAcceptedAt = null;
+    if (sellerType === 'professionnel') {
+      if (req.body.pledge !== true) {
+        return res.status(400).json({ error: "Cochez la case d'engagement : un professionnel s'engage à ne proposer que des produits conformes à la réglementation de l'Union européenne." });
+      }
+      pledgeAcceptedAt = new Date().toISOString();
+    }
+
     // 0 quater. Informations fiscales (déclaration à l'administration fiscale)
     const cleanedTax = cleanTaxInfo(sellerType, siret, taxRaw);
     if (!cleanedTax.ok) {
@@ -566,6 +576,7 @@ export default async function handler(req, res) {
         seller_type: sellerType,
         siret: siret,
         phone: phone,
+        pledge_accepted_at: pledgeAcceptedAt,
       };
       if (pseudo) {
         changes.pseudo = pseudo;
@@ -589,6 +600,7 @@ export default async function handler(req, res) {
           seller_type: sellerType,
           siret: siret,
           phone: phone,
+          pledge_accepted_at: pledgeAcceptedAt,
           pseudo: pseudo,
         })
         .select('id')

@@ -21,11 +21,33 @@
       <p class="legal-date">Une question, un souci, une idée ? Écrivez-nous.</p>
 
       <h2>Nous écrire</h2>
-      <ul>
-        <li>Par e-mail : <span class="todo">[à compléter]</span></li>
-        <li>Par courrier : <span class="todo">[à compléter]</span></li>
-      </ul>
-      <p>Dans votre message, indiquez l'adresse e-mail de votre compte Agrivoisin et, s'il s'agit d'une commande, ce que vous avez commandé et la date. Cela nous permet de vous répondre plus vite.</p>
+      <p>Choisissez le motif de votre message : cela nous permet de vous répondre plus vite.</p>
+      <form id="contactForm" novalidate style="max-width:520px;">
+        <label class="cf-label" for="cfReason">Motif</label>
+        <select id="cfReason" class="cf-field">
+          <option value="">Choisissez un motif</option>
+          <option>Question sur une commande</option>
+          <option>Question sur mon compte</option>
+          <option>Réclamation vendeur</option>
+          <option>Mes données personnelles</option>
+          <option>Autre</option>
+        </select>
+
+        <label class="cf-label" for="cfEmail">Votre adresse e-mail</label>
+        <input id="cfEmail" class="cf-field" type="email" maxlength="254" autocomplete="email" placeholder="vous@exemple.com">
+
+        <label class="cf-label" for="cfMsg">Votre message</label>
+        <textarea id="cfMsg" class="cf-field" rows="5" maxlength="3000" placeholder="Expliquez-nous en quelques mots. Pour une commande, indiquez ce que vous avez commandé et la date."></textarea>
+
+        <div style="position:absolute;left:-5000px;" aria-hidden="true"><label>Ne pas remplir <input id="cfWebsite" type="text" tabindex="-1" autocomplete="off"></label></div>
+
+        <p id="cfError" class="cf-error" style="display:none;" role="alert"></p>
+        <button type="submit" id="cfSubmit" class="btn btn-primary" style="margin-top:16px;">Envoyer le message</button>
+      </form>
+      <div id="cfDone" style="display:none;max-width:520px;padding:16px 18px;border-radius:14px;background:var(--cream-soft);">
+        <p style="margin:0;font-weight:700;color:var(--leaf-deep);">Merci, votre message a bien été envoyé.</p>
+        <p style="margin:6px 0 0;">Nous vous répondrons par e-mail.</p>
+      </div>
 
       <h2>Vos données personnelles</h2>
       <p>Pour consulter, corriger ou supprimer vos données, lisez la page <a href="confidentialite.html" style="text-decoration:underline;">Confidentialité</a>, puis écrivez-nous à l'adresse ci-dessus.</p>
@@ -81,6 +103,67 @@
 </footer>
 
 <script src="script.js"></script>
+<script>
+  (function () {
+    var form = document.getElementById('contactForm');
+    var done = document.getElementById('cfDone');
+    var errorEl = document.getElementById('cfError');
+    var submitBtn = document.getElementById('cfSubmit');
+
+    function showError(text) {
+      errorEl.textContent = text;
+      errorEl.style.display = 'block';
+    }
+    function resetButton() {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Envoyer le message';
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errorEl.style.display = 'none';
+
+      var reason = document.getElementById('cfReason').value;
+      var email = document.getElementById('cfEmail').value.trim();
+      var message = document.getElementById('cfMsg').value.trim();
+
+      if (!reason) { showError('Choisissez le motif de votre message.'); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { showError('Indiquez une adresse e-mail valide pour recevoir notre réponse.'); return; }
+      if (message.length < 10) { showError('Écrivez votre message (10 caractères au moins).'); return; }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Envoi en cours...';
+
+      fetch('/api/get-listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'contact_message',
+          reason: reason,
+          email: email,
+          message: message,
+          website: document.getElementById('cfWebsite').value
+        })
+      })
+        .then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; });
+        })
+        .then(function (r) {
+          if (r.ok) {
+            form.style.display = 'none';
+            done.style.display = 'block';
+          } else {
+            showError(r.data.error || "Impossible d'envoyer votre message pour le moment. Réessayez.");
+            resetButton();
+          }
+        })
+        .catch(function () {
+          showError("Impossible d'envoyer votre message pour le moment. Réessayez.");
+          resetButton();
+        });
+    });
+  })();
+</script>
 <style>
   .legal-doc { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:40px 44px 44px; max-width:820px; margin:0 auto; text-align:left; box-sizing:border-box; }
   .legal-doc h1 { font-size:1.9rem; margin:0 0 6px; text-align:left; }
@@ -91,6 +174,10 @@
   .legal-doc li { line-height:1.7; margin-bottom:8px; text-align:left; list-style:disc; color:inherit; }
   .todo { background:#FFE27A; padding:1px 6px; border-radius:6px; font-weight:600; }
   @media (max-width: 640px) { .legal-doc { padding:26px 20px 30px; border-radius:20px; } .legal-doc h1 { font-size:1.55rem; } }
+  .cf-label { display:block; font-size:0.85rem; font-weight:700; color:var(--leaf-deep); margin:14px 0 6px; }
+  .cf-field { width:100%; box-sizing:border-box; padding:11px 13px; border:1px solid #e6e0d3; border-radius:12px; font:inherit; font-size:0.95rem; background:#fff; color:#3d3a35; }
+  textarea.cf-field { resize:vertical; }
+  .cf-error { margin:14px 0 0; padding:10px 12px; border-radius:10px; background:#FDECEA; color:#C8352F; font-size:0.88rem; font-weight:600; }
 </style>
 </body>
 </html>

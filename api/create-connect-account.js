@@ -13,7 +13,7 @@ function normalizeName(value) {
   return String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .replace(/œ/g, 'oe')
     .replace(/æ/g, 'ae')
     .replace(/[^a-z0-9]+/g, ' ')
@@ -104,7 +104,7 @@ function cleanPseudo(raw) {
     return { ok: true, pseudo: null };
   }
   const pseudo = String(raw).trim().replace(/\s+/g, ' ');
-  if (!/^[A-Za-z0-9\u00C0-\u00FF][A-Za-z0-9\u00C0-\u00FF -]{1,18}[A-Za-z0-9\u00C0-\u00FF]$/.test(pseudo)) {
+  if (!/^[A-Za-z0-9À-ÿ][A-Za-z0-9À-ÿ -]{1,18}[A-Za-z0-9À-ÿ]$/.test(pseudo)) {
     return { ok: false, status: 400, error: PSEUDO_ERROR };
   }
   return { ok: true, pseudo };
@@ -467,6 +467,16 @@ export default async function handler(req, res) {
       }
     }
 
+    // Téléphone de l'entreprise : obligatoire pour un professionnel (il est affiché sur sa page vendeur)
+    let phone = null;
+    if (sellerType === 'professionnel') {
+      phone = String(req.body.phone == null ? '' : req.body.phone).trim();
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phone.length > 20 || !/^[0-9+\s.()-]+$/.test(phone) || phoneDigits.length < 9 || phoneDigits.length > 15) {
+        return res.status(400).json({ error: "Indiquez un numéro de téléphone valide pour l'entreprise." });
+      }
+    }
+
     // 0 quater. Informations fiscales (déclaration à l'administration fiscale)
     const cleanedTax = cleanTaxInfo(sellerType, siret, taxRaw);
     if (!cleanedTax.ok) {
@@ -555,6 +565,7 @@ export default async function handler(req, res) {
         longitude: longitude,
         seller_type: sellerType,
         siret: siret,
+        phone: phone,
       };
       if (pseudo) {
         changes.pseudo = pseudo;
@@ -577,6 +588,7 @@ export default async function handler(req, res) {
           user_id: userId,
           seller_type: sellerType,
           siret: siret,
+          phone: phone,
           pseudo: pseudo,
         })
         .select('id')

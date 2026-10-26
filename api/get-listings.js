@@ -14,16 +14,16 @@ function todayInParis() {
 }
 
 // Interrupteur : afficher ou non l'adresse de l'entreprise sur la vitrine d'un vendeur professionnel.
-// false = l'adresse reste cachée (choix actuel, en attendant l'avis d'un juriste). true = elle est affichée.
-const SHOW_PRO_ADDRESS = false;
+// true = elle est affichée (choix du 26/10/2026, pour donner à l'acheteur les coordonnées du professionnel). false = elle reste cachée.
+const SHOW_PRO_ADDRESS = true;
 
 // Vitrine d'un vendeur professionnel : le nom de la boutique, sa présentation, ses images,
-// et ses informations légales (SIRET, et adresse de l'entreprise si l'interrupteur ci-dessus est sur true).
+// et ses informations légales (SIRET, e-mail de contact, et adresse de l'entreprise si l'interrupteur ci-dessus est sur true).
 // Elle n'est jamais envoyée pour un particulier, et jamais avec la liste des annonces.
 async function loadShop(sellerId) {
   const { data, error } = await supabase
     .from('sellers')
-    .select('shop_name, shop_description, shop_cover_url, shop_logo_url, address, siret, city')
+    .select('shop_name, shop_description, shop_cover_url, shop_logo_url, address, siret, city, email')
     .eq('id', sellerId)
     .maybeSingle();
   if (error || !data) return null;
@@ -36,6 +36,7 @@ async function loadShop(sellerId) {
     address: SHOW_PRO_ADDRESS ? clean(data.address) : null,
     city: clean(data.city),
     siret: clean(data.siret),
+    email: clean(data.email),
   };
 }
 

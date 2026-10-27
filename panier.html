@@ -137,9 +137,9 @@
 
 <script src="script.js"></script>
 <style>
-  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#F2765E 0%,#F8B3A5 50%,#FEF0ED 100%); }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
-  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#F8B3A5; color:#6B1608; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; text-align:left; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
   .my-video img { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
@@ -178,6 +178,15 @@
   .addr-row > div { flex:1; }
   .addr-box p.addr-note { font-size:0.8rem; color:#6B5842; margin:2px 0 0; }
   .addr-box p.addr-error { font-size:0.88rem; font-weight:600; color:#C8352F; margin:10px 0 0; }
+  /* Couleur de la page : une seule, sauf le bouton Retour */
+  .my-panel #cartSubtitle { color:#8A4034; }
+  .my-panel .cart-ship-title, .my-panel .cart-ship-fee, .my-panel .addr-box label { color:#D03A1E; }
+  .addr-box { border-color:#F59A87; }
+  .addr-box input:focus { border-color:#E24E30; outline:none; }
+  .my-panel .btn-primary { background:#D9421F; box-shadow:0 4px 14px rgba(217,66,31,0.4); }
+  .my-panel .btn-primary:hover { background:#B02F13; box-shadow:0 6px 18px rgba(217,66,31,0.48); }
+  .cart-qty-btn { background:#FEF0ED; color:#D03A1E; }
+  .cart-qty-btn:hover:not(:disabled) { background:#F8B3A5; }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(

@@ -228,9 +228,9 @@
 
 <script src="script.js"></script>
 <style>
-  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#F8BBD0 0%,#FCE4EC 55%,#FFF5F8 100%); }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
-  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#F8BBD0; color:#880E4F; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-form-box { max-width:480px; margin:0 auto; text-align:left; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
@@ -254,6 +254,24 @@
   .pw-eye .eye-off { display:none; }
   .pw-eye.shown .eye-on { display:none; }
   .pw-eye.shown .eye-off { display:block; }
+  /* Rose : une seule couleur pour toute la page, sauf le bouton Retour */
+  .my-panel .auth-subtitle { color:#8A4B63; }
+  .my-panel .auth-form label { color:#C2185B; }
+  .my-panel .auth-form input { border-color:#F48FB1; }
+  .my-panel .auth-form input:focus { border-color:#EC407A; }
+  .my-panel .auth-form input[type="checkbox"], .my-panel .auth-form input[type="radio"] { accent-color:#EC407A; }
+  .my-panel .btn-primary { background:#EC407A; box-shadow:0 4px 14px rgba(236,64,122,0.4); }
+  .my-panel .btn-primary:hover { background:#D81B60; box-shadow:0 6px 18px rgba(236,64,122,0.48); }
+  .seller-type legend { color:#C2185B; }
+  .auth-form .seller-type-option { border-color:#F48FB1; }
+  .auth-form .seller-type-option strong { color:#C2185B; }
+  .auth-form .seller-type-option:has(input:checked) { border-color:#EC407A; background:#FFF5F8; }
+  .auth-form .seller-type-option:has(input:focus-visible) { outline-color:#EC407A; }
+  .pro-offer { border-color:#EC407A; background:#FFF5F8; }
+  .pro-offer > strong { color:#C2185B; }
+  .my-panel .auth-form p[style*="cream-soft"] { background:#FFF5F8 !important; }
+  .my-panel .auth-switch a { color:#C2185B; }
+  .pw-eye:focus-visible { outline-color:#EC407A; }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(

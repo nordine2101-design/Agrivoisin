@@ -6,6 +6,9 @@
 <title>Les annonces — Agrivoisin</title>
 <meta name="description" content="Parcourez les récoltes disponibles près de chez vous sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400&display=swap" rel="stylesheet">
 <script src="supabase.js"></script>
 </head>
 <body>
@@ -24,7 +27,7 @@
     <div style="text-align:left;margin-bottom:-22px;">
       <a href="index.html" class="btn btn-ghost btn-back">Retour</a>
     </div>
-    <h1>Les trésors du voisinage</h1>
+    <h1>Les <span class="or3">trésors</span> du voisinage</h1>
     <p>Les produits des particuliers et des professionnels près de chez vous.</p>
   </div>
 </section>
@@ -704,6 +707,7 @@
   .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }
   .price-wrap .price { color:#C8352F; }
   .promo-pill { display:inline-block; margin:6px 0 0 0; padding:3px 10px; border-radius:999px; background:#FFE27A; color:#B45A00; font-size:0.75rem; font-weight:700; }
+  .or3 { font-family:'Josefin Sans',sans-serif; font-weight:400; text-transform:uppercase; letter-spacing:.25em; font-size:0.8em; transform:scaleX(1.12); transform-origin:left center; margin-right:.8em; background-image:linear-gradient(180deg,#FFF1A8 0%,#E5B93C 45%,#B8860B 55%,#F2D675 100%); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; display:inline-block; filter:drop-shadow(0 2px 1px rgba(90,60,0,.35)); }
 </style>
 </body>
 </html>

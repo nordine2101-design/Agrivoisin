@@ -11,12 +11,12 @@
 <body>
 
 <!-- ============ MES VENTES ============ -->
-<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;flex-wrap:wrap;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;min-height:533px;box-sizing:border-box;text-align:center;">
-    <div style="text-align:left;margin:-24px 0 12px -20px;">
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
       <a href="mes-annonces.html" class="btn btn-ghost btn-back">Retour</a>
+      <h1>Mes ventes</h1>
     </div>
-    <h1>Mes ventes</h1>
     <p id="pageSubtitle">Retrouvez ici les commandes passées chez vous.</p>
 
     <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de vos ventes...</p>
@@ -32,9 +32,7 @@
 
     <div id="salesContainer" style="text-align:left;margin-top:16px;"></div>
   </div>
-  <div style="width:440px;max-width:100%;min-height:400px;align-self:stretch;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;">
-    <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="width:auto;height:auto;max-width:80%;max-height:80%;">
-  </div>
+  <div class="my-video"></div>
 </section>
 
 <!-- ============ FOOTER ============ -->
@@ -550,6 +548,21 @@
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
   .money-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#C98A9B 0%,#E3BCC7 50%,#FAF0F3 100%); }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#E3BCC7; color:#4F0A21; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  /* Couleur de la page : une seule, sauf le bouton Retour et les repères d'état */
+  .my-panel #pageSubtitle { color:#6E3040; }
+  .my-panel .sale-card { border:1.5px solid #CE95A5; background:#FAF0F3; }
+  .my-panel .sale-date, .my-panel .sale-total, .my-panel .money-total { color:#8C1B3C; }
+  .my-panel .sale-head { border-bottom-color:#CE95A5; }
+  .my-panel .ship-action label, .my-panel .ship-addr .t, .my-panel .tax-box label { color:#8C1B3C; }
+  .my-panel .ship-addr { border-color:#CE95A5; }
+  .my-panel .btn-primary { background:#8C1B3C; box-shadow:0 4px 14px rgba(140,27,60,0.4); }
+  .my-panel .btn-primary:hover { background:#6E1230; box-shadow:0 6px 18px rgba(140,27,60,0.48); }
+  .my-panel a:not(.btn) { color:#8C1B3C; }
 </style>
 
 </body>

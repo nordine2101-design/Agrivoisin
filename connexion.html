@@ -8,9 +8,9 @@
 <link rel="stylesheet" href="style.css">
 <script src="supabase.js"></script>
 <style>
-  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#A5E06A 0%,#CDF0A6 50%,#F6FCEE 100%); }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
-  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#CDF0A6; color:#1F4D00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-form-box { max-width:420px; margin:0 auto; text-align:left; }
   .my-video { width:500px; flex-shrink:0; position:sticky; top:20px; box-sizing:border-box; padding:10px; background:var(--cream-soft); border-radius:28px; }
@@ -23,6 +23,16 @@
   .pw-eye .eye-off { display:none; }
   .pw-eye.shown .eye-on { display:none; }
   .pw-eye.shown .eye-off { display:block; }
+  /* Turquoise : une seule couleur pour toute la page, sauf le bouton Retour */
+  .my-panel .auth-subtitle { color:#3F6A1F; }
+  .my-panel .auth-form label { color:#4C9A12; }
+  .my-panel .auth-form input { border-color:#A6DC72; }
+  .my-panel .auth-form input:focus { border-color:#5FB41C; }
+  .my-panel .btn-primary { background:#5BAE1A; box-shadow:0 4px 14px rgba(91,174,26,0.4); }
+  .my-panel .btn-primary:hover { background:#43870F; box-shadow:0 6px 18px rgba(91,174,26,0.48); }
+  .my-panel .auth-link-inline { color:#4C9A12; }
+  .my-panel .auth-switch a { color:#4C9A12; }
+  .pw-eye:focus-visible { outline-color:#5FB41C; }
 </style>
 </head>
 <body>

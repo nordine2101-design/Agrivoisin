@@ -135,6 +135,12 @@
   .listing-actions .btn:disabled { opacity:0.5; cursor:not-allowed; }
   .promo-btn { width:128px; height:128px; padding:0; border:0; background:#00D9D0; color:#fff; font-family:inherit; font-size:0.74rem; font-weight:800; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; text-align:center; clip-path:polygon(50.0% 0.0%, 61.1% 15.8%, 79.4% 9.5%, 79.1% 28.8%, 97.6% 34.5%, 86.0% 50.0%, 97.6% 65.5%, 79.1% 71.2%, 79.4% 90.5%, 61.1% 84.2%, 50.0% 100.0%, 38.9% 84.2%, 20.6% 90.5%, 20.9% 71.2%, 2.4% 65.5%, 14.0% 50.0%, 2.4% 34.5%, 20.9% 28.8%, 20.6% 9.5%, 38.9% 15.8%); transition:transform .15s ease, background .15s ease; }
   .promo-btn:hover { background:#00B3AB; transform:scale(1.06); }
+  .promo-btn { position:relative; }
+  .promo-btn::before, .promo-btn::after { content:""; position:absolute; clip-path:polygon(50.0% 0.0%, 61.1% 15.8%, 79.4% 9.5%, 79.1% 28.8%, 97.6% 34.5%, 86.0% 50.0%, 97.6% 65.5%, 79.1% 71.2%, 79.4% 90.5%, 61.1% 84.2%, 50.0% 100.0%, 38.9% 84.2%, 20.6% 90.5%, 20.9% 71.2%, 2.4% 65.5%, 14.0% 50.0%, 2.4% 34.5%, 20.9% 28.8%, 20.6% 9.5%, 38.9% 15.8%); }
+  .promo-btn::before { inset:3px; background:#fff; }
+  .promo-btn::after { inset:6px; background:#00D9D0; transition:background .15s ease; }
+  .promo-btn:hover::after { background:#00B3AB; }
+  .promo-word { position:relative; z-index:1; font-size:1.3rem; border:3px solid #fff; border-radius:7px; padding:0 2px; }
   .promo-btn:focus-visible { outline:3px solid #37474F; outline-offset:2px; }
   .promo-badge { display:inline-block; margin-top:10px; padding:4px 12px; border-radius:999px; font-size:0.85rem; font-weight:700; background:#ECEFF1; color:#37474F; }
   .promo-badge.promo-soon { background:#eee8da; color:#6B5842; }
@@ -408,7 +414,7 @@
       (dates ? '<p class="listing-dates">' + escapeHtml(dates) + '</p>' : '') +
       '<div class="listing-actions">' +
       '<a class="btn btn-primary" href="produit.html?id=' + encodeURIComponent(item.id) + '">Voir l\'annonce</a>' +
-      (isPro ? '<button type="button" class="promo-btn" aria-label="Promotions">Promotions</button>' : '') +
+      (isPro ? '<button type="button" class="promo-btn" aria-label="Promotions"><span class="promo-word">PROMO</span></button>' : '') +
       '<button type="button" class="btn btn-ghost delete-btn">Supprimer</button>' +
       '</div>' +
       '</div>' +

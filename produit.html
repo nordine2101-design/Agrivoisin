@@ -27,11 +27,6 @@
           <h2 class="info-title">Vendeur</h2>
       <div id="listingSeller" style="font-size:0.95rem;margin-bottom:6px;"></div>
       <div id="listingRating" style="margin:0 0 16px;"></div>
-      <p id="listingLegal" style="display:none;margin:18px 0 0;font-size:0.8rem;line-height:1.5;color:#6B5842;text-align:left;border-top:1px solid #e6e0d3;padding-top:12px;">
-        <strong id="listingLegalName"></strong><br>
-        Ce vendeur professionnel s'engage à ne proposer que des produits conformes à la réglementation de l'Union européenne.<br>
-        <a id="listingLegalLink" href="#" style="color:var(--leaf-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px;">Informations légales du vendeur</a>
-      </p>
         </div>
         <div class="info-box">
           <h2 class="info-title">Retrait</h2>
@@ -56,17 +51,22 @@
         <div class="info-box">
           <h2 class="info-title">Description</h2>
       <p id="listingFreshness" style="display:none;font-weight:600;color:var(--leaf-deep);margin-bottom:8px;"></p>
-      <p id="listingDescription" style="line-height:1.7;margin-bottom:22px;"></p>
+      <p id="listingDescription" style="line-height:1.5;margin-bottom:22px;"></p>
         </div>
         <div class="info-box">
           <h2 class="info-title">Prix</h2>
-      <p style="margin-bottom:22px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span><span id="listingLot" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
+      <p style="margin-bottom:12px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span><span id="listingLot" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
       <p id="listingStock" style="display:none;margin:-10px 0 18px;font-weight:700;"></p>
       <button type="button" id="addToCartBtn" class="btn btn-primary" style="width:100%;">Ajouter au panier</button>
       <p id="listingStockNote" style="display:none;margin-top:12px;font-size:0.9rem;color:#6B5842;"></p>
       <a id="viewCartLink" href="panier.html" style="display:none;margin-top:14px;font-weight:700;color:var(--leaf-deep);">Voir mon panier</a>
         </div>
       </div>
+      <p id="listingLegal" style="display:none;margin:18px 0 0;font-size:0.8rem;line-height:1.5;color:#6B5842;text-align:left;border-top:1px solid #e6e0d3;padding-top:12px;">
+        <strong id="listingLegalName"></strong><br>
+        Ce vendeur professionnel s'engage à ne proposer que des produits conformes à la réglementation de l'Union européenne.<br>
+        <a id="listingLegalLink" href="#" style="color:var(--leaf-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px;">Informations légales du vendeur</a>
+      </p>
       <p style="margin:14px 0 0;text-align:center;"><a href="#" id="reportOpenLink" style="font-size:0.82rem;color:#8a7a62;text-decoration:underline;text-underline-offset:2px;">Signaler cette annonce</a></p>
     </div>
   </div>
@@ -254,7 +254,7 @@
   }
 
   // Ce que veut dire chaque niveau de fraîcheur : montré dans un encadré quand on survole (ou touche) les flocons.
-  // L'espace insécable ( ) colle le « h » à son chiffre : « 24 h » ne se coupe jamais en fin de ligne.
+  // L'espace insécable colle le « h » à son chiffre : « 24 h » ne se coupe jamais en fin de ligne.
   const FRESHNESS_LEVELS = [
     { stars: 3, label: 'Très frais', text: 'Récolté il y a moins de 24 h' },
     { stars: 2, label: 'Frais', text: 'Récolté entre 24 et 48 h' },
@@ -634,13 +634,28 @@
   .listing-pill { font-size:1rem; text-align:center; margin:0; display:inline-block; background:#CDE8C8; color:#1F4D00; padding:5px 18px; border-radius:28px; position:absolute; left:50%; top:0; transform:translate(-50%,-50%); width:max-content; max-width:min(520px, calc(100% - 220px)); }
   .listing-chip { position:absolute; top:22px; right:32px; font-size:0.72rem; font-weight:700; color:#2F5A33; background:#EAF3E8; border-radius:999px; padding:6px 14px; text-transform:uppercase; letter-spacing:0.05em; }
   .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:stretch; margin:6px 0 6px; text-align:left; }
-  .info-box { border:2px solid #9FC49A; border-radius:14px; background:#F6F9F5; padding:14px; min-width:0; }
+  .info-box { border:2px solid #9FC49A; border-radius:14px; background:#F6F9F5; padding:12px 14px; min-width:0; }
   .info-title { font-size:0.75rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; margin:0 0 10px; }
   .info-box .seller-card { border:0; background:none; padding:0; margin:0; }
   .info-box #listingPickup, .info-box #listingShip { background:none; padding:0; margin-bottom:12px; }
   .info-box #listingPickup > p, .info-box #listingShip > p:first-child { display:none; }
   .info-box #listingTrustNote { margin-top:8px !important; }
-  .info-box #listingLegal { margin-top:12px !important; }
+  #listingLegal { margin:10px 0 0 !important; padding-top:8px !important; font-size:0.75rem !important; line-height:1.4 !important; text-align:center !important; }
+  #listingLegal br { display:none; }
+  #listingLegal strong { font-weight:700; }
+  #listingLegalName::after { content:" \2014 "; }
+  .info-box .freshness-icon { width:46px; height:46px; }
+  .info-box #listingFreshness { margin-bottom:4px !important; }
+  .info-box #listingShipBadge { margin:0 0 8px !important; gap:8px !important; }
+  .info-box #listingShipBadge img { width:80px; height:auto; }
+  .info-box #listingShipBadge strong { font-size:1.1rem !important; }
+  .info-box #listingTrustNote { font-size:0.85rem; line-height:1.4; }
+  .info-box #listingTrustNote { padding:8px 12px !important; margin-top:6px !important; font-size:0.8rem; }
+  .info-box #listingPickup, .info-box #listingShip { margin-bottom:6px; }
+  .info-box #listingPickupLines { line-height:1.4 !important; }
+  .info-box .seller-card-btn { margin-top:8px; padding:7px 18px; }
+  .info-box .seller-card-avatar { width:40px; height:40px; font-size:1.1rem; }
+  .info-box .info-title { margin-bottom:6px; }
   .info-box #listingDescription { margin-bottom:12px !important; text-align:left; }
   .seller-rating { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; font-weight:700; color:var(--leaf-deep); font-size:1.25rem; }
   .seller-rating-icon { width:34px; height:34px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }

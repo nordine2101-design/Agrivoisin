@@ -137,9 +137,9 @@
 
 <script src="script.js"></script>
 <style>
-  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#E6C13E 0%,#F2DC8A 50%,#FDF8E4 100%); }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#3FC98A 0%,#9BE6C2 50%,#EAFAF2 100%); }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
-  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#F2DC8A; color:#4D3A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#9BE6C2; color:#06432A; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; text-align:left; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
   .my-video img { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
@@ -179,14 +179,14 @@
   .addr-box p.addr-note { font-size:0.8rem; color:#6B5842; margin:2px 0 0; }
   .addr-box p.addr-error { font-size:0.88rem; font-weight:600; color:#C8352F; margin:10px 0 0; }
   /* Couleur de la page : une seule, sauf le bouton Retour */
-  .my-panel #cartSubtitle { color:#756220; }
-  .my-panel .cart-ship-title, .my-panel .cart-ship-fee, .my-panel .addr-box label { color:#9A7A00; }
-  .addr-box { border-color:#E8CB62; }
-  .addr-box input:focus { border-color:#BE9600; outline:none; }
-  .my-panel .btn-primary { background:#B58C00; box-shadow:0 4px 14px rgba(181,140,0,0.4); }
-  .my-panel .btn-primary:hover { background:#8F6D00; box-shadow:0 6px 18px rgba(181,140,0,0.48); }
-  .cart-qty-btn { background:#FDF8E4; color:#9A7A00; }
-  .cart-qty-btn:hover:not(:disabled) { background:#F2DC8A; }
+  .my-panel #cartSubtitle { color:#2A6B50; }
+  .my-panel .cart-ship-title, .my-panel .cart-ship-fee, .my-panel .addr-box label { color:#0E8F5A; }
+  .addr-box { border-color:#6ED9A8; }
+  .addr-box input:focus { border-color:#12A86B; outline:none; }
+  .my-panel .btn-primary { background:#0F9B61; box-shadow:0 4px 14px rgba(15,155,97,0.4); }
+  .my-panel .btn-primary:hover { background:#0B7A4B; box-shadow:0 6px 18px rgba(15,155,97,0.48); }
+  .cart-qty-btn { background:#EAFAF2; color:#0E8F5A; }
+  .cart-qty-btn:hover:not(:disabled) { background:#9BE6C2; }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(

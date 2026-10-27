@@ -758,17 +758,22 @@
 </script>
 
 <style>
-  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#FFC58F 0%,#FFDDB8 60%,#FFF1E0 100%); }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
-  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFD1A3; color:#8A4B12; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-topbar { position:relative; display:flex; justify-content:center; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-topbar .btn { position:absolute; left:0; top:50%; transform:translateY(-50%); }
   .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
   .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
-  .order-banner { background:var(--leaf-deep, #385C3B); color:#fff; font-weight:700; font-size:1rem; letter-spacing:0.02em; text-align:center; padding:10px 14px; border-radius:10px; margin:26px 0 10px; }
+  /* Boutons en orange (le bouton « Retour » garde sa couleur) */
+  .my-panel .btn-primary { background:#FF7A00; color:#fff; box-shadow:0 4px 14px rgba(255,122,0,0.38); }
+  .my-panel .btn-primary:hover { background:#E56500; box-shadow:0 6px 18px rgba(255,122,0,0.48); }
+  .my-panel .btn-ghost:not(.btn-back) { background:#E56500; border-color:#E56500; color:#fff; }
+  .my-panel .btn-ghost:not(.btn-back):hover { background:#7A3500; border-color:#7A3500; }
+  .order-banner { background:#E56500; color:#fff; font-weight:700; font-size:1rem; letter-spacing:0.02em; text-align:center; padding:10px 14px; border-radius:10px; margin:26px 0 10px; }
   .order-banner:first-child { margin-top:0; }
-  .order-card { background:#f9f7f2; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .order-card { background:#FFF1E0; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
   .order-card h3 { font-size:0.95rem; margin-bottom:8px; }
   .order-seller-block { border-top:1px solid #eee; padding-top:14px; margin-top:14px; }
   .order-item-line { font-size:0.9rem; line-height:1.6; }
@@ -808,17 +813,17 @@
   .payout-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
   .payout-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
   .seller-address { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
-  .seller-address-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .seller-address-title { font-size:0.7rem; font-weight:700; color:#E56500; text-transform:uppercase; letter-spacing:0.05em; }
   .ship-badge { display:inline-block; font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px; vertical-align:middle; font-family:var(--font-body); }
   .ship-todo { background:#FFE9C7; color:#B45A00; }
   .ship-sent { background:#DDEFDB; color:#3E6B42; }
   .ship-pick { background:#EEE9DD; color:#6B5842; }
   .deliver-addr { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
-  .deliver-addr-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .deliver-addr-title { font-size:0.7rem; font-weight:700; color:#E56500; text-transform:uppercase; letter-spacing:0.05em; }
   .ship-done { margin:8px 0; background:#f6f9f5; border:1px solid #cfe3cf; border-radius:10px; padding:8px 10px; font-size:0.85rem; line-height:1.5; color:#4C7A50; }
   .ship-wait { margin:8px 0; background:#FFF6E8; border:1px solid #F0C48A; border-radius:10px; padding:8px 10px; font-size:0.85rem; line-height:1.5; color:#8a5a12; }
   .pickup-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; }
-  .pickup-box-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .pickup-box-title { font-size:0.7rem; font-weight:700; color:#E56500; text-transform:uppercase; letter-spacing:0.05em; }
   .pickup-set { font-size:0.85rem; line-height:1.6; margin-top:3px; }
   .pickup-names { font-style:italic; color:#6B5842; }
   .payout-actions, .payout-report-buttons { flex-direction:row; flex-wrap:wrap; }

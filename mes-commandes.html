@@ -3,37 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mes ventes — Agrivoisin</title>
-<meta name="description" content="Retrouvez les commandes passées chez vous sur Agrivoisin.">
+<title>Mes commandes — Agrivoisin</title>
+<meta name="description" content="Retrouvez vos commandes et laissez un avis aux vendeurs sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
 <script src="supabase.js"></script>
 </head>
 <body>
 
-<!-- ============ MES VENTES ============ -->
-<section class="page-header" style="display:flex;align-items:stretch;justify-content:center;gap:0;flex-wrap:wrap;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:44px 40px;max-width:440px;width:100%;min-height:533px;box-sizing:border-box;text-align:center;">
-    <div style="text-align:left;margin:-24px 0 12px -20px;">
-      <a href="mes-annonces.html" class="btn btn-ghost btn-back">Retour</a>
+<!-- ============ MES COMMANDES ============ -->
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
+      <a href="index.html" class="btn btn-ghost btn-back">Retour</a>
+      <h1>Mes commandes</h1>
     </div>
-    <h1>Mes ventes</h1>
-    <p id="pageSubtitle">Retrouvez ici les commandes passées chez vous.</p>
+    <p class="my-intro">Retrouvez vos achats et laissez un avis aux vendeurs.</p>
 
-    <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de vos ventes...</p>
-    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous devez être connecté pour voir vos ventes. <a href="connexion.html?retour=mes-ventes.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
-    <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;"></p>
-    <div id="taxContainer" style="text-align:left;"></div>
-    <p id="noSalesMessage" style="display:none;margin-top:16px;">Vous n'avez pas encore de vente. Elles apparaîtront ici dès qu'un acheteur aura passé commande.</p>
+    <p id="loadingMessage" style="margin-top:16px;color:#C8352F;text-align:center;">Chargement de vos commandes...</p>
+    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;">Vous devez être connecté pour voir vos commandes. <a href="connexion.html">Se connecter</a></p>
+    <p id="noOrdersMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;">Vous n'avez pas encore passé de commande.</p>
 
-    <div id="notSellerSection" style="display:none;margin-top:16px;">
-      <p style="margin-bottom:14px;">Vous n'avez pas encore de compte vendeur.</p>
-      <a href="vendre.html" class="btn btn-primary">Devenir vendeur</a>
-    </div>
-
-    <div id="salesContainer" style="text-align:left;margin-top:16px;"></div>
+    <div id="ordersContainer" style="text-align:left;margin-top:16px;"></div>
   </div>
-  <div style="width:440px;max-width:100%;min-height:400px;align-self:stretch;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;">
-    <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="width:auto;height:auto;max-width:80%;max-height:80%;">
+
+  <div class="my-video">
+    <video src="mamie-video3.mp4" autoplay muted playsinline></video>
   </div>
 </section>
 
@@ -88,24 +82,20 @@
     'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
   );
 
-  const pageSubtitle = document.getElementById('pageSubtitle');
   const loadingMessage = document.getElementById('loadingMessage');
   const notLoggedMessage = document.getElementById('notLoggedMessage');
-  const errorMessage = document.getElementById('errorMessage');
-  const noSalesMessage = document.getElementById('noSalesMessage');
-  const notSellerSection = document.getElementById('notSellerSection');
-  const salesContainer = document.getElementById('salesContainer');
-  const taxContainer = document.getElementById('taxContainer');
+  const noOrdersMessage = document.getElementById('noOrdersMessage');
+  const ordersContainer = document.getElementById('ordersContainer');
 
-  // Protège l'affichage : un titre d'annonce n'est jamais interprété comme du code
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString('fr-FR');
+  }
+
+  // Protège l'affichage : un nom saisi par un vendeur n'est jamais interprété comme du code
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     }[c]));
-  }
-
-  function formatDate(iso) {
-    return new Date(iso).toLocaleDateString('fr-FR');
   }
 
   function formatAmount(value) {
@@ -134,192 +124,38 @@
     return pluralWord(u);
   }
 
-  // Une commande expédiée : l'argent rejoint le compte de paiement 14 jours après l'envoi du colis
-  const SHIPPED_RELEASE_DAYS = 14;
+  // Les articles achetés chez un vendeur, écrits comme un ticket : « Tomates : 2 × 1 kg = 2 kg, soit 6,00 € »
+  function renderTicketLines(seller) {
+    const items = seller.items || [];
+    // Réponse d'un ancien serveur (sans quantité) : on garde l'ancien affichage plutôt que d'inventer
+    if (items.length === 0 || items.some((item) => item.quantity == null)) {
+      return '<div class="order-item-line">' + escapeHtml((seller.products || []).join(', ')) + '</div>';
+    }
+    const lines = items.map((item) => {
+      const qty = Number(item.quantity) || 1;
+      const unit = String(item.unit == null ? '' : item.unit).trim() || 'unité';
+      const calc = qty + ' × 1 ' + unit + ' = ' + qty + ' ' + unitLabel(unit, qty) +
+        (item.amount != null ? ', soit ' + formatAmount(item.amount) : '');
+      return '<div class="order-item-line"><strong>' + escapeHtml(item.title) + '</strong> : ' + escapeHtml(calc) + '</div>';
+    }).join('');
 
-  // Les frais de service mensuel d'un vendeur actif (le serveur les prélève une seule fois par mois)
-  const MONTHLY_FEE_EUROS = 2;
-
-  // « 2 € » (entier) ou « 0,43 € » : pour les phrases courantes
-  function shortAmount(value) {
-    const n = Number(value);
-    return Number.isInteger(n) ? n + ' €' : formatAmount(n);
+    // Les frais d'expédition de ce vendeur, avec ce qui est expédié (quantité et unité)
+    if (!seller.delivery) return lines;
+    const shippedParts = items.filter((item) => item.shipped).map((item) => {
+      const qty = Number(item.quantity) || 1;
+      return qty + ' ' + unitLabel(item.unit, qty);
+    });
+    return lines + '<div class="order-item-line">Expédition' + (shippedParts.length ? ' (' + escapeHtml(shippedParts.join(' + ')) + ')' : '') +
+      ' : ' + escapeHtml(formatAmount(seller.delivery.shippingAmount)) + '</div>';
   }
 
-  // ---------- Informations fiscales demandées au vendeur particulier (règle européenne DAC7) ----------
-
-  function renderTaxBox(taxInfo) {
-    const status = taxInfo && taxInfo.status;
-
-    if (status === 'received') {
-      taxContainer.innerHTML =
-        '<div class="tax-done"><b>Informations fiscales reçues le ' + escapeHtml(formatDate(taxInfo.date)) + '.</b><br>' +
-        'Merci, vous n\'avez rien d\'autre à faire. Pour les modifier, écrivez-nous depuis la <a href="contact.html">page Contact</a>.</div>';
-      return;
-    }
-
-    if (status !== 'needed') {
-      taxContainer.innerHTML = '';
-      return;
-    }
-
-    taxContainer.innerHTML =
-      '<form class="tax-box" id="taxForm" novalidate>' +
-      '<h2>Informations demandées pour les impôts</h2>' +
-      '<p>La loi oblige Agrivoisin à transmettre à l\'administration fiscale l\'identité des vendeurs et les sommes perçues. ' +
-      'Merci de renseigner ces informations pour continuer à vendre sans interruption. Elles ne sont jamais visibles par les acheteurs.</p>' +
-      '<label for="taxName">Nom et prénom</label>' +
-      '<input id="taxName" type="text" maxlength="120" autocomplete="name">' +
-      '<label for="taxBirthDate">Date de naissance</label>' +
-      '<input id="taxBirthDate" type="date" min="1900-01-01" max="' + new Date().toISOString().slice(0, 10) + '" autocomplete="bday">' +
-      '<label for="taxId">Numéro fiscal (13 chiffres)</label>' +
-      '<input id="taxId" type="text" inputmode="numeric" maxlength="20" autocomplete="off">' +
-      '<p class="hint">Vous ne l\'avez pas ? Indiquez à la place votre lieu de naissance.</p>' +
-      '<label for="taxBirthPlace">Lieu de naissance (si pas de numéro fiscal)</label>' +
-      '<input id="taxBirthPlace" type="text" maxlength="100" autocomplete="off">' +
-      '<p class="tax-error" style="display:none;"></p>' +
-      '<button type="submit" class="btn btn-primary">Envoyer mes informations</button>' +
-      '</form>';
-  }
-
-  taxContainer.addEventListener('submit', async (event) => {
-    if (event.target.id !== 'taxForm') return;
-    event.preventDefault();
-
-    const form = event.target;
-    const errorEl = form.querySelector('.tax-error');
-    const button = form.querySelector('button');
-    const showError = (text) => { errorEl.textContent = text; errorEl.style.display = 'block'; };
-    errorEl.style.display = 'none';
-
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-      showError('Session expirée, reconnectez-vous.');
-      return;
-    }
-
-    button.disabled = true;
-    button.textContent = 'Envoi...';
-
-    try {
-      const response = await fetch('/api/get-my-sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-        body: JSON.stringify({
-          action: 'save_tax_info',
-          legalName: form.querySelector('#taxName').value,
-          birthDate: form.querySelector('#taxBirthDate').value,
-          taxId: form.querySelector('#taxId').value,
-          birthPlace: form.querySelector('#taxBirthPlace').value,
-        }),
-      });
-      let data = {};
-      try { data = await response.json(); } catch (e) { data = {}; }
-      if (!response.ok) throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
-      renderTaxBox(data.taxInfo);
-    } catch (err) {
-      showError(err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message);
-      button.disabled = false;
-      button.textContent = 'Envoyer mes informations';
-    }
-  });
-
-  // État de l'argent pour cette vente
-  function renderMoneyBox(payout, shipment) {
-    // Anciennes ventes (avant l'argent retenu) : rien à afficher
-    if (!payout) return '';
-
-    if (payout.status === 'verse') {
-      const when = payout.releasedAt ? ' le ' + formatDate(payout.releasedAt) : '';
-      return '<div class="money-box money-done">Argent versé' + escapeHtml(when) + '.</div>';
-    }
-    if (payout.status === 'rembourse') {
-      return '<div class="money-box money-refunded">Commande remboursée à l\'acheteur après un problème signalé : cette vente ne vous sera pas versée.</div>';
-    }
-    if (payout.status === 'probleme') {
-      return '<div class="money-box money-problem">Problème signalé par l\'acheteur : le versement est suspendu le temps qu\'Agrivoisin examine la situation.</div>';
-    }
-    if (payout.status === 'en_cours') {
-      return '<div class="money-box">Versement en cours de traitement...</div>';
-    }
-
-    // Commande à expédier, colis pas encore parti : pas de date tant que le colis n'est pas parti
-    if (shipment && !shipment.shippedAt) {
-      return '<div class="money-box">L\'argent est gardé par Agrivoisin. Une fois le colis parti, il rejoint votre compte de paiement ' + SHIPPED_RELEASE_DAYS + ' jours plus tard (ou dès que l\'acheteur confirme la réception), puis votre banque lors du virement mensuel (à partir du 05 de chaque mois).</div>';
-    }
-
-    // En attente : l'argent est gardé par Agrivoisin
-    const releaseDate = payout.autoReleaseAt ? new Date(payout.autoReleaseAt) : null;
-    const when = releaseDate && releaseDate.getTime() > Date.now()
-      ? 'le ' + formatDate(payout.autoReleaseAt)
-      : 'très prochainement';
-    return '<div class="money-box">L\'argent est gardé par Agrivoisin jusqu\'à ce que l\'acheteur confirme avoir reçu sa commande, ou automatiquement ' + escapeHtml(when) + '. Il rejoint alors votre compte de paiement, puis votre banque lors du virement mensuel (à partir du 05 de chaque mois).</div>';
-  }
-
-  // Le détail de l'argent d'une vente, avec les chiffres du vendeur lui-même :
-  // - versé : commission, frais de carte, frais de service du mois (s'il y en a eu) et « Vous recevez »
-  // - en attente : commission, vrais frais de carte, montant exact de la vente (et les 2 € du mois à part)
-  function renderMoneyDetail(sale) {
-    const payout = sale.payout;
-    const m = payout && payout.money;
-    if (!m) return '';
-
-    // Le pourcentage se calcule sur les articles (les frais d'expédition n'ont pas de commission en pourcentage)
-    const total = Number(sale.goodsAmount != null ? sale.goodsAmount : sale.totalAmount) || 0;
-    const shipment = sale.shipment;
-    const flatFee = Number(m.flatFee) > 0 ? Number(m.flatFee) : 0;
-    const percent = total > 0 ? Math.round((Number(m.commission) / total) * 100) : null;
-    const commissionLabel = 'Commission Agrivoisin' + (percent != null ? ' (' + percent + ' %)' : '');
-    const line = (label, value, className) =>
-      '<div class="money-line' + (className ? ' ' + className : '') + '"><span>' + escapeHtml(label) +
-      '</span><span class="money-amount">' + escapeHtml(value) + '</span></div>';
-
-    if (payout.status === 'verse') {
-      // Ancienne vente sans montant reçu enregistré : rien d'inventé
-      if (m.received == null) return '';
-      let html = line(commissionLabel, '− ' + formatAmount(m.commission));
-      if (flatFee > 0) html += line('Forfait expédition', '− ' + formatAmount(flatFee));
-      html += line('Frais de carte', '− ' + formatAmount(m.cardFee));
-      if (Number(m.monthlyFee) > 0) {
-        html += line('Frais de service du mois', '− ' + formatAmount(m.monthlyFee));
-      }
-      html += line('Vous recevez', formatAmount(m.received), 'money-total');
-      return '<div class="money-detail">' + html + '</div>';
-    }
-
-    if (m.afterCommission != null) {
-      // Les chiffres EXACTS : les vrais frais de carte relevés chez Stripe dès le paiement.
-      // S'ils ne sont pas connus (ventes d'avant ce changement), on n'affiche rien à leur place.
-      const cardFeeKnown = m.cardFee != null && m.saleAmount != null;
-      let html = '';
-      if (shipment) {
-        html += line('Produits', formatAmount(sale.goodsAmount));
-        html += line('Frais d\'expédition', formatAmount(shipment.shippingAmount));
-      }
-      html += line(commissionLabel, '− ' + formatAmount(m.commission));
-      if (flatFee > 0) html += line('Forfait expédition', '− ' + formatAmount(flatFee));
-      let notes = '';
-
-      if (cardFeeKnown) {
-        html += line('Frais de carte', '− ' + formatAmount(m.cardFee));
-        html += line('Montant de cette vente', formatAmount(m.saleAmount), 'money-total');
-      } else {
-        html += line('Après commission', formatAmount(m.afterCommission), 'money-total');
-        notes += '<p class="money-note">Les frais de carte de Stripe seront retirés au versement.</p>';
-      }
-
-      // Les frais de service du mois, en ligne séparée : retirés une seule fois, du premier versement du mois
-      if (m.monthlyFeeDue != null && Number(m.monthlyFeeDue) > 0) {
-        const due = Number(m.monthlyFeeDue);
-        const text = due >= MONTHLY_FEE_EUROS
-          ? shortAmount(due) + ' de frais de service du mois sont retirés une seule fois, du premier versement du mois.'
-          : 'Il reste ' + shortAmount(due) + ' de frais de service du mois à retirer, une seule fois, du prochain versement du mois.';
-        notes += '<p class="money-note">' + escapeHtml(text) + '</p>';
-      }
-
-      return '<div class="money-detail">' + html + notes + '</div>';
-    }
-    return '';
+  // L'étiquette à côté du vendeur : comment la commande est remise
+  function deliveryBadge(seller) {
+    const d = seller.delivery;
+    const pickup = (seller.items || []).some((item) => !item.shipped);
+    if (!d) return ' <span class="ship-badge ship-pick">Retrait chez le vendeur</span>';
+    if (d.shippedAt) return ' <span class="ship-badge ship-sent">Colis parti</span>';
+    return ' <span class="ship-badge ship-todo">Expédition · En préparation</span>' + (pickup ? ' <span class="ship-badge ship-pick">+ retrait chez le vendeur</span>' : '');
   }
 
   // 0612345678 -> 06 12 34 56 78
@@ -328,181 +164,593 @@
     return /^0\d{9}$/.test(digits) ? digits.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : String(phone == null ? '' : phone);
   }
 
-  function badge(text, className) {
-    return ' <span class="ship-badge ' + className + '">' + escapeHtml(text) + '</span>';
-  }
-
-  // L'adresse de livraison de l'acheteur (seulement tant que le colis n'est pas parti) et le bouton « colis parti »
-  function renderShipActions(sale) {
-    const sh = sale.shipment;
-    const payout = sale.payout;
-    if (!sh || sh.shippedAt || !payout || payout.status !== 'en_attente') return '';
+  // Adresse de livraison de l'acheteur (la sienne) et état du colis
+  function renderDeliverySection(seller) {
+    const d = seller.delivery;
+    if (!d) return '';
     let html = '';
-    const a = sh.address;
+    const a = d.address;
     if (a) {
-      html += '<div class="ship-addr"><div class="t">Adresse de livraison de l\'acheteur</div><strong>' + escapeHtml(a.name) + '</strong><br>' +
-        escapeHtml(a.address) + '<br>' +
+      html += '<div class="deliver-addr"><div class="deliver-addr-title">Livraison à</div>' +
+        escapeHtml(a.name) + '<br>' + escapeHtml(a.address) + '<br>' +
         (a.address2 ? escapeHtml(a.address2) + '<br>' : '') +
         escapeHtml(a.postalCode + ' ' + a.city + ', ' + a.country) + '<br>' +
         'Téléphone : ' + escapeHtml(formatPhone(a.phone)) + '</div>';
     }
-    html += '<div class="ship-action" data-order="' + escapeHtml(sale.orderId) + '">' +
-      '<label>Numéro de suivi (facultatif)</label>' +
-      '<input type="text" class="ship-tracking" maxlength="40" placeholder="Par exemple : 6A12345678901" autocomplete="off">' +
-      '<button type="button" class="btn btn-primary ship-btn">J\'ai expédié le colis</button>' +
-      '<p>Cliquez seulement quand le colis est remis au transporteur.</p>' +
-      '<p class="ship-error" style="display:none;"></p></div>';
+    if (d.shippedAt) {
+      html += '<div class="ship-done">Colis expédié le ' + escapeHtml(formatDate(d.shippedAt)) + '.' +
+        (d.trackingNumber ? ' Suivi : ' + escapeHtml(d.trackingNumber) : '') + '</div>';
+    } else if (seller.payout && seller.payout.status === 'en_attente') {
+      html += '<div class="ship-wait">Le vendeur prépare votre colis. Vous verrez ici quand il sera parti.</div>';
+    }
     return html;
   }
 
-  function renderSale(sale) {
-    const sh = sale.shipment;
-    let itemsHtml = '';
-    const shippedParts = [];
-    const parcelList = [];
-    (sale.items || []).forEach((item) => {
-      const qty = Number(item.quantity) || 1;
-      const unit = String(item.unit == null ? '' : item.unit).trim() || 'unité';
-      const calc = qty + ' × 1 ' + unit + ' = ' + qty + ' ' + unitLabel(unit, qty) +
-        (item.amount != null ? ', soit ' + formatAmount(item.amount) : '');
-      itemsHtml += '<div class="sale-item"><strong>' + escapeHtml(item.title) + '</strong> : ' + escapeHtml(calc) + '</div>';
-      if (item.shipped) {
-        shippedParts.push(qty + ' ' + unitLabel(unit, qty));
-        // Un colis par entrée : la découpe calculée par le serveur, ou une seule quantité
-        const split = Array.isArray(item.parcels) && item.parcels.length > 1 ? item.parcels : [qty];
-        split.forEach((n) => parcelList.push(Number(n) + ' ' + unitLabel(unit, Number(n))));
-      }
-    });
-    if (sh) {
-      const detail = parcelList.length > 1
-        ? ' en ' + parcelList.length + ' colis (' + escapeHtml(parcelList.map((t, i) => 'Colis ' + (i + 1) + ' : ' + t).join(' · ')) + ')'
-        : (shippedParts.length ? ' (' + escapeHtml(shippedParts.join(' + ')) + ')' : '');
-      itemsHtml += '<div class="sale-item">Expédition' + detail +
-        ' : ' + escapeHtml(formatAmount(sh.shippingAmount)) + '</div>';
-    }
-
-    // L'étiquette à côté de la date : ce qu'il y a à faire, ou comment la commande est remise
-    let tag = badge('Retrait', 'ship-pick');
-    if (sh) {
-      if (sh.shippedAt) tag = badge('Colis parti', 'ship-sent');
-      else if (sale.payout && sale.payout.status === 'en_attente') tag = badge('À expédier', 'ship-todo');
-      else tag = '';
-    }
-
-    // Colis parti, argent encore retenu : la date d'envoi, le suivi et le jour où l'argent rejoint le compte de paiement
-    let shippedHtml = '';
-    let moneyBox = renderMoneyBox(sale.payout, sh);
-    if (sh && sh.shippedAt && sale.payout && sale.payout.status === 'en_attente') {
-      const when = sale.payout.autoReleaseAt ? new Date(sale.payout.autoReleaseAt) : null;
-      shippedHtml = '<div class="ship-done">Colis expédié le ' + escapeHtml(formatDate(sh.shippedAt)) + '.' +
-        (sh.trackingNumber ? ' Suivi : ' + escapeHtml(sh.trackingNumber) : '') + '<br>' +
-        'L\'argent rejoint votre compte de paiement ' +
-        (when && when.getTime() > Date.now() ? 'le ' + escapeHtml(formatDate(sale.payout.autoReleaseAt)) : 'très prochainement') +
-        ' (ou dès que l\'acheteur confirme la réception), puis votre banque lors du virement mensuel à partir du 05.</div>';
-      moneyBox = '';
-    } else if (sh && sh.shippedAt && sh.trackingNumber) {
-      shippedHtml = '<div class="ship-done">Colis expédié le ' + escapeHtml(formatDate(sh.shippedAt)) + '. Suivi : ' + escapeHtml(sh.trackingNumber) + '</div>';
-    }
-
-    return (
-      '<div class="sale-card">' +
-      '<div class="sale-head"><span class="sale-date">Vente du ' + escapeHtml(formatDate(sale.createdAt)) + tag + '</span>' +
-      '<span class="sale-total">' + escapeHtml(formatAmount(sale.totalAmount)) + '</span></div>' +
-      itemsHtml +
-      renderShipActions(sale) +
-      shippedHtml +
-      moneyBox +
-      renderMoneyDetail(sale) +
-      '</div>'
-    );
+  // Les frais de service payés par l'acheteur : une seule ligne par commande, à la fin du ticket.
+  // Rien pour les anciennes commandes (sans frais de service).
+  function renderServiceFeeLine(order) {
+    const fee = Number(order.serviceFee);
+    if (!(fee > 0)) return '';
+    return '<div class="order-fee-line"><span>Frais de service</span><span class="order-fee-amount">' + escapeHtml(formatAmount(fee)) + '</span></div>';
   }
 
-  // Le vendeur déclare « colis parti » : un seul clic compte, puis la liste est relue
-  salesContainer.addEventListener('click', async (event) => {
-    const button = event.target.closest('.ship-btn');
-    if (!button) return;
-    const box = button.closest('.ship-action');
-    const errorEl = box.querySelector('.ship-error');
-    errorEl.style.display = 'none';
+  // Comment un vendeur est désigné : « Vendeur de Lyon » (jamais de contact direct)
+  function sellerLabel(seller) {
+    if (seller.sellerCity) return 'Vendeur de ' + seller.sellerCity;
+    return seller.sellerEmail || 'Vendeur';
+  }
 
-    if (!window.confirm('Confirmez-vous que le colis est bien remis au transporteur ?')) return;
+  // ---------- Horaires de retrait ----------
 
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
-      errorEl.textContent = 'Session expirée, reconnectez-vous.';
-      errorEl.style.display = 'block';
-      return;
+  const PICKUP_DAYS = [
+    { n: 1, short: 'lun' }, { n: 2, short: 'mar' }, { n: 3, short: 'mer' }, { n: 4, short: 'jeu' },
+    { n: 5, short: 'ven' }, { n: 6, short: 'sam' }, { n: 7, short: 'dim' },
+  ];
+
+  // "18:00:00" -> "18h" ; "08:30:00" -> "8h30"
+  function formatPickupTime(value) {
+    const [h, m] = String(value).split(':');
+    const hour = String(parseInt(h, 10));
+    return m && m !== '00' ? hour + 'h' + m : hour + 'h';
+  }
+
+  // Une ligne par groupe de jours : [{ days: 'lun-ven', text: '18h-20h' }, ...]
+  function pickupGroups(rows) {
+    const byDay = {};
+    (rows || []).forEach((r) => {
+      (byDay[r.day_of_week] = byDay[r.day_of_week] || []).push(r);
+    });
+
+    const dayTexts = [];
+    PICKUP_DAYS.forEach((d) => {
+      const list = byDay[d.n];
+      if (!list || list.length === 0) return;
+      list.sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+      dayTexts.push({
+        n: d.n,
+        short: d.short,
+        text: list.map((r) => formatPickupTime(r.start_time) + '-' + formatPickupTime(r.end_time)).join(' et '),
+      });
+    });
+
+    const groups = [];
+    dayTexts.forEach((d) => {
+      const last = groups[groups.length - 1];
+      if (last && last.text === d.text && last.lastN === d.n - 1) {
+        last.lastN = d.n;
+        last.lastShort = d.short;
+      } else {
+        groups.push({ text: d.text, firstShort: d.short, lastShort: d.short, lastN: d.n });
+      }
+    });
+
+    return groups.map((g) => ({
+      days: g.firstShort === g.lastShort ? g.firstShort : g.firstShort + '-' + g.lastShort,
+      text: g.text,
+    }));
+  }
+
+  // Encadré des horaires d'un vendeur. Les articles qui ont les mêmes horaires sont regroupés :
+  // si tous ont les mêmes, on n'affiche pas leurs noms ; sinon on nomme chaque groupe d'articles.
+  function renderPickupSection(items) {
+    const withHours = (items || [])
+      .map((item) => ({ title: item.title, groups: pickupGroups(item.pickup_hours) }))
+      .filter((item) => item.groups.length > 0);
+    if (withHours.length === 0) return '';
+
+    const sets = [];
+    withHours.forEach((item) => {
+      const key = JSON.stringify(item.groups);
+      let set = sets.find((s) => s.key === key);
+      if (!set) {
+        set = { key, groups: item.groups, titles: [] };
+        sets.push(set);
+      }
+      set.titles.push(item.title);
+    });
+
+    const showNames = sets.length > 1 || withHours.length < items.length;
+
+    let html = '<div class="pickup-box"><div class="pickup-box-title">Horaires de retrait</div>';
+    sets.forEach((set) => {
+      html += '<div class="pickup-set">';
+      if (showNames) {
+        html += '<div class="pickup-names">' + escapeHtml(set.titles.join(', ')) + '</div>';
+      }
+      set.groups.forEach((g) => {
+        html += '<div><strong>' + escapeHtml(g.days) + '</strong> ' + escapeHtml(g.text) + '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // Adresse de retrait : affichée seulement tant que le serveur la donne (avant la confirmation de réception)
+  function renderAddressSection(seller) {
+    if (!seller.sellerAddress) return '';
+    return '<div class="seller-address">' +
+      '<div class="seller-address-title">Adresse de retrait</div>' +
+      '<div>' + escapeHtml(seller.sellerAddress) + '</div>' +
+      '</div>';
+  }
+
+  // Un avis n'est possible qu'une fois la réception confirmée (paiement versé).
+  // Les anciennes commandes, sans versement enregistré, ne sont pas concernées.
+  function reviewAllowed(seller) {
+    return !seller.payout || seller.payout.status === 'verse';
+  }
+
+  // « lundi 12 octobre à 18 h » ou « lundi 12 octobre à 18 h 30 » (heure de Paris)
+  function formatParisMoment(iso) {
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    const minutes = parts.minute === '00' ? '' : ' ' + parts.minute;
+    return parts.weekday + ' ' + parts.day + ' ' + parts.month + ' à ' + parseInt(parts.hour, 10) + ' h' + minutes;
+  }
+
+  function payoutDoneHtml() {
+    return '<div class="payout-box payout-done"><p>Paiement versé au vendeur.</p></div>';
+  }
+
+  // Commande remboursée par Agrivoisin après un problème : plus aucun bouton, le vendeur n'est pas payé
+  function payoutRefundedHtml(payout) {
+    const amount = payout && payout.refundedAmount != null ? ' : ' + formatAmount(payout.refundedAmount) : '';
+    return '<div class="payout-box payout-refunded"><p>Commande remboursée' + escapeHtml(amount) + '. Le remboursement est fait sur la carte utilisée pour le paiement.</p></div>';
+  }
+
+  function payoutProblemHtml() {
+    return '<div class="payout-box payout-problem"><p>Problème signalé : le paiement est suspendu. Agrivoisin examine la situation.</p></div>';
+  }
+
+  // Une commande expédiée : l'argent est versé 14 jours après l'envoi du colis
+  const SHIPPED_RELEASE_DAYS = 14;
+
+  function renderPayoutSection(orderId, seller) {
+    const payout = seller.payout;
+    // Anciennes commandes (avant l'argent retenu) : rien à afficher
+    if (!payout) return '';
+
+    if (payout.status === 'verse') return payoutDoneHtml();
+    if (payout.status === 'rembourse') return payoutRefundedHtml(payout);
+    if (payout.status === 'probleme') return payoutProblemHtml();
+    if (payout.status === 'en_cours') {
+      return '<div class="payout-box"><p>Versement au vendeur en cours de traitement...</p></div>';
     }
 
-    button.disabled = true;
-    button.textContent = 'Envoi...';
+    // En attente : l'argent est gardé par Agrivoisin
+    const releaseDate = payout.autoReleaseAt ? new Date(payout.autoReleaseAt) : null;
+    const when = releaseDate && releaseDate.getTime() > Date.now()
+      ? 'le ' + formatDate(payout.autoReleaseAt)
+      : 'très prochainement';
+
+    // Avant le début du créneau de retrait, la commande n'a pas pu être retirée : pas de signalement possible.
+    // Sans début de créneau (anciennes commandes, annonces sans horaires), aucune attente.
+    const startsAt = payout.pickupStartAt ? new Date(payout.pickupStartAt) : null;
+    const reportLocked = !!(startsAt && !Number.isNaN(startsAt.getTime()) && startsAt.getTime() > Date.now());
+
+    // Colis pas encore parti : pas de date, et pas de bouton « J'ai bien reçu » (rien n'a pu être reçu)
+    const notShippedYet = !!(seller.delivery && !seller.delivery.shippedAt);
+    const intro = notShippedYet
+      ? 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + SHIPPED_RELEASE_DAYS + ' jours après l\'envoi du colis, ou dès que vous confirmez la réception.'
+      : 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + when + ', ou dès que vous confirmez la réception.';
+
+    return `
+      <div class="payout-box" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(seller.sellerId)}">
+        <p>${intro}</p>
+        <div class="payout-actions">
+          ${notShippedYet ? '' : '<button type="button" class="btn btn-primary payout-confirm-btn">J\'ai bien reçu ma commande</button>'}
+          <button type="button" class="btn btn-ghost payout-report-btn"${reportLocked ? ' disabled data-locked="1"' : ''}>Signaler un problème</button>
+        </div>
+        ${reportLocked ? `<p class="payout-report-hint">Vous pourrez signaler un problème à partir du ${escapeHtml(formatParisMoment(payout.pickupStartAt))}.</p>` : ''}
+        <div class="payout-report-form" style="display:none;">
+          <label class="payout-report-label">Expliquez le problème (obligatoire)</label>
+          <textarea class="payout-report-reason" maxlength="1000" placeholder="Par exemple : le vendeur n'était pas là, ou les légumes étaient abîmés"></textarea>
+          <div class="payout-report-buttons">
+            <button type="button" class="btn btn-primary payout-report-send">Envoyer le signalement</button>
+            <button type="button" class="btn btn-ghost payout-report-cancel">Annuler</button>
+          </div>
+        </div>
+        <p class="payout-error" style="color:#C8352F;display:none;"></p>
+      </div>
+    `;
+  }
+
+  async function sendPayoutAction(box, action, reason) {
+    const orderId = box.dataset.orderId;
+    const sellerId = box.dataset.sellerId;
+    const errorEl = box.querySelector('.payout-error');
+    const buttons = box.querySelectorAll('button');
+
+    errorEl.style.display = 'none';
+    buttons.forEach((b) => { b.disabled = true; });
+
     try {
-      const response = await fetch('/api/get-my-sales', {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        throw new Error('Session expirée, reconnectez-vous.');
+      }
+
+      const response = await fetch('/api/payouts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-        body: JSON.stringify({
-          action: 'mark_shipped',
-          orderId: box.getAttribute('data-order'),
-          trackingNumber: box.querySelector('.ship-tracking').value,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + session.access_token,
+        },
+        body: JSON.stringify(action === 'report' ? { action, orderId, sellerId, reason } : { action, orderId, sellerId }),
       });
-      let data = {};
-      try { data = await response.json(); } catch (e) { data = {}; }
-      if (!response.ok) throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
-      await init();
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Une erreur est survenue');
+      }
+
+      // L'adresse du vendeur disparaît tout de suite de l'écran (et le serveur ne la renverra plus)
+      const sellerBlock = box.closest('.order-seller-block');
+      if (sellerBlock) {
+        sellerBlock.querySelectorAll('.seller-address, .deliver-addr, .ship-wait').forEach((el) => el.remove());
+      }
+
+      box.outerHTML = data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml();
+
+      // Réception confirmée : l'acheteur peut maintenant laisser son avis
+      if (data.status !== 'probleme' && sellerBlock) {
+        const reviewSlot = sellerBlock.querySelector('.review-slot');
+        if (reviewSlot && reviewSlot.innerHTML.trim() === '') {
+          reviewSlot.innerHTML = renderStrawberryPicker(orderId, sellerId);
+          attachReviewFormHandlers();
+        }
+      }
     } catch (err) {
-      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.textContent = err.message;
       errorEl.style.display = 'block';
-      button.disabled = false;
-      button.textContent = 'J\'ai expédié le colis';
+      buttons.forEach((b) => { b.disabled = b.dataset.locked === '1'; });
+    }
+  }
+
+  function attachPayoutHandlers() {
+    document.querySelectorAll('.payout-box[data-order-id]').forEach((box) => {
+      const confirmBtn = box.querySelector('.payout-confirm-btn');
+      const reportBtn = box.querySelector('.payout-report-btn');
+
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+          if (window.confirm("Confirmez-vous avoir bien reçu votre commande ? Le vendeur sera payé tout de suite, et cette action ne peut pas être annulée.")) {
+            sendPayoutAction(box, 'confirm');
+          }
+        });
+      }
+
+      const actionsEl = box.querySelector('.payout-actions');
+      const formEl = box.querySelector('.payout-report-form');
+      const reasonEl = box.querySelector('.payout-report-reason');
+      const errorEl = box.querySelector('.payout-error');
+
+      // « Signaler un problème » ouvre d'abord le formulaire : l'explication est obligatoire
+      reportBtn.addEventListener('click', () => {
+        errorEl.style.display = 'none';
+        actionsEl.style.display = 'none';
+        formEl.style.display = 'block';
+        reasonEl.focus();
+      });
+
+      box.querySelector('.payout-report-cancel').addEventListener('click', () => {
+        errorEl.style.display = 'none';
+        formEl.style.display = 'none';
+        actionsEl.style.display = '';
+      });
+
+      box.querySelector('.payout-report-send').addEventListener('click', () => {
+        const reason = reasonEl.value.trim();
+        if (reason.length < 10) {
+          errorEl.textContent = "Merci d'expliquer le problème (au moins 10 caractères).";
+          errorEl.style.display = 'block';
+          return;
+        }
+        if (window.confirm("Signaler un problème avec cette commande ? Le paiement au vendeur sera suspendu le temps qu'Agrivoisin examine la situation.")) {
+          sendPayoutAction(box, 'report', reason);
+        }
+      });
+    });
+  }
+
+  function strawberryIcons(count) {
+    let icons = '';
+    const total = Math.max(0, Math.min(4, Math.floor(Number(count)) || 0));
+    for (let j = 0; j < total; j++) {
+      icons += '<span class="strawberry-icon-wrap"><img src="fraise-mascotte.png" alt="fraise" class="strawberry-icon"></span>';
+    }
+    return icons;
+  }
+
+  // Encadré d'explication affiché au survol des fraises (comme pour le flocon de neige)
+  const STRAWBERRY_LEVELS = [
+    { n: 1, title: 'Décevant.', text: 'Le produit ne correspondait pas à l’annonce.' },
+    { n: 2, title: 'Moyen.', text: 'Le produit était correct, mais j’attendais mieux.' },
+    { n: 3, title: 'Bien.', text: 'Le produit était conforme à l’annonce.' },
+    { n: 4, title: 'Excellent.', text: 'Produit superbe, vendeur au top, je recommande.' }
+  ];
+  let strawberryTipCount = 0;
+
+  function strawberryTipHtml(tipId, current) {
+    let html = `<div class="strawberry-tip" id="${tipId}" role="tooltip">`;
+    STRAWBERRY_LEVELS.forEach((level) => {
+      let icons = '';
+      for (let j = 0; j < level.n; j++) {
+        icons += '<img src="fraise-mascotte.png" alt="">';
+      }
+      html += `<div class="strawberry-tip-row${level.n === current ? ' current' : ''}" data-level="${level.n}">
+        <span class="strawberry-tip-icons">${icons}</span>
+        <span class="strawberry-tip-text"><strong>${level.title}</strong> ${level.text}</span>
+      </div>`;
+    });
+    html += `</div>`;
+    return html;
+  }
+
+  function strawberryCheckedLevel(group) {
+    const checked = group.querySelector('input[type="radio"]:checked');
+    return checked ? Number(checked.value) : 0;
+  }
+
+  function setStrawberryTipLevel(group, level) {
+    group.querySelectorAll('.strawberry-tip-row').forEach((row) => {
+      row.classList.toggle('current', Number(row.dataset.level) === level);
+    });
+  }
+
+  // L'encadré est « fixe » (il flotte par-dessus la page) : la liste des commandes défile dans un cadre
+  // qui le couperait sinon. On le place à droite des fraises, ou au-dessus / en dessous sur un petit écran.
+  function placeStrawberryTip(group) {
+    const tip = group.querySelector('.strawberry-tip');
+    if (!tip) return;
+    const before = tip.style.cssText;
+    tip.style.visibility = 'hidden';
+    tip.style.display = 'block';
+    const g = group.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
+    tip.style.display = '';
+    tip.style.visibility = '';
+    let top;
+    let left;
+    if (g.right + 14 + w + 8 <= window.innerWidth) {
+      // De la place à droite : l'encadré s'affiche à droite des fraises, comme pour le flocon
+      left = g.right + 14;
+      top = g.top + g.height / 2 - h / 2;
+      top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
+    } else {
+      // Sinon (petit écran) : au-dessus des fraises, ou en dessous s'il n'y a pas la place
+      top = g.top - h - 8;
+      if (top < 8) top = g.bottom + 8;
+      left = Math.min(g.left, window.innerWidth - w - 8);
+      if (left < 8) left = 8;
+    }
+    tip.style.left = Math.round(left) + 'px';
+    tip.style.top = Math.round(top) + 'px';
+  }
+  function placeVisibleStrawberryTips() {
+    document.querySelectorAll('.strawberry-group').forEach((g) => {
+      const tip = g.querySelector('.strawberry-tip');
+      if (tip && getComputedStyle(tip).display !== 'none') placeStrawberryTip(g);
+    });
+  }
+  document.addEventListener('mouseover', (e) => {
+    const hovered = e.target.closest('.strawberry-group');
+    if (hovered) placeStrawberryTip(hovered);
+  });
+  document.addEventListener('focusin', (e) => {
+    const focused = e.target.closest && e.target.closest('.strawberry-group');
+    if (focused) placeStrawberryTip(focused);
+  });
+  document.addEventListener('scroll', placeVisibleStrawberryTips, true);
+  window.addEventListener('resize', placeVisibleStrawberryTips);
+
+  document.addEventListener('mouseover', (e) => {
+    const option = e.target.closest('.strawberry-option');
+    if (!option) return;
+    const group = option.closest('.strawberry-group');
+    if (group) setStrawberryTipLevel(group, Number(option.querySelector('input').value));
+  });
+  document.addEventListener('mouseout', (e) => {
+    const option = e.target.closest('.strawberry-option');
+    if (!option) return;
+    const group = option.closest('.strawberry-group');
+    if (group) setStrawberryTipLevel(group, strawberryCheckedLevel(group));
+  });
+  document.addEventListener('change', (e) => {
+    const group = e.target.closest && e.target.closest('.strawberry-group');
+    if (group) setStrawberryTipLevel(group, strawberryCheckedLevel(group));
+  });
+  // Écran tactile : un toucher ouvre l'encadré, un toucher ailleurs le ferme
+  document.addEventListener('click', (e) => {
+    const touchOnly = !window.matchMedia('(hover: hover)').matches;
+    document.querySelectorAll('.strawberry-group.open').forEach((g) => {
+      if (!g.contains(e.target)) g.classList.remove('open');
+    });
+    if (!touchOnly) return;
+    const group = e.target.closest('.strawberry-group');
+    if (group) {
+      group.classList.add('open');
+      placeStrawberryTip(group);
     }
   });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.strawberry-group.open').forEach((g) => g.classList.remove('open'));
+    }
+  });
+
+  function renderStrawberryPicker(orderId, sellerId) {
+    const tipId = 'strawberryTip' + (++strawberryTipCount);
+    let html = `<form class="review-form" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(sellerId)}">`;
+    html += `<div class="strawberry-picker strawberry-group" aria-describedby="${tipId}">`;
+    for (let i = 1; i <= 4; i++) {
+      html += `
+        <label class="strawberry-option">
+          <input type="radio" name="rating-${escapeHtml(orderId)}-${escapeHtml(sellerId)}" value="${i}" required>
+          <span class="strawberry-row">${strawberryIcons(i)}</span>
+        </label>`;
+    }
+    html += strawberryTipHtml(tipId, 0);
+    html += `</div>`;
+    html += `<textarea placeholder="Votre avis sur ce vendeur (optionnel)" class="review-comment"></textarea>`;
+    html += `<button type="submit" class="btn btn-primary">Envoyer mon avis</button>`;
+    html += `<p class="review-error" style="color:#C8352F;display:none;"></p>`;
+    html += `</form>`;
+    return html;
+  }
+
+  function renderExistingReview(review, justSubmitted) {
+    const tipId = 'strawberryTip' + (++strawberryTipCount);
+    return `
+      <div class="existing-review">
+        <span class="strawberry-group strawberry-group-fixed" tabindex="0" aria-describedby="${tipId}"><span class="strawberry-row">${strawberryIcons(review.rating)}</span>${strawberryTipHtml(tipId, Number(review.rating))}</span>
+        ${review.comment ? `<p>"${escapeHtml(review.comment)}"</p>` : ''}
+        <p style="font-size:0.9em;color:#888;">${justSubmitted ? 'Avis envoyé' : 'Avis déjà envoyé'}</p>
+      </div>
+    `;
+  }
+
+  function attachReviewFormHandlers() {
+    document.querySelectorAll('.review-form').forEach((form) => {
+      if (form.dataset.bound) return;
+      form.dataset.bound = '1';
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const orderId = form.dataset.orderId;
+        const sellerId = form.dataset.sellerId;
+        const ratingInput = form.querySelector(`input[name="rating-${orderId}-${sellerId}"]:checked`);
+        const errorEl = form.querySelector('.review-error');
+        errorEl.style.display = 'none';
+
+        if (!ratingInput) {
+          errorEl.textContent = 'Merci de choisir une note.';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        const rating = parseInt(ratingInput.value, 10);
+        const comment = form.querySelector('.review-comment').value;
+
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) {
+          errorEl.textContent = 'Session expirée, reconnectez-vous.';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        const { error } = await supabaseClient.from('reviews').insert({
+          order_id: orderId,
+          seller_id: sellerId,
+          buyer_id: session.user.id,
+          rating: rating,
+          comment: comment || null,
+        });
+
+        if (error) {
+          errorEl.textContent = 'Erreur : ' + error.message;
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        form.outerHTML = renderExistingReview({ rating, comment }, true);
+      });
+    });
+  }
 
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     if (!session) {
       loadingMessage.style.display = 'none';
-      pageSubtitle.style.display = 'none';
       notLoggedMessage.style.display = 'block';
       return;
     }
 
     try {
-      const response = await fetch('/api/get-my-sales', {
+      const response = await fetch('/api/get-my-orders', {
         headers: { Authorization: 'Bearer ' + session.access_token },
       });
       const data = await response.json();
 
       loadingMessage.style.display = 'none';
 
-      if (!response.ok) {
-        if (data.error && data.error.includes('vendeur')) {
-          pageSubtitle.style.display = 'none';
-          notSellerSection.style.display = 'block';
-          return;
-        }
-        throw new Error(data.error || 'Erreur');
-      }
-
-      renderTaxBox(data.taxInfo);
-
-      const sales = data.sales || [];
-
-      if (sales.length === 0) {
-        noSalesMessage.style.display = 'block';
+      if (!data.orders || data.orders.length === 0) {
+        noOrdersMessage.style.display = 'block';
         return;
       }
 
-      salesContainer.innerHTML =
-        '<p class="payout-note">Votre argent est viré à votre banque une fois par mois, à partir du 05.</p>' +
-        sales.map(renderSale).join('');
+      // Numéro d'une commande = son rang d'achat : la toute première commande passée est la n° 1,
+      // la suivante la n° 2, etc. Ce numéro ne change jamais, même quand une nouvelle commande arrive.
+      const purchaseRank = new Map();
+      data.orders
+        .map((order, index) => ({ order, index }))
+        .sort((a, b) => (new Date(a.order.createdAt) - new Date(b.order.createdAt)) || (b.index - a.index))
+        .forEach((entry, position) => purchaseRank.set(entry.order.orderId, position + 1));
+
+      data.orders.forEach((order) => {
+        const banner = document.createElement('div');
+        banner.className = 'order-banner';
+        banner.textContent = 'Commande n° ' + purchaseRank.get(order.orderId);
+        ordersContainer.appendChild(banner);
+
+        const orderDiv = document.createElement('div');
+        orderDiv.className = 'order-card';
+        const date = new Date(order.createdAt).toLocaleDateString('fr-FR');
+
+        let sellersHtml = '';
+        order.sellers.forEach((seller) => {
+          sellersHtml += `
+            <div class="order-seller-block">
+              <p><strong>${escapeHtml(sellerLabel(seller))}</strong>${deliveryBadge(seller)}</p>
+              ${renderTicketLines(seller)}
+              ${renderDeliverySection(seller)}
+              ${renderAddressSection(seller)}
+              ${renderPickupSection((seller.items || []).filter((item) => !item.shipped))}
+              ${renderPayoutSection(order.orderId, seller)}
+              <div class="review-slot">${seller.review ? renderExistingReview(seller.review, false) : (reviewAllowed(seller) ? renderStrawberryPicker(order.orderId, seller.sellerId) : '')}</div>
+            </div>
+          `;
+        });
+
+        orderDiv.innerHTML = `
+          <h3>Commande du ${date} — ${Number(order.totalAmount).toFixed(2).replace('.', ',')} €</h3>
+          ${sellersHtml}
+          ${renderServiceFeeLine(order)}
+        `;
+        ordersContainer.appendChild(orderDiv);
+      });
+
+      attachReviewFormHandlers();
+      attachPayoutHandlers();
 
     } catch (err) {
+      loadingMessage.textContent = 'Erreur de chargement de vos commandes.';
       console.error(err);
-      loadingMessage.style.display = 'none';
-      errorMessage.textContent = 'Impossible de charger vos ventes pour le moment.';
-      errorMessage.style.display = 'block';
     }
   }
 
@@ -510,46 +758,71 @@
 </script>
 
 <style>
-  .sale-card { background:#f9f7f2; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
-  .sale-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px; }
-  .sale-date { font-family:var(--font-display); font-weight:700; font-size:0.95rem; color:var(--leaf-deep); }
-  .sale-total { font-weight:700; font-size:0.95rem; color:var(--leaf-deep); white-space:nowrap; }
-  .sale-item { font-size:0.9rem; line-height:1.6; }
-  .money-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin-top:10px; font-size:0.85rem; line-height:1.5; }
-  .money-detail { margin-top:10px; font-size:0.85rem; color:#6B5842; }
-  .money-line { display:flex; justify-content:space-between; gap:12px; padding:2px 0; }
-  .money-amount { white-space:nowrap; }
-  .money-total { border-top:1px solid #e6e0d3; margin-top:4px; padding-top:6px; font-weight:700; color:var(--leaf-deep); }
-  #salesContainer p.money-note { margin:8px 0 0; font-size:0.8rem; color:#888; line-height:1.4; }
-  #salesContainer p.payout-note { font-size:0.85rem; color:#6B5842; margin:0 0 12px; }
-  .tax-box { text-align:left; border:1px solid #F0C48A; background:#FFF6E8; border-radius:12px; padding:14px; margin-bottom:16px; }
-  .tax-box h2 { font-size:1rem; margin:0 0 6px; color:#B26A0B; }
-  .tax-box p { font-size:0.85rem; line-height:1.5; margin:0 0 10px; color:#5b4a35; }
-  .tax-box label { display:block; font-size:0.78rem; font-weight:700; color:var(--leaf-deep); margin:8px 0 3px; }
-  .tax-box input { width:100%; box-sizing:border-box; padding:9px; border:1px solid #ddd; border-radius:8px; font-size:0.9rem; font-family:inherit; }
-  .tax-box p.hint { font-size:0.78rem; color:#888; margin:4px 0 0; }
-  .tax-box p.tax-error { color:#C8352F; font-weight:700; margin:10px 0 0; }
-  .tax-box .btn { margin-top:12px; width:100%; }
-  .tax-box .btn:disabled { opacity:0.5; cursor:not-allowed; }
-  .tax-done { text-align:left; border:1px solid #cfe3cf; background:#f6f9f5; border-radius:12px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:#4C7A50; line-height:1.5; }
-  .tax-done a { color:var(--leaf-deep); font-weight:700; }
-  .ship-badge { display:inline-block; font-family:var(--font-body, inherit); font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; }
+  .my-topbar { position:relative; display:flex; justify-content:center; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-topbar .btn { position:absolute; left:0; top:50%; transform:translateY(-50%); }
+  .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
+  .order-banner { background:var(--leaf-deep, #385C3B); color:#fff; font-weight:700; font-size:1rem; letter-spacing:0.02em; text-align:center; padding:10px 14px; border-radius:10px; margin:26px 0 10px; }
+  .order-banner:first-child { margin-top:0; }
+  .order-card { background:#f9f7f2; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .order-card h3 { font-size:0.95rem; margin-bottom:8px; }
+  .order-seller-block { border-top:1px solid #eee; padding-top:14px; margin-top:14px; }
+  .order-item-line { font-size:0.9rem; line-height:1.6; }
+  .order-fee-line { display:flex; justify-content:space-between; gap:12px; border-top:1px solid #eee; margin-top:14px; padding-top:10px; font-size:0.9rem; color:#6B5842; }
+  .order-fee-amount { white-space:nowrap; }
+  .strawberry-picker { display:flex; flex-direction:column; align-items:flex-start; gap:10px; margin:10px 0; width:fit-content; }
+  .strawberry-group { position:relative; cursor:default; outline-offset:4px; }
+  .strawberry-group-fixed { display:inline-block; }
+  .strawberry-tip { display:none; position:fixed; left:0; top:0; z-index:1000; pointer-events:none; width:min(340px, calc(100vw - 16px)); box-sizing:border-box; padding:10px; background:#fff; border:1px solid #e6e0d3; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.15); font-size:0.88rem; line-height:1.4; color:#3b3126; text-align:left; font-weight:400; }
+  .strawberry-group.open .strawberry-tip { display:block; }
+  @media (hover: hover) { .strawberry-group:hover .strawberry-tip { display:block; } }
+  .strawberry-group:has(input:focus-visible) .strawberry-tip, .strawberry-group:focus-visible .strawberry-tip { display:block; }
+  .strawberry-tip-row { display:flex; align-items:center; gap:10px; padding:7px 8px; border-left:3px solid transparent; border-radius:8px; }
+  .strawberry-tip-row + .strawberry-tip-row { margin-top:3px; }
+  .strawberry-tip-row.current { background:#EEF2FF; border-left-color:#4169E1; }
+  .strawberry-tip-icons { display:flex; width:76px; flex-shrink:0; }
+  .strawberry-tip-icons img { width:18px; height:18px; object-fit:contain; mix-blend-mode:multiply; }
+  .strawberry-tip-text strong { color:#4169E1; }
+  .strawberry-option { cursor:pointer; display:inline-block; }
+  .strawberry-row { display:inline-flex; flex-direction:row; flex-wrap:nowrap; align-items:center; gap:2px; }
+  .strawberry-icon-wrap { width:56px; height:56px; display:inline-block; flex-shrink:0; }
+  .strawberry-icon { width:100%; height:100%; object-fit:contain; display:block; mix-blend-mode:multiply; }
+  .review-comment { width:100%; min-height:60px; margin:10px 0; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; }
+  .existing-review { background:#f6f9f5; border-radius:8px; padding:10px; margin-top:8px; }
+  .payout-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin:8px 0; }
+  .payout-box p { margin:0 0 8px; font-size:0.85rem; }
+  .payout-box p:last-child { margin-bottom:0; }
+  .payout-actions { display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
+  .payout-actions .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
+  .payout-report-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .payout-box p.payout-report-hint { font-size:0.8rem; color:#888; margin:0 0 8px; }
+  .payout-box .payout-report-label { display:block; font-size:0.8rem; font-weight:700; color:#6B5842; margin-bottom:6px; }
+  .payout-box .payout-report-reason { width:100%; min-height:80px; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; font-size:0.85rem; box-sizing:border-box; resize:vertical; }
+  .payout-report-buttons { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .payout-report-buttons .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
+  .payout-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
+  .payout-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
+  .payout-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
+  .seller-address { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
+  .seller-address-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .ship-badge { display:inline-block; font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px; vertical-align:middle; font-family:var(--font-body); }
   .ship-todo { background:#FFE9C7; color:#B45A00; }
   .ship-sent { background:#DDEFDB; color:#3E6B42; }
   .ship-pick { background:#EEE9DD; color:#6B5842; }
-  .ship-addr { background:#fff; border:2px solid #9FC49A; border-radius:10px; padding:10px 12px; margin-top:10px; font-size:0.88rem; line-height:1.55; }
-  .ship-addr .t { font-size:0.72rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px; }
-  .ship-action { margin-top:10px; background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:12px; }
-  .ship-action label { display:block; font-size:0.78rem; font-weight:700; color:var(--leaf-deep); margin:0 0 4px; }
-  .ship-action input { width:100%; box-sizing:border-box; padding:9px; border:1px solid #ddd; border-radius:8px; font:inherit; font-size:0.9rem; margin-bottom:10px; }
-  .ship-action .btn { width:100%; }
-  .ship-action .btn:disabled { opacity:0.5; cursor:not-allowed; }
-  .ship-action p { font-size:0.8rem; color:#6B5842; margin:8px 0 0; line-height:1.45; }
-  .ship-action p.ship-error { color:#C8352F; font-weight:700; }
-  .ship-done { margin-top:10px; background:#f6f9f5; border:1px solid #cfe3cf; border-radius:10px; padding:10px; font-size:0.85rem; line-height:1.5; color:#4C7A50; }
-  .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
-  .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
-  .money-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
+  .deliver-addr { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
+  .deliver-addr-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .ship-done { margin:8px 0; background:#f6f9f5; border:1px solid #cfe3cf; border-radius:10px; padding:8px 10px; font-size:0.85rem; line-height:1.5; color:#4C7A50; }
+  .ship-wait { margin:8px 0; background:#FFF6E8; border:1px solid #F0C48A; border-radius:10px; padding:8px 10px; font-size:0.85rem; line-height:1.5; color:#8a5a12; }
+  .pickup-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; }
+  .pickup-box-title { font-size:0.7rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; }
+  .pickup-set { font-size:0.85rem; line-height:1.6; margin-top:3px; }
+  .pickup-names { font-style:italic; color:#6B5842; }
+  .payout-actions, .payout-report-buttons { flex-direction:row; flex-wrap:wrap; }
+  .payout-actions .btn, .payout-report-buttons .btn { width:auto; }
 </style>
 
 </body>

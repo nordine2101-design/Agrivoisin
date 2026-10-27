@@ -11,7 +11,7 @@
 
 <!-- ============ FICHE ANNONCE ============ -->
 <section class="page-header" style="display:flex;align-items:flex-start;justify-content:center;gap:24px;">
-  <div style="background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:32px 32px 36px;max-width:780px;width:100%;box-sizing:border-box;text-align:center;">
+  <div style="position:relative;background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:32px 32px 36px;max-width:780px;width:100%;box-sizing:border-box;text-align:center;">
     <div style="text-align:left;margin:-24px 0 12px -20px;">
       <a href="annonces.html" id="backLink" class="btn btn-ghost btn-back">Retour</a>
     </div>
@@ -20,8 +20,8 @@
     <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;"></p>
 
     <div id="listingDetail" style="display:none;">
-      <span id="listingTag" class="tag" style="font-size:0.72rem;font-weight:700;color:var(--leaf);text-transform:uppercase;letter-spacing:0.05em;"></span>
-      <h1 id="listingTitle" style="margin:6px 0 10px;font-size:1.7rem;"></h1>
+      <span id="listingTag" class="tag listing-chip"></span>
+      <h1 id="listingTitle" class="listing-pill"></h1>
       <div class="info-grid">
         <div class="info-box">
           <h2 class="info-title">Vendeur</h2>
@@ -631,7 +631,9 @@
   }
 </script>
 <style>
-  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:stretch; margin:0 0 6px; text-align:left; }
+  .listing-pill { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#CDE8C8; color:#1F4D00; padding:8px 26px; border-radius:28px; position:absolute; left:50%; top:0; transform:translate(-50%,-50%); width:max-content; max-width:min(520px, calc(100% - 220px)); }
+  .listing-chip { position:absolute; top:22px; right:32px; font-size:0.72rem; font-weight:700; color:#2F5A33; background:#EAF3E8; border-radius:999px; padding:6px 14px; text-transform:uppercase; letter-spacing:0.05em; }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:stretch; margin:6px 0 6px; text-align:left; }
   .info-box { border:2px solid #9FC49A; border-radius:14px; background:#F6F9F5; padding:14px; min-width:0; }
   .info-title { font-size:0.75rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; margin:0 0 10px; }
   .info-box .seller-card { border:0; background:none; padding:0; margin:0; }

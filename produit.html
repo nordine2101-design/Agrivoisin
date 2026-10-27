@@ -23,8 +23,8 @@
       <span id="listingTag" class="tag" style="font-size:0.72rem;font-weight:700;color:var(--leaf);text-transform:uppercase;letter-spacing:0.05em;"></span>
       <h1 id="listingTitle" style="margin:6px 0 10px;font-size:1.7rem;"></h1>
       <p id="listingFreshness" style="display:none;font-weight:600;color:var(--leaf-deep);margin-bottom:8px;"></p>
-      <p id="listingSeller" style="font-size:0.95rem;margin-bottom:6px;"></p>
-      <p id="listingRating" style="margin:0 0 16px;"></p>
+      <div id="listingSeller" style="font-size:0.95rem;margin-bottom:6px;"></div>
+      <div id="listingRating" style="margin:0 0 16px;"></div>
       <div id="listingPickup" style="display:none;margin-bottom:18px;padding:12px 14px;border-radius:12px;background:var(--cream-soft);text-align:left;">
         <p style="font-size:0.75rem;font-weight:700;color:var(--leaf-deep);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.05em;">Horaires de retrait</p>
         <div id="listingPickupLines" style="font-size:0.9rem;line-height:1.7;"></div>
@@ -373,13 +373,42 @@
     }
     const sellerEl = document.getElementById('listingSeller');
     sellerEl.textContent = '';
+    const ratingEl = document.getElementById('listingRating');
     if (item.sellers && item.sellers.pseudo && item.sellers.city) {
-      const sellerLink = document.createElement('a');
-      sellerLink.href = 'vendeur.html?listing=' + encodeURIComponent(item.id);
-      sellerLink.className = 'seller-link';
-      sellerLink.textContent = item.sellers.pseudo;
-      sellerEl.appendChild(sellerLink);
-      sellerEl.appendChild(document.createTextNode(' · ' + cityText));
+      // Carte vendeur : tout est cliquable et mène à la page du vendeur (sa note, ses avis et ses annonces en ligne)
+      const isPro = item.sellers.seller_type === 'professionnel';
+      const shopName = (isPro && item.seller_legal_name) ? item.seller_legal_name : item.sellers.pseudo;
+      const card = document.createElement('a');
+      card.href = 'vendeur.html?listing=' + encodeURIComponent(item.id);
+      card.className = 'seller-card';
+
+      const top = document.createElement('span');
+      top.className = 'seller-card-top';
+      const avatar = document.createElement('span');
+      avatar.className = 'seller-card-avatar';
+      avatar.textContent = shopName.replace(/^\[[^\]]*\]\s*/, '').charAt(0).toUpperCase() || '?';
+      const text = document.createElement('span');
+      text.className = 'seller-card-text';
+      const nameEl = document.createElement('strong');
+      nameEl.className = 'seller-card-name';
+      nameEl.textContent = shopName;
+      const sub = document.createElement('span');
+      sub.className = 'seller-card-sub';
+      sub.textContent = cityText;
+      text.appendChild(nameEl);
+      text.appendChild(sub);
+      text.appendChild(ratingEl); // la note se range dans la carte
+      ratingEl.style.margin = '4px 0 0';
+      top.appendChild(avatar);
+      top.appendChild(text);
+
+      const btn = document.createElement('span');
+      btn.className = 'seller-card-btn';
+      btn.textContent = 'Voir la boutique →';
+
+      card.appendChild(top);
+      card.appendChild(btn);
+      sellerEl.appendChild(card);
     } else {
       sellerEl.textContent = cityText;
     }
@@ -594,6 +623,17 @@
   .seller-rating { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; font-weight:700; color:var(--leaf-deep); font-size:1.25rem; }
   .seller-rating-icon { width:34px; height:34px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
   .seller-rating-count { font-size:0.85rem; font-weight:400; color:#6B5842; }
+  .seller-card { display:block; text-align:left; padding:14px; margin:0 0 16px; border:2px solid #9FC49A; border-radius:14px; background:#F6F9F5; text-decoration:none; color:inherit; }
+  .seller-card:hover { border-color:#4C7A50; }
+  .seller-card-top { display:flex; align-items:center; gap:12px; }
+  .seller-card-avatar { width:46px; height:46px; border-radius:50%; background:#4C7A50; color:#fff; font-weight:800; font-size:1.3rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .seller-card-text { flex:1; min-width:0; }
+  .seller-card-name { display:block; font-size:1.05rem; color:#2F5A33; word-break:break-word; }
+  .seller-card-sub { display:block; font-size:0.85rem; color:#6B5842; }
+  .seller-card .seller-rating { justify-content:flex-start; font-size:0.9rem; gap:4px; }
+  .seller-card .seller-rating-icon { width:26px; height:26px; }
+  .seller-card-btn { display:flex; align-items:center; justify-content:center; margin-top:12px; padding:9px 18px; border-radius:999px; background:#4C7A50; color:#fff; font-weight:700; font-size:0.9rem; box-shadow:0 4px 12px rgba(76,122,80,0.35); transition:background .15s ease; }
+  .seller-card:hover .seller-card-btn { background:#2F5A33; }
   .seller-link { color:var(--leaf-deep); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
   .seller-link:hover { color:var(--carrot-deep); }
   .seller-rating-new { font-size:0.95rem; font-weight:700; color:#6B5842; }

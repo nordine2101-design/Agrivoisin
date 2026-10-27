@@ -8,9 +8,9 @@
 <link rel="stylesheet" href="style.css">
 <script src="supabase.js"></script>
 <style>
-  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#FFC38B 0%,#FFDDB9 50%,#FFF6EC 100%); }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
-  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFE27A; color:#E06A00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFDDB9; color:#6A3200; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-form-box { max-width:420px; margin:0 auto; text-align:left; }
   .my-video { width:500px; flex-shrink:0; position:sticky; top:20px; box-sizing:border-box; padding:10px; background:var(--cream-soft); border-radius:28px; }
@@ -23,6 +23,14 @@
   .pw-eye .eye-off { display:none; }
   .pw-eye.shown .eye-on { display:none; }
   .pw-eye.shown .eye-off { display:block; }
+  /* Couleur de la page : une seule */
+  .my-panel .auth-subtitle { color:#8A5A2C; }
+  .my-panel .auth-form label { color:#C9660A; }
+  .my-panel .auth-form input { border-color:#FFB86F; }
+  .my-panel .auth-form input:focus { border-color:#F08A1A; }
+  .my-panel .btn-primary { background:#F29130; box-shadow:0 4px 14px rgba(242,145,48,0.4); }
+  .my-panel .btn-primary:hover { background:#C9660A; box-shadow:0 6px 18px rgba(242,145,48,0.48); }
+  .pw-eye:focus-visible { outline-color:#F08A1A; }
 </style>
 </head>
 <body>

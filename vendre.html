@@ -10,48 +10,16 @@
 </head>
 <body>
 
-<!-- ============ HEADER ============ -->
-<header class="site-header">
-  <div class="logo-bar" style="position:relative;">
-    <a href="index.html" class="logo">
-      <img src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="height:200px;width:auto;">
-    </a>
-    <a href="panier.html" class="cart-icon" aria-label="Panier" style="position:absolute;top:12px;right:32px;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="9" cy="21" r="1"></circle>
-        <circle cx="20" cy="21" r="1"></circle>
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-      </svg>
-      <span class="cart-count">0</span>
-    </a>
-  </div>
-
-  <div class="container nav-bar">
-    <nav class="main-nav">
-      <a href="index.html#comment-ca-marche">Comment ça marche</a>
-      <a href="annonces.html">Les annonces</a>
-      <a href="index.html#pourquoi">Pourquoi Agrivoisin</a>
-      <a href="publier-annonce.html">Publier une annonce</a>
-    </nav>
-
-    <div class="header-actions">
-      <a href="mes-annonces.html" class="btn btn-ghost">Mes annonces</a>
-      <a href="mes-commandes.html" class="btn btn-ghost">Mes commandes</a>
-      <a href="connexion.html" class="btn btn-ghost">Se connecter</a>
-      <a href="inscription.html" class="btn btn-primary">Créer un compte</a>
-      <button class="nav-toggle" aria-label="Menu">
-        <span></span><span></span><span></span>
-      </button>
-    </div>
-  </div>
-</header>
-
 <!-- ============ FORMULAIRE VENDEUR ============ -->
-<section class="auth-section">
-  <div class="auth-card auth-card-wide">
-    <h1>Vendez vos récoltes</h1>
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
+      <a href="index.html" class="btn btn-ghost btn-back">Retour</a>
+      <h1>Vendez vos récoltes</h1>
+    </div>
     <p class="auth-subtitle">Créez votre compte de paiement sécurisé pour recevoir directement l'argent de vos ventes sur Agrivoisin.</p>
 
+    <div class="my-form-box">
     <p id="notLoggedMessage" style="display:none;text-align:center;">Vous devez être connecté pour devenir vendeur. <a href="connexion.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
 
     <form class="auth-form" id="sellerForm" style="display:none;">
@@ -152,7 +120,10 @@
     </form>
 
     <p class="auth-switch" id="sellerError" style="color:#C8352F;display:none;"></p>
+    </div>
   </div>
+
+  <div class="my-video"></div>
 </section>
 
 <!-- ============ FOOTER ============ -->
@@ -202,17 +173,33 @@
 
 <script src="script.js"></script>
 <style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#FF9E8F 0%,#FFC9C0 50%,#FFF3F1 100%); }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFC9C0; color:#7A1D10; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-form-box { max-width:420px; margin:0 auto; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
+  /* Couleur de la page : une seule, sauf le bouton Retour */
+  .my-panel .auth-subtitle { color:#8A4237; }
+  .my-panel .auth-form label { color:#D6402B; }
+  .my-panel .auth-form input[type="text"], .my-panel .auth-form input[type="tel"], .my-panel .auth-form input[type="email"], .my-panel .auth-form input[type="date"] { border-color:#FFA899; }
+  .my-panel .auth-form input:focus { border-color:#EE5A44; }
+  .my-panel .btn-primary { background:#EE5A44; box-shadow:0 4px 14px rgba(238,90,68,0.4); }
+  .my-panel .btn-primary:hover { background:#C9402C; box-shadow:0 6px 18px rgba(238,90,68,0.48); }
+  .my-panel .auth-form a, .my-panel .my-form-box > p a { color:#D6402B; }
   .seller-type { border:none; margin:0 0 6px; padding:0; display:flex; flex-direction:column; gap:10px; }
-  .seller-type legend { font-size:0.85rem; font-weight:600; color:var(--leaf-deep); padding:0; margin-bottom:8px; }
-  .auth-form .seller-type-option { display:flex; align-items:flex-start; gap:12px; margin:0; padding:12px 14px; border:1.5px solid rgba(107, 88, 66, 0.2); border-radius:var(--radius-sm); cursor:pointer; font-weight:400; font-size:0.95rem; color:var(--ink); line-height:1.4; }
-  .auth-form .seller-type-option strong { color:var(--leaf-deep); }
-  .auth-form .seller-type-option input { width:auto; margin:3px 0 0; padding:0; border:none; flex-shrink:0; accent-color:var(--leaf-deep); }
-  .auth-form .seller-type-option:has(input:checked) { border-color:var(--leaf-deep); background:var(--cream-soft); }
-  .pro-offer { margin:4px 0 14px; padding:12px 14px; border:1.5px solid var(--leaf-deep); border-radius:var(--radius-sm); background:var(--cream-soft); font-size:0.9rem; line-height:1.45; color:var(--ink); text-align:left; }
-  .pro-offer > strong { display:block; color:var(--leaf-deep); margin-bottom:6px; }
+  .seller-type legend { font-size:0.85rem; font-weight:600; color:#D6402B; padding:0; margin-bottom:8px; }
+  .auth-form .seller-type-option { display:flex; align-items:flex-start; gap:12px; margin:0; padding:12px 14px; border:1.5px solid #FFA899; border-radius:var(--radius-sm); cursor:pointer; font-weight:400; font-size:0.95rem; color:var(--ink); line-height:1.4; }
+  .auth-form .seller-type-option strong { color:#D6402B; }
+  .auth-form .seller-type-option input { width:auto; margin:3px 0 0; padding:0; border:none; flex-shrink:0; accent-color:#EE5A44; }
+  .auth-form .seller-type-option:has(input:checked) { border-color:#EE5A44; background:#FFF3F1; }
+  .pro-offer { margin:4px 0 14px; padding:12px 14px; border:1.5px solid #FFA899; border-radius:var(--radius-sm); background:#FFF3F1; font-size:0.9rem; line-height:1.45; color:var(--ink); text-align:left; }
+  .pro-offer > strong { display:block; color:#D6402B; margin-bottom:6px; }
   .pro-offer ul { margin:0; padding-left:20px; list-style:disc; }
   .pro-offer li { margin:3px 0; }
-  .auth-form .seller-type-option:has(input:focus-visible) { outline:2px solid var(--leaf-deep); outline-offset:2px; }
+  .auth-form .seller-type-option:has(input:focus-visible) { outline:2px solid #EE5A44; outline-offset:2px; }
+  .my-panel .auth-form .seller-type-option, .my-panel .auth-form label[style*="display:flex"] { color:var(--ink); }
+  .my-panel .auth-form .seller-type-option strong { color:#D6402B; }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(

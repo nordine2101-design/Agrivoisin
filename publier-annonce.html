@@ -1136,6 +1136,7 @@
   .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
   .my-panel { background:#F4FAEC; border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
   .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#C9E8A0; color:#2E6B2F; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1::before { content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:calc(50% + 2px); box-sizing:border-box; border:2px solid #fff; border-bottom:none; border-radius:999px 999px 0 0; pointer-events:none; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-form-box { max-width:560px; margin:0 auto; }
   .my-form-box .auth-form > label { align-self:flex-start; background:#4C9F50; color:#fff; padding:5px 16px; border-radius:999px; font-size:0.9rem; }

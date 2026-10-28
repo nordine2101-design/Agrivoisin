@@ -590,6 +590,57 @@
     renderListings();
   });
 
+  // ---------- Retour depuis une annonce : on retrouve la page, les filtres et l'endroit où on était ----------
+  const LIST_STATE_KEY = 'agrivoisin_annonces_etat';
+  let scrollToRestore = null;
+
+  // Au clic sur une annonce, on note où on en est
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href^="produit.html"]');
+    if (!link) return;
+    try {
+      sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify({
+        page: currentPage,
+        category: currentCategory,
+        sort: currentSort,
+        search: searchInput.value,
+        particulier: typeParticulier.checked,
+        professionnel: typeProfessionnel.checked,
+        y: window.scrollY,
+      }));
+    } catch (err) {}
+  });
+
+  // En arrivant depuis une annonce (bouton Retour), on remet tout comme c'était
+  (function restoreListState() {
+    try {
+      const ref = document.referrer ? new URL(document.referrer) : null;
+      if (!ref || ref.origin !== window.location.origin || !/\/produit(\.html)?$/.test(ref.pathname)) return;
+      const saved = JSON.parse(sessionStorage.getItem(LIST_STATE_KEY));
+      sessionStorage.removeItem(LIST_STATE_KEY);
+      if (!saved) return;
+
+      const chip = Array.from(chipsContainer.querySelectorAll('.chip')).find((c) => c.dataset.category === saved.category);
+      if (chip) {
+        chipsContainer.querySelectorAll('.chip').forEach((c) => c.classList.remove('chip-active'));
+        chip.classList.add('chip-active');
+        currentCategory = saved.category;
+      }
+      if (Array.from(sortSelect.options).some((o) => o.value === saved.sort)) {
+        sortSelect.value = saved.sort;
+        currentSort = saved.sort;
+      }
+      searchInput.value = saved.search || '';
+      currentSearch = normalizeText(searchInput.value.trim());
+      typeParticulier.checked = !!saved.particulier;
+      typeProfessionnel.checked = !!saved.professionnel;
+      currentPage = Math.max(1, parseInt(saved.page, 10) || 1);
+      try { history.replaceState(null, '', currentPage > 1 ? '?page=' + currentPage : window.location.pathname); } catch (err) {}
+      scrollToRestore = Number(saved.y) || 0;
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    } catch (err) {}
+  })();
+
   loadBuyerLocation();
   loadFavorites();
 
@@ -598,6 +649,13 @@
     .then((data) => {
       allListings = data.listings || [];
       renderListings();
+      if (scrollToRestore !== null) {
+        const y = scrollToRestore;
+        scrollToRestore = null;
+        window.scrollTo(0, y);
+        // Les photos finissent de se charger : on se replace encore une fois
+        setTimeout(() => window.scrollTo(0, y), 400);
+      }
     })
     .catch((err) => console.error('Erreur chargement annonces :', err));
 </script>

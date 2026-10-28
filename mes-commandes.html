@@ -761,6 +761,7 @@
   .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#FFC58F 0%,#FFDDB8 60%,#FFF1E0 100%); }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
   .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFD1A3; color:#8A4B12; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1::before { content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:calc(50% + 2px); box-sizing:border-box; border:2px solid #fff; border-bottom:none; border-radius:999px 999px 0 0; pointer-events:none; }
   .my-topbar { position:relative; display:flex; justify-content:center; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-topbar .btn { position:absolute; left:0; top:50%; transform:translateY(-50%); }
   .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }

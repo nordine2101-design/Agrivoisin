@@ -648,18 +648,19 @@
         particulier: typeParticulier.checked,
         professionnel: typeProfessionnel.checked,
         y: window.scrollY,
+        t: Date.now(),
       }));
     } catch (err) {}
   });
 
-  // En arrivant depuis une annonce (bouton Retour), on remet tout comme c'était
+  // En arrivant depuis une annonce ou depuis la boutique d'un vendeur (bouton Retour), on remet tout comme c'était
   (function restoreListState() {
     try {
       const ref = document.referrer ? new URL(document.referrer) : null;
-      if (!ref || ref.origin !== window.location.origin || !/\/produit(\.html)?$/.test(ref.pathname)) return;
+      if (!ref || ref.origin !== window.location.origin || !/\/(produit|vendeur)(\.html)?$/.test(ref.pathname)) return;
       const saved = JSON.parse(sessionStorage.getItem(LIST_STATE_KEY));
       sessionStorage.removeItem(LIST_STATE_KEY);
-      if (!saved) return;
+      if (!saved || !saved.t || Date.now() - saved.t > 30 * 60 * 1000) return;
 
       const chip = Array.from(chipsContainer.querySelectorAll('.chip')).find((c) => c.dataset.category === saved.category);
       if (chip) {

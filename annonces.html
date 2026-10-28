@@ -485,25 +485,39 @@
     });
   }
 
-  // Une ligne de séparation entre chaque rangée d'annonces (3 par rangée, 2 sur tablette, 1 sur téléphone)
+  // Les annonces sont rangées par rangées (3 par rangée, 2 sur tablette, 1 sur téléphone).
+  // Chaque rangée a son fond, en alternant rose très léger et vert très léger, avec un trait entre deux rangées.
+  function columnsPerRow() {
+    if (window.matchMedia('(max-width: 560px)').matches) return 1;
+    if (window.matchMedia('(max-width: 900px)').matches) return 2;
+    return 3;
+  }
+
   function placeRowSeparators() {
-    container.querySelectorAll('.row-sep').forEach((el) => el.remove());
-    const columns = getComputedStyle(container).gridTemplateColumns.split(' ').filter(Boolean).length || 1;
     const cards = Array.from(container.querySelectorAll('.produce-card'));
-    for (let i = cards.length - 1; i > 0; i--) {
+    container.innerHTML = '';
+    const columns = columnsPerRow();
+    let band = null;
+    cards.forEach((card, i) => {
       if (i % columns === 0) {
-        const sep = document.createElement('div');
-        sep.className = 'row-sep';
-        sep.setAttribute('aria-hidden', 'true');
-        container.insertBefore(sep, cards[i]);
+        if (i > 0) {
+          const sep = document.createElement('div');
+          sep.className = 'row-sep';
+          sep.setAttribute('aria-hidden', 'true');
+          container.appendChild(sep);
+        }
+        band = document.createElement('div');
+        band.className = 'row-band ' + ((i / columns) % 2 === 0 ? 'row-band-rose' : 'row-band-vert');
+        container.appendChild(band);
       }
-    }
+      band.appendChild(card);
+    });
   }
 
   // Quand l'écran change de taille, le nombre d'annonces par rangée peut changer
   let lastColumnCount = 0;
   window.addEventListener('resize', () => {
-    const columns = getComputedStyle(container).gridTemplateColumns.split(' ').filter(Boolean).length;
+    const columns = columnsPerRow();
     if (columns !== lastColumnCount) {
       lastColumnCount = columns;
       placeRowSeparators();
@@ -774,11 +788,14 @@
   .type-check:has(input:checked) { background:#fff; border-color:#7CCB86; box-shadow:none; color:#3E9B4D; }
   .type-check:has(input:focus-visible) { outline:2px solid #7CCB86; outline-offset:2px; }
 
-  /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone) */
-  .listings-grid { grid-template-columns: repeat(3, 1fr); }
-  .listings-grid .row-sep { grid-column: 1 / -1; height: 4px; border-radius: 4px; background: #4C7A50; }
-  @media (max-width: 900px) { .listings-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 560px) { .listings-grid { grid-template-columns: 1fr; } }
+  /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone), chaque rangée sur son fond */
+  .listings-grid { display: block; }
+  .listings-grid .row-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 22px; margin: 0 -22px; border-radius: 24px; }
+  .listings-grid .row-band-rose { background: #FCE4EC; }
+  .listings-grid .row-band-vert { background: #EAF5E6; }
+  .listings-grid .row-sep { height: 4px; border-radius: 4px; background: #4C7A50; margin: 14px 0; }
+  @media (max-width: 900px) { .listings-grid .row-band { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .listings-grid .row-band { grid-template-columns: 1fr; margin: 0 -12px; padding: 12px; } }
 
   /* Pages d'annonces : Précédent, numéros, Suivant */
   .pager { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:36px; }

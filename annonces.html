@@ -450,6 +450,8 @@
       container.appendChild(card);
     });
 
+    placeRowSeparators();
+
     container.querySelectorAll('.icon-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         if (btn.disabled) return;
@@ -482,6 +484,31 @@
       });
     });
   }
+
+  // Une ligne de séparation entre chaque rangée d'annonces (3 par rangée, 2 sur tablette, 1 sur téléphone)
+  function placeRowSeparators() {
+    container.querySelectorAll('.row-sep').forEach((el) => el.remove());
+    const columns = getComputedStyle(container).gridTemplateColumns.split(' ').filter(Boolean).length || 1;
+    const cards = Array.from(container.querySelectorAll('.produce-card'));
+    for (let i = cards.length - 1; i > 0; i--) {
+      if (i % columns === 0) {
+        const sep = document.createElement('div');
+        sep.className = 'row-sep';
+        sep.setAttribute('aria-hidden', 'true');
+        container.insertBefore(sep, cards[i]);
+      }
+    }
+  }
+
+  // Quand l'écran change de taille, le nombre d'annonces par rangée peut changer
+  let lastColumnCount = 0;
+  window.addEventListener('resize', () => {
+    const columns = getComputedStyle(container).gridTemplateColumns.split(' ').filter(Boolean).length;
+    if (columns !== lastColumnCount) {
+      lastColumnCount = columns;
+      placeRowSeparators();
+    }
+  });
 
   // Quand on change un filtre, un tri ou la recherche, on repart de la page 1
   function goToFirstPage() {
@@ -749,6 +776,7 @@
 
   /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone) */
   .listings-grid { grid-template-columns: repeat(3, 1fr); }
+  .listings-grid .row-sep { grid-column: 1 / -1; height: 4px; border-radius: 4px; background: #4C7A50; }
   @media (max-width: 900px) { .listings-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 560px) { .listings-grid { grid-template-columns: 1fr; } }
 

@@ -27,6 +27,10 @@
           <h2 class="info-title">Vendeur</h2>
       <div id="listingSeller" style="font-size:0.95rem;margin-bottom:6px;"></div>
       <div id="listingRating" style="margin:0 0 16px;"></div>
+      <div id="listingShipBadge" style="display:none;align-items:center;justify-content:center;gap:10px;margin:0 0 18px;">
+        <img src="expedition-possible%20(1).png" alt="" width="180" height="173">
+        <strong style="color:var(--leaf-deep);font-size:1.5rem;">Livraison possible</strong>
+      </div>
         </div>
         <div class="info-box">
           <h2 class="info-title">Retrait</h2>
@@ -38,10 +42,6 @@
         <p style="font-size:0.75rem;font-weight:700;color:var(--leaf-deep);margin:0 0 4px;text-transform:uppercase;letter-spacing:0.05em;">Expédition par le vendeur</p>
         <div id="listingShipLines" style="font-size:0.9rem;line-height:1.7;"></div>
         <p id="listingShipNote" style="font-size:0.8rem;color:#6B5842;margin:8px 0 0;"></p>
-      </div>
-      <div id="listingShipBadge" style="display:none;align-items:center;justify-content:center;gap:10px;margin:0 0 18px;">
-        <img src="expedition-possible%20(1).png" alt="" width="180" height="173">
-        <strong style="color:var(--leaf-deep);font-size:1.5rem;">Livraison possible</strong>
       </div>
       <p class="product-trust-note" id="listingTrustNote" style="margin-top:20px;text-align:left;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:20px;height:20px;flex-shrink:0;"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/></svg>
@@ -653,6 +653,8 @@
   .info-box #listingTrustNote { padding:8px 12px !important; margin-top:6px !important; font-size:0.8rem; }
   .info-box #listingPickup, .info-box #listingShip { margin-bottom:6px; }
   .info-box #listingPickupLines { line-height:1.4 !important; }
+  .info-box #listingShipLines { line-height:1.4 !important; }
+  .info-box #listingShipNote { margin-top:4px !important; font-size:0.78rem !important; line-height:1.35; }
   .info-box .seller-card-btn { margin-top:8px; padding:7px 18px; }
   .info-box .seller-card-avatar { width:40px; height:40px; font-size:1.1rem; }
   .info-box .info-title { margin-bottom:6px; }

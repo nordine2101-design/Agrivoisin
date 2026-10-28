@@ -11,6 +11,7 @@
   .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#A5E06A 0%,#CDF0A6 50%,#F6FCEE 100%); }
   .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
   .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#CDF0A6; color:#1F4D00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1::before { content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:calc(50% + 2px); box-sizing:border-box; border:2px solid #fff; border-bottom:none; border-radius:999px 999px 0 0; pointer-events:none; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-form-box { max-width:420px; margin:0 auto; text-align:left; }
   .my-video { width:500px; flex-shrink:0; position:sticky; top:20px; box-sizing:border-box; padding:10px; background:var(--cream-soft); border-radius:28px; }

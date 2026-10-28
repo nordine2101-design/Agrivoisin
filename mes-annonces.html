@@ -439,7 +439,7 @@
   function renderAll() {
     summaryEl.textContent = summaryText();
     if (allListings.length === 0) {
-      container.innerHTML = '<p class="my-empty">Vous n\'avez pas encore publié d\'annonce. Cliquez sur « Publier une annonce » pour mettre votre première récolte en vente.</p>';
+      container.innerHTML = '<p class="my-empty">Votre étal est encore vide. Cliquez sur « Publier une annonce » pour mettre votre premier produit en vente.</p>';
       return;
     }
     container.innerHTML = allListings.map(buildListingCardHtml).join('');

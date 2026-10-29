@@ -51,6 +51,7 @@
         <div class="info-box">
           <h2 class="info-title">Description</h2>
       <p id="listingFreshness" style="display:none;font-weight:600;color:var(--leaf-deep);margin-bottom:8px;"></p>
+      <div id="listingBio" class="bio-line" style="display:none;"><span class="bio-big">BIO <span class="bio-text">Agriculture biologique</span></span></div>
       <p id="listingDescription" style="line-height:1.5;margin-bottom:22px;"></p>
         </div>
         <div class="info-box">
@@ -344,6 +345,11 @@
 
     document.getElementById('listingTag').textContent = item.subcategory || item.category || 'Récolte';
     document.getElementById('listingTitle').textContent = item.title;
+
+    // Produit bio (réservé aux professionnels) : indiqué dans le cadre Description, comme la fraîcheur
+    if (item.is_bio === true) {
+      document.getElementById('listingBio').style.display = 'flex';
+    }
 
     const freshness = freshnessInfo(item.harvest_date);
     if (freshness) {
@@ -687,6 +693,9 @@
   #listingLegalName::after { content:" \2014 "; }
   .info-box .freshness-icon { width:90px; height:90px; }
   .info-box #listingFreshness { margin-bottom:4px !important; }
+  .bio-line { justify-content:center; margin:6px 0 12px; }
+  .bio-line .bio-big { display:inline-flex; align-items:center; gap:8px; background:#fff; border:2px solid #2F8F3A; color:#2F8F3A; border-radius:999px; padding:6px 18px; font-weight:800; font-size:1.05rem; letter-spacing:0.06em; }
+  .bio-line .bio-text { font-weight:600; letter-spacing:0; font-size:0.85rem; }
   .info-box #listingShipBadge { margin:0 0 8px !important; gap:8px !important; }
   .info-box #listingShipBadge img { width:130px; height:auto; }
   .info-box #listingShipBadge strong { font-size:1.4rem !important; line-height:1.1 !important; }

@@ -44,6 +44,7 @@
         <label class="type-check"><input type="checkbox" id="typeParticulier"><span>Particuliers</span></label>
         <label class="type-check"><input type="checkbox" id="typeProfessionnel"><span>Professionnels</span></label>
         <a class="fav-link" href="favoris.html"><img src="favori-banane-epluchee.png" alt="" width="26" height="26"><span>Favoris</span><img src="cerise-pleine.png" alt="" width="26" height="26"></a>
+        <button type="button" class="map-pill" id="mapToggle" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" fill="currentColor"/></svg><span>Carte</span></button>
       </div>
     </div>
     <p id="buyerCityDisplay" style="display:none;font-size:0.8rem;color:#4C7A50;margin-top:6px;"></p>
@@ -65,8 +66,26 @@
   </div>
 </section>
 
+<!-- ============ CARTE DES ANNONCES ============ -->
+<section id="mapSection" class="map-section" style="display:none;">
+  <div class="container">
+    <div class="map-bar" role="group" aria-label="Rayon autour de votre ville">
+      <span class="map-bar-label">Rayon :</span>
+      <label class="type-check"><input type="radio" name="mapRadius" value="2"><span>2 km</span></label>
+      <label class="type-check"><input type="radio" name="mapRadius" value="5"><span>5 km</span></label>
+      <label class="type-check"><input type="radio" name="mapRadius" value="10" checked><span>10 km</span></label>
+      <label class="type-check"><input type="radio" name="mapRadius" value="20"><span>20 km</span></label>
+      <label class="type-check"><input type="checkbox" id="mapBio"><span>Bio</span></label>
+    </div>
+    <p id="mapCount" class="map-count"></p>
+    <div id="mapNeedCity" class="map-need-city" style="display:none;">Indiquez votre ville ci-dessus, puis cliquez sur « Valider » : la carte montrera les annonces autour de chez vous.</div>
+    <div id="map" class="map-box"></div>
+    <p class="map-note">Chaque annonce est placée au centre de la commune du vendeur, jamais à son adresse. Rouge : professionnel. Vert : particulier. Point bleu : vous.</p>
+  </div>
+</section>
+
 <!-- ============ GRILLE D'ANNONCES ============ -->
-<section class="listings-section">
+<section class="listings-section" id="listingsSection">
   <div class="container">
     <div id="realListingsContainer" class="produce-grid listings-grid"></div>
     <p id="noListingsMessage" style="display:none;text-align:center;margin-top:24px;">Aucune annonce ne correspond à votre recherche pour le moment.</p>
@@ -315,6 +334,7 @@
   });
 
   function renderListings() {
+    if (mapOn) { renderMap(); return; }
     container.innerHTML = '';
 
     let filtered = currentCategory === 'Tout'
@@ -683,6 +703,154 @@
     } catch (err) {}
   })();
 
+  // ---------- Carte des annonces ----------
+  // Elle montre seulement les annonces qui correspondent aux filtres (produit, catégorie, type de vendeur, Bio)
+  // et qui sont dans le rayon choisi autour de la ville de l'acheteur. Une étiquette par annonce.
+  let mapOn = false;
+  let leafletMap = null;
+  let mapLayer = null;
+  let leafletLoading = null;
+  const MAP_MAX_LABELS = 40;
+  const mapToggle = document.getElementById('mapToggle');
+  const mapSection = document.getElementById('mapSection');
+  const listingsSection = document.getElementById('listingsSection');
+  const mapBio = document.getElementById('mapBio');
+  const mapCount = document.getElementById('mapCount');
+  const mapNeedCity = document.getElementById('mapNeedCity');
+  const mapBox = document.getElementById('map');
+
+  function loadLeaflet() {
+    if (window.L) return Promise.resolve();
+    if (leafletLoading) return leafletLoading;
+    leafletLoading = new Promise((resolve, reject) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';
+      document.head.appendChild(css);
+      const js = document.createElement('script');
+      js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
+      js.onload = resolve;
+      js.onerror = () => { leafletLoading = null; reject(new Error('leaflet')); };
+      document.head.appendChild(js);
+    });
+    return leafletLoading;
+  }
+
+  function currentRadius() {
+    const r = document.querySelector('input[name="mapRadius"]:checked');
+    return r ? Number(r.value) : 10;
+  }
+
+  function mapListings() {
+    const radius = currentRadius();
+    return allListings.filter((item) => {
+      if (currentCategory !== 'Tout' && item.category !== currentCategory) return false;
+      if (!matchesSearch(item, currentSearch)) return false;
+      if (typeParticulier.checked || typeProfessionnel.checked) {
+        const isPro = item.sellers && item.sellers.seller_type === 'professionnel';
+        if (isPro ? !typeProfessionnel.checked : !typeParticulier.checked) return false;
+      }
+      if (mapBio.checked && item.is_bio !== true) return false;
+      const d = getDistanceForListing(item);
+      return d !== null && d <= radius;
+    }).sort((a, b) => getDistanceForListing(a) - getDistanceForListing(b));
+  }
+
+  function shortTitle(t) {
+    t = String(t || '');
+    return t.length > 22 ? t.slice(0, 21).trim() + '…' : t;
+  }
+
+  function popupHtml(item) {
+    const d = getDistanceForListing(item);
+    const city = item.sellers && item.sellers.city ? item.sellers.city : '';
+    const dist = d < 1 ? Math.round(d * 1000) + ' m' : d.toFixed(1).replace('.', ',') + ' km';
+    const price = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + (item.unit || 'kg');
+    const isPro = item.sellers && item.sellers.seller_type === 'professionnel';
+    const photo = item.image_url ? '<img class="map-pop-photo" src="' + escapeHtml(item.image_url) + '" alt="">' : '';
+    return photo +
+      '<div class="map-pop-title">' + escapeHtml(item.title) + (item.is_bio === true ? ' <span class="bio-pill">BIO</span>' : '') + '</div>' +
+      '<div class="map-pop-sub">' + escapeHtml(city) + ' · à ' + dist + ' · ' + (isPro ? 'Professionnel' : 'Particulier') + '</div>' +
+      '<div class="map-pop-price">' + price + '</div>' +
+      '<a class="map-pop-btn" href="produit.html?id=' + encodeURIComponent(item.id) + '">Voir l\'annonce</a>';
+  }
+
+  function renderMap() {
+    if (!buyerLocation) {
+      mapBox.style.display = 'none';
+      mapCount.textContent = '';
+      mapNeedCity.style.display = 'block';
+      return;
+    }
+    mapNeedCity.style.display = 'none';
+    mapBox.style.display = 'block';
+    loadLeaflet().then(() => {
+      if (!mapOn) return;
+      const radius = currentRadius();
+      if (!leafletMap) {
+        leafletMap = L.map(mapBox, { scrollWheelZoom: false });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 18,
+          attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+        }).addTo(leafletMap);
+        mapLayer = L.layerGroup().addTo(leafletMap);
+      }
+      mapLayer.clearLayers();
+      const center = [buyerLocation.lat, buyerLocation.lng];
+      L.circle(center, { radius: radius * 1000, color: '#4169E1', weight: 2, dashArray: '6 6', fillColor: '#4169E1', fillOpacity: 0.06, interactive: false }).addTo(mapLayer);
+      L.circleMarker(center, { radius: 7, color: '#fff', weight: 2, fillColor: '#4169E1', fillOpacity: 1, interactive: false }).addTo(mapLayer);
+
+      const list = mapListings();
+      const shown = list.slice(0, MAP_MAX_LABELS);
+
+      // Les annonces d'une même commune ont le même point : on empile leurs étiquettes l'une sous l'autre
+      const groups = {};
+      shown.forEach((item) => {
+        const key = item.sellers.latitude + ',' + item.sellers.longitude;
+        (groups[key] = groups[key] || []).push(item);
+      });
+      Object.keys(groups).forEach((key) => {
+        const items = groups[key];
+        items.forEach((item, i) => {
+          const isPro = item.sellers.seller_type === 'professionnel';
+          const html = '<span class="map-label ' + (isPro ? 'is-pro' : 'is-part') + '" style="transform:translate(-50%,' + (i * 30 - 14) + 'px)">' + escapeHtml(shortTitle(item.title)) +
+            (item.is_bio === true ? ' <span class="map-label-bio">BIO</span>' : '') +
+            ' · ' + Number(item.price).toFixed(2).replace('.', ',') + ' €/' + escapeHtml(item.unit || 'kg') + '</span>';
+          const icon = L.divIcon({ className: 'map-label-wrap', html: html, iconSize: null, iconAnchor: [0, 0] });
+          const marker = L.marker([item.sellers.latitude, item.sellers.longitude], { icon: icon, keyboard: true });
+          marker.bindPopup(popupHtml(item), { className: 'map-popup', maxWidth: 240, minWidth: 200 });
+          marker.addTo(mapLayer);
+        });
+      });
+      leafletMap.invalidateSize();
+      leafletMap.fitBounds(L.latLng(center).toBounds(radius * 2000), { padding: [20, 20] });
+
+      const city = buyerLocation.city || 'votre ville';
+      if (list.length === 0) {
+        mapCount.textContent = 'Aucune annonce dans un rayon de ' + radius + ' km autour de ' + city + '. Essayez un rayon plus grand.';
+      } else {
+        mapCount.textContent = list.length + (list.length > 1 ? ' annonces' : ' annonce') + ' dans un rayon de ' + radius + ' km autour de ' + city +
+          (list.length > MAP_MAX_LABELS ? ' (les ' + MAP_MAX_LABELS + ' plus proches sont affichées : précisez votre recherche)' : '') + '.';
+      }
+    }).catch((err) => {
+      console.error('Erreur carte :', err);
+      mapCount.textContent = 'La carte ne peut pas s\'afficher pour le moment.';
+    });
+  }
+
+  function setMapMode(on) {
+    mapOn = on;
+    mapToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+    mapToggle.classList.toggle('is-on', on);
+    mapSection.style.display = on ? 'block' : 'none';
+    listingsSection.style.display = on ? 'none' : '';
+    renderListings();
+  }
+
+  mapToggle.addEventListener('click', () => setMapMode(!mapOn));
+  document.querySelectorAll('input[name="mapRadius"]').forEach((r) => r.addEventListener('change', renderMap));
+  mapBio.addEventListener('change', renderMap);
+
   loadBuyerLocation();
   loadFavorites();
 
@@ -782,6 +950,30 @@
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
   #favToast a { color:#FFD21F; font-weight:700; }
+  /* Carte des annonces */
+  .map-pill { position:relative; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; user-select:none; }
+  .map-pill.is-on { background:#fff; border-color:#7CCB86; box-shadow:none; color:#3E9B4D; }
+  .map-pill:focus-visible { outline:2px solid #7CCB86; outline-offset:2px; }
+  .map-section { padding:6px 0 40px; }
+  .map-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0 10px; }
+  .map-bar-label { font-weight:700; color:#4C7A50; margin-right:2px; }
+  .map-count { font-size:0.9rem; font-weight:700; color:#4C7A50; margin:0 0 10px; min-height:1.2em; }
+  .map-box { height:560px; border-radius:28px; overflow:hidden; box-shadow:var(--shadow-soft); position:relative; z-index:0; isolation:isolate; background:#E8F0E4; }
+  @media (max-width: 700px) { .map-box { height:440px; } }
+  .map-need-city { padding:26px; border-radius:28px; background:#EAF3E8; color:#2F5A33; font-weight:700; text-align:center; }
+  .map-note { font-size:0.8rem; color:#6B5842; margin:10px 0 0; }
+  .map-label-wrap { background:none; border:0; width:auto !important; height:auto !important; }
+  .map-label { display:inline-block; white-space:nowrap; padding:5px 12px; border-radius:999px; border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.3); color:#fff; font-size:0.8rem; font-weight:700; cursor:pointer; }
+  .map-label.is-pro { background:#C8352F; }
+  .map-label.is-part { background:#3E9B4D; }
+  .map-label-bio { display:inline-block; background:#fff; color:#2F8F3A; border-radius:999px; padding:0 6px; font-size:0.65rem; font-weight:800; letter-spacing:0.04em; }
+  .map-popup .leaflet-popup-content-wrapper { border-radius:18px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+  .map-popup .leaflet-popup-content { margin:12px; font-family:inherit; }
+  .map-pop-photo { display:block; width:100%; height:110px; object-fit:cover; border-radius:12px; margin-bottom:8px; }
+  .map-pop-title { font-family:var(--font-display); font-size:1.05rem; color:#2F5A33; line-height:1.25; margin-bottom:4px; }
+  .map-pop-sub { font-size:0.8rem; color:#6B5842; margin-bottom:6px; }
+  .map-pop-price { font-weight:700; color:#2F5A33; margin-bottom:8px; }
+  .map-pop a.map-pop-btn, .map-popup a.map-pop-btn { display:block; text-align:center; padding:9px 14px; border-radius:999px; background:#E8915A; color:#fff !important; font-weight:700; font-size:0.9rem; text-decoration:none; }
   .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; margin-left:90px; }
   @media (max-width: 900px) { .seller-type-filter { margin-left:0; } }
   .type-check { position:relative; display:inline-flex; align-items:center; padding:9px 18px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; user-select:none; }

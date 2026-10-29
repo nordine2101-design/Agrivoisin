@@ -591,7 +591,47 @@
 
     loadingMessage.style.display = 'none';
     detailEl.style.display = 'block';
+    fitListingTitle();
   }
+
+  // Le titre s'adapte toujours : il ne cache jamais la catégorie (en haut à droite) ni le bouton Retour.
+  // Il se place dans la place libre, passe sur 2 lignes si besoin, puis rapetisse un peu si nécessaire.
+  function fitListingTitle() {
+    const pill = document.getElementById('listingTitle');
+    const chip = document.getElementById('listingTag');
+    const back = document.getElementById('backLink');
+    if (!pill || !chip || !back || !pill.offsetParent || detailEl.style.display === 'none') return;
+    const BASE = 38.4, MIN = 18, GAP = 14;
+    const panel = pill.offsetParent.getBoundingClientRect();
+    pill.style.left = '';
+    pill.style.maxWidth = 'none';
+    pill.style.fontSize = BASE + 'px';
+    const natural = pill.getBoundingClientRect().width;
+    const center = panel.width / 2;
+    const free = {
+      left: back.getBoundingClientRect().right - panel.left + GAP,
+      right: chip.getBoundingClientRect().left - panel.left - GAP,
+    };
+    const symmetric = 2 * Math.min(center - free.left, free.right - center);
+    let maxWidth, middle;
+    if (symmetric >= Math.min(natural, 250)) {
+      maxWidth = Math.min(520, symmetric);
+      middle = center;
+    } else {
+      maxWidth = Math.max(160, Math.min(520, free.right - free.left));
+      middle = (free.left + free.right) / 2;
+    }
+    pill.style.maxWidth = maxWidth + 'px';
+    pill.style.left = middle + 'px';
+    let size = BASE;
+    while (size > MIN && pill.getBoundingClientRect().height > size * 2.3 + 12) {
+      size -= 1;
+      pill.style.fontSize = size + 'px';
+    }
+  }
+  window.addEventListener('resize', fitListingTitle);
+  window.addEventListener('load', fitListingTitle);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitListingTitle);
 
   // Sur téléphone (pas de souris) : un toucher sur les flocons ouvre ou ferme l'encadré, un toucher ailleurs le ferme
   document.addEventListener('click', (e) => {

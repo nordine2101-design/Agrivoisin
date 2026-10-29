@@ -47,6 +47,13 @@
         </label>
       </div>
 
+      <div id="bioWrap" style="display:none;text-align:left;background:var(--cream-soft);border-radius:10px;padding:12px;">
+        <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:0.9rem;background:none;color:var(--soil);padding:0;border-radius:0;">
+          <input type="checkbox" id="isBio" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;">
+          <span><strong>Produit bio</strong> (réservé aux professionnels) : mon produit est certifié agriculture biologique. La mention « Bio » sera affichée sur l'annonce.</span>
+        </label>
+      </div>
+
       <label for="description">Description</label>
       <input type="text" id="description" placeholder="Décrivez votre récolte">
 
@@ -222,6 +229,11 @@
     document.getElementById('proAttestWrap').style.display = needed ? '' : 'none';
     document.getElementById('proAttest').required = needed;
     if (!needed) document.getElementById('proAttest').checked = false;
+
+    // La case « Bio » n'existe que pour un professionnel
+    const isPro = currentSellerType === 'professionnel';
+    document.getElementById('bioWrap').style.display = isPro ? '' : 'none';
+    if (!isPro) document.getElementById('isBio').checked = false;
   }
 
   // ---------- Mode de remise et frais d'expédition (professionnels, produits qui se conservent) ----------
@@ -1084,6 +1096,7 @@
         pickupHours: pickup.rows,
         quantity: quantityValue,
         proAttest: document.getElementById('proAttest').checked,
+        isBio: currentSellerType === 'professionnel' && document.getElementById('isBio').checked,
         deliveryMode: mode,
         shippingTiers: shipping.tiers,
       };
@@ -1113,6 +1126,7 @@
       harvestDateHint.style.display = 'none';
       photoPreviewWrap.style.display = 'none';
       document.getElementById('proAttestWrap').style.display = 'none';
+      document.getElementById('bioWrap').style.display = currentSellerType === 'professionnel' ? '' : 'none';
       resetDelivery();
       resetUnitPicker();
       buildPickupDays();

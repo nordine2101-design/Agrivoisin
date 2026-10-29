@@ -149,7 +149,7 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
-    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers, multiParcel } = req.body;
+    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers, multiParcel, isBio } = req.body;
 
     // 1. Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
@@ -190,6 +190,15 @@ export default async function handler(req, res) {
         });
       }
       proAttestedAt = new Date().toISOString();
+    }
+
+    // 2 quater. La mention « Bio » est réservée aux professionnels (label officiel)
+    let bio = false;
+    if (isBio === true) {
+      if (seller.seller_type !== 'professionnel') {
+        return res.status(400).json({ error: 'La mention « Bio » est réservée aux vendeurs professionnels.' });
+      }
+      bio = true;
     }
 
     // 3. Le mode de remise : retrait (par défaut), expédition, ou les deux.
@@ -246,6 +255,7 @@ export default async function handler(req, res) {
         image_url: imageUrl,
         quantity_available: stock.quantity,
         pro_attested_at: proAttestedAt,
+        is_bio: bio,
         delivery_mode: mode,
         shipping_tiers: shipping.tiers,
         multi_parcel: acceptsMultiParcel,

@@ -36,9 +36,9 @@
         <option value="" disabled selected>Choisissez une sous-catégorie</option>
       </select>
 
-      <label for="harvestDate" id="harvestDateLabel" style="display:none;">Date de récolte</label>
-      <input type="date" id="harvestDate" style="display:none;">
-      <p id="harvestDateHint" style="display:none;font-size:0.85em;color:#888;margin-top:-8px;">Cette date détermine le niveau de fraîcheur affiché sur votre annonce.</p>
+      <label for="harvestDate" id="harvestDateLabel" style="display:none;">Date et heure de récolte</label>
+      <input type="datetime-local" id="harvestDate" style="display:none;">
+      <p id="harvestDateHint" style="display:none;font-size:0.85em;color:#888;margin-top:-8px;">Cette date et cette heure déterminent le niveau de fraîcheur affiché sur votre annonce : « Très frais » pendant 24 h après la récolte.</p>
 
       <div id="proAttestWrap" style="display:none;text-align:left;background:var(--cream-soft);border-radius:10px;padding:12px;">
         <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:0.9rem;background:none;color:var(--soil);padding:0;border-radius:0;">
@@ -621,7 +621,7 @@
       harvestDateLabel.style.display = '';
       harvestDateHint.style.display = '';
       harvestDateInput.required = true;
-      harvestDateInput.max = new Date().toISOString().split('T')[0];
+      harvestDateInput.max = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     } else {
       harvestDateInput.style.display = 'none';
       harvestDateLabel.style.display = 'none';
@@ -1088,7 +1088,8 @@
         title: document.getElementById('title').value,
         category: document.getElementById('category').value,
         subcategory: document.getElementById('subcategory').value || null,
-        harvestDate: document.getElementById('harvestDate').value || null,
+        harvestDate: document.getElementById('harvestDate').value ? document.getElementById('harvestDate').value.slice(0, 10) : null,
+        harvestAt: document.getElementById('harvestDate').value ? new Date(document.getElementById('harvestDate').value).toISOString() : null,
         description: document.getElementById('description').value,
         price: parseFloat(document.getElementById('price').value),
         unit: document.getElementById('unit').value,

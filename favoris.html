@@ -147,9 +147,11 @@
     return cart.filter((c) => String(c.listingId) === String(listingId)).length;
   }
 
-  function freshnessInfo(harvestDate) {
-    if (!harvestDate) return null;
-    const harvest = new Date(harvestDate + 'T00:00:00');
+  // La fraîcheur se calcule à partir de l'heure de récolte indiquée par le vendeur ;
+  // pour les anciennes annonces (sans heure), on compte à partir du début du jour de récolte.
+  function freshnessInfo(harvestDate, harvestAt) {
+    if (!harvestDate && !harvestAt) return null;
+    const harvest = harvestAt ? new Date(harvestAt) : new Date(harvestDate + 'T00:00:00');
     const now = new Date();
     const hoursSince = (now - harvest) / (1000 * 60 * 60);
 
@@ -245,7 +247,7 @@
       card.className = 'produce-card';
       card.dataset.kind = (item.sellers && item.sellers.seller_type === 'professionnel') ? 'pro' : 'part';
 
-      const freshness = freshnessInfo(item.harvest_date);
+      const freshness = freshnessInfo(item.harvest_date, item.harvest_at);
       const freshnessHtml = freshness
         ? `<p class="freshness-badge" title="${freshness.label}"><span class="freshness-icons">${freshnessIconsHtml(freshness.stars)}</span><span class="freshness-label">${freshness.label}</span></p>`
         : '';

@@ -427,7 +427,7 @@
           <img src="${escapeHtml(item.image_url || 'agrivoisin-logo-final.png')}" alt="${escapeHtml(item.title)}">
         </a>
         <div class="produce-card-body">
-          <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${promoPill}${lotPill}
+          <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${item.is_bio === true ? '<span class="bio-pill">BIO</span>' : ''}${promoPill}${lotPill}
           <div class="title-row">
             <h4><a href="produit.html?id=${escapeHtml(item.id)}">${escapeHtml(item.title)}</a></h4>
             <button type="button" class="fav-btn${isFav ? ' is-fav' : ''}" data-listing-id="${escapeHtml(item.id)}" aria-pressed="${isFav ? 'true' : 'false'}" aria-label="${isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}">
@@ -790,6 +790,7 @@
   .type-check:has(input:focus-visible) { outline:2px solid #7CCB86; outline-offset:2px; }
 
   /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone), chaque rangée sur son fond */
+  .bio-pill { display:inline-block; margin-left:6px; background:#fff; border:2px solid #2F8F3A; color:#2F8F3A; border-radius:999px; padding:2px 10px; font-weight:800; font-size:0.72rem; letter-spacing:0.05em; vertical-align:middle; }
   .listings-grid { display: block; }
   .listings-grid .row-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 22px; margin: 0 -22px; border-radius: 24px; }
   .listings-grid .row-band-rose { background: #FCE4EC; }

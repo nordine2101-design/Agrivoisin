@@ -51,7 +51,7 @@
 <section class="hero" style="padding-top:0;">
   <div class="hero-content" style="padding-top:20px;">
     <h1>Le surplus de <em>votre</em> jardin devient le régal <em>d'un voisin</em></h1>
-    <p>Agrivoisin relie les jardiniers particuliers qui récoltent plus qu'ils ne consomment aux voisins qui rêvent de légumes fraîchement cueillis. Simple, local, et payé en toute sécurité avant même de connaître l'adresse du vendeur.</p>
+    <p id="heroText">Agrivoisin relie les jardiniers particuliers qui récoltent plus qu'ils ne consomment aux voisins qui rêvent de légumes fraîchement cueillis. Simple, local, et payé en toute sécurité avant même de connaître l'adresse du vendeur.</p>
     <div class="hero-cta">
       <a href="annonces.html" class="btn btn-primary">Découvrir les annonces</a>
       <a href="inscription.html" class="btn btn-outline-light">Créer un compte</a>
@@ -397,6 +397,19 @@
 
   updateCartCount();
   window.addEventListener('pageshow', updateCartCount);
+
+  // Au premier affichage, on ne voit que la bannière et le titre : la phrase et les boutons apparaissent en descendant
+  function placeHeroText() {
+    var text = document.getElementById('heroText');
+    if (!text) return;
+    text.style.marginTop = '';
+    var top = text.getBoundingClientRect().top + window.pageYOffset;
+    var gap = window.innerHeight - top + 24;
+    if (gap > 0) text.style.marginTop = gap + 'px';
+  }
+  window.addEventListener('load', placeHeroText);
+  window.addEventListener('resize', placeHeroText);
+  placeHeroText();
 
   const supabaseClient = window.supabase.createClient(
     'https://eipksfszadhratfvavvs.supabase.co',

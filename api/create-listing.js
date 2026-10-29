@@ -149,7 +149,20 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
-    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers, multiParcel, isBio } = req.body;
+    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers, multiParcel, isBio, harvestAt } = req.body;
+
+    // 0. Date et heure de la récolte (elles servent à calculer la fraîcheur affichée sur l'annonce)
+    let harvestMoment = null;
+    if (harvestAt != null && harvestAt !== '') {
+      const parsed = new Date(harvestAt);
+      if (Number.isNaN(parsed.getTime())) {
+        return res.status(400).json({ error: "La date et l'heure de récolte ne sont pas valides." });
+      }
+      if (parsed.getTime() > Date.now() + 5 * 60 * 1000) {
+        return res.status(400).json({ error: "La récolte ne peut pas être dans le futur." });
+      }
+      harvestMoment = parsed.toISOString();
+    }
 
     // 1. Retrouver le vendeur lié à ce compte connecté
     const { data: seller, error: sellerError } = await supabase
@@ -251,7 +264,8 @@ export default async function handler(req, res) {
         unit,
         category,
         subcategory,
-        harvest_date: harvestDate,
+        harvest_date: harvestDate || (harvestMoment ? harvestMoment.slice(0, 10) : harvestDate),
+        harvest_at: harvestMoment,
         image_url: imageUrl,
         quantity_available: stock.quantity,
         pro_attested_at: proAttestedAt,

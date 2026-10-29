@@ -398,14 +398,24 @@
   updateCartCount();
   window.addEventListener('pageshow', updateCartCount);
 
-  // Au premier affichage, on ne voit que la bannière et le titre : la phrase et les boutons apparaissent en descendant
+  // Au premier affichage, on ne voit rien de coupé : la bannière, puis le titre en entier si la place le permet.
+  // Si le titre ne tient pas en entier, il apparaît en descendant, avec la phrase et les boutons.
   function placeHeroText() {
+    var title = document.querySelector('.hero h1');
     var text = document.getElementById('heroText');
-    if (!text) return;
+    if (!title || !text) return;
+    title.style.marginTop = '';
     text.style.marginTop = '';
-    var top = text.getBoundingClientRect().top + window.pageYOffset;
-    var gap = window.innerHeight - top + 24;
-    if (gap > 0) text.style.marginTop = gap + 'px';
+    var screen = window.innerHeight;
+    var titleRect = title.getBoundingClientRect();
+    var titleTop = titleRect.top + window.pageYOffset;
+    if (titleRect.bottom + window.pageYOffset > screen - 8) {
+      title.style.marginTop = (screen - titleTop + 24) + 'px';
+    } else {
+      var textTop = text.getBoundingClientRect().top + window.pageYOffset;
+      var gap = screen - textTop + 24;
+      if (gap > 0) text.style.marginTop = gap + 'px';
+    }
   }
   window.addEventListener('load', placeHeroText);
   window.addEventListener('resize', placeHeroText);

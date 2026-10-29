@@ -164,9 +164,11 @@
     errorMessage.style.display = 'block';
   }
 
-  function freshnessInfo(harvestDate) {
-    if (!harvestDate) return null;
-    const harvest = new Date(harvestDate + 'T00:00:00');
+  // La fraîcheur se calcule à partir de l'heure de récolte indiquée par le vendeur ;
+  // pour les anciennes annonces (sans heure), on compte à partir du début du jour de récolte.
+  function freshnessInfo(harvestDate, harvestAt) {
+    if (!harvestDate && !harvestAt) return null;
+    const harvest = harvestAt ? new Date(harvestAt) : new Date(harvestDate + 'T00:00:00');
     const hoursSince = (new Date() - harvest) / (1000 * 60 * 60);
     if (hoursSince < 24) return { stars: 3, label: 'Très frais' };
     if (hoursSince < 48) return { stars: 2, label: 'Frais' };
@@ -351,7 +353,7 @@
       document.getElementById('listingBio').style.display = 'flex';
     }
 
-    const freshness = freshnessInfo(item.harvest_date);
+    const freshness = freshnessInfo(item.harvest_date, item.harvest_at);
     if (freshness) {
       const el = document.getElementById('listingFreshness');
       // Le flocon de neige d'Agrivoisin, répété 1, 2 ou 3 fois (à la place des étoiles), puis le texte.

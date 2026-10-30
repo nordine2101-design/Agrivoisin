@@ -67,12 +67,12 @@ async function loadProNames(sellerIds) {
   return names;
 }
 
-// Applique la promotion en cours (réservée aux vendeurs professionnels, début et fin inclus).
+// Applique la promotion en cours (début et fin inclus).
 // Les champs de promotion ne sont jamais envoyés tels quels au navigateur.
 function withCurrentPrice(item) {
   const { promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, ...rest } = item;
   const seller = Array.isArray(item.sellers) ? item.sellers[0] : item.sellers;
-  if (!seller || seller.seller_type !== 'professionnel') return rest;
+  if (!seller) return rest;
 
   // Un lot (par exemple 3 kg pour 7 €) : le prix à l'unité ne change pas, le navigateur reçoit la quantité et le prix du lot.
   // Il suit les mêmes dates qu'une promotion, et une annonce n'a qu'une seule offre à la fois.

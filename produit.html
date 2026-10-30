@@ -606,7 +606,7 @@
 
   // Le titre s'adapte toujours : il ne cache jamais la catégorie (en haut à droite) ni le bouton Retour.
   // Il se place dans la place libre, passe sur 2 lignes si besoin, puis rapetisse un peu si nécessaire.
-  function fitListingTitle() {
+  function fitListingTitleCore() {
     const pill = document.getElementById('listingTitle');
     const chip = document.getElementById('listingTag');
     const back = document.getElementById('backLink');
@@ -637,6 +637,21 @@
     while (size > MIN && pill.getBoundingClientRect().height > size * 2.3 + 12) {
       size -= 1;
       pill.style.fontSize = size + 'px';
+    }
+  }
+  // Les 4 cases doivent toujours tenir à l'écran sans défiler : si l'écran est trop petit, la fiche se réduit juste assez.
+  function fitListingTitle() {
+    const grid = document.querySelector('.info-grid');
+    const panel = grid ? grid.offsetParent : null;
+    if (!panel || !panel.offsetParent || detailEl.style.display === 'none') { fitListingTitleCore(); return; }
+    panel.style.zoom = '';
+    fitListingTitleCore();
+    const top = panel.getBoundingClientRect().top + window.scrollY;
+    const bottom = grid.getBoundingClientRect().bottom + window.scrollY;
+    const room = window.innerHeight - top - 28;
+    const needed = bottom - top;
+    if (needed > room && room > 0) {
+      panel.style.zoom = Math.max(0.45, room / needed);
     }
   }
   window.addEventListener('resize', fitListingTitle);

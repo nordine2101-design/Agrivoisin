@@ -151,6 +151,7 @@
 
       <label for="sellerAddress" id="sellerAddressLabel" style="display:none;">Adresse complète (sera communiquée à l'acheteur après paiement uniquement)</label>
       <input type="text" id="sellerAddress" placeholder="Ex : 12 rue des Jardins, 75000 Paris" style="display:none;">
+      <p id="sellerAddressNote" class="seller-address-note" style="display:none;"><strong>À savoir :</strong> cette adresse est celle où les acheteurs viendront chercher leurs commandes. Elle ne leur est communiquée qu'après le paiement.</p>
 
       <label style="display:flex;align-items:flex-start;gap:10px;margin:18px 0 6px;font-weight:400;font-size:0.92rem;line-height:1.5;cursor:pointer;">
         <input type="checkbox" id="acceptTerms" required style="width:auto;margin:4px 0 0;flex-shrink:0;">
@@ -275,6 +276,7 @@
   .my-panel .auth-form p[style*="cream-soft"] { background:#FFF5F8 !important; }
   .my-panel .auth-switch a { color:#C2185B; }
   .pw-eye:focus-visible { outline-color:#EC407A; }
+  .seller-address-note { margin:-4px 0 4px; padding:10px 12px; border-radius:10px; background:var(--cream-soft); font-size:0.85rem; line-height:1.4; color:var(--soil); text-align:left; }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(
@@ -374,6 +376,7 @@
       if (selectedType === 'jardinier') {
         sellerAddressLabel.style.display = '';
         sellerAddressInput.style.display = '';
+        document.getElementById('sellerAddressNote').style.display = '';
         sellerAddressInput.required = true;
         postalCodeLabel.style.display = '';
         postalCodeInput.style.display = '';
@@ -384,6 +387,7 @@
       } else {
         sellerAddressLabel.style.display = 'none';
         sellerAddressInput.style.display = 'none';
+        document.getElementById('sellerAddressNote').style.display = 'none';
         sellerAddressInput.required = false;
         postalCodeLabel.style.display = 'none';
         postalCodeInput.style.display = 'none';

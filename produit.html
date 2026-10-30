@@ -529,7 +529,7 @@
     imageEl.style.maxHeight = '533px';
     imageEl.style.borderRadius = '28px';
 
-    // Stock : « Plus que 3 kg » / « Épuisé », et le bouton se grise s'il n'y en a plus ou si le panier contient déjà tout
+    // Stock : « Plus que 3 kg » / « Épuisé ». Le bouton devient vert « Dans mon panier » quand l'annonce est dans le panier ; un clic dessus l'enlève.
     const stock = item.quantity_available == null ? null : Number(item.quantity_available);
     const stockEl = document.getElementById('listingStock');
     const stockNoteEl = document.getElementById('listingStockNote');
@@ -540,35 +540,33 @@
     }
 
     function refreshStock() {
+      const inCart = unitsInCart() > 0;
       stockEl.style.display = 'none';
       stockNoteEl.style.display = 'none';
 
-      if (stock === null) {
-        addBtn.disabled = false;
-        return;
-      }
-
-      if (stock <= 0) {
+      if (stock !== null && stock <= 0) {
         stockEl.textContent = 'Épuisé';
         stockEl.style.color = '#C8352F';
         stockEl.style.display = 'block';
-        addBtn.disabled = true;
-        addBtn.textContent = 'Épuisé';
-        return;
-      }
-
-      if (stock <= LOW_STOCK_THRESHOLD) {
+      } else if (stock !== null && stock <= LOW_STOCK_THRESHOLD) {
         stockEl.textContent = 'Plus que ' + stock + ' ' + unitLabel(item.unit, stock);
         stockEl.style.color = '#C26A1E';
         stockEl.style.display = 'block';
       }
 
-      if (unitsInCart() >= stock) {
+      addBtn.classList.toggle('in-cart', inCart);
+      addBtn.setAttribute('aria-pressed', inCart ? 'true' : 'false');
+      viewCartLink.style.display = inCart ? 'inline-block' : 'none';
+
+      if (inCart) {
+        addBtn.disabled = false;
+        addBtn.textContent = '✓ Dans mon panier';
+      } else if (stock !== null && stock <= 0) {
         addBtn.disabled = true;
-        stockNoteEl.textContent = 'Votre panier contient déjà tout le stock disponible (' + stock + ' ' + unitLabel(item.unit, stock) + ').';
-        stockNoteEl.style.display = 'block';
+        addBtn.textContent = 'Épuisé';
       } else {
         addBtn.disabled = false;
+        addBtn.textContent = 'Ajouter au panier';
       }
     }
 
@@ -576,25 +574,29 @@
 
     addBtn.addEventListener('click', () => {
       if (addBtn.disabled) return;
-      const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+      let cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+      const inCart = cart.some((c) => String(c.listingId) === String(item.id));
 
-      // Jamais plus d'unités dans le panier qu'il n'en reste en stock
-      if (stock !== null && cart.filter((c) => String(c.listingId) === String(item.id)).length >= stock) {
-        refreshStock();
-        return;
+      if (inCart) {
+        // Second clic : on enlève le produit du panier
+        cart = cart.filter((c) => String(c.listingId) !== String(item.id));
+      } else {
+        cart.push({
+          name: item.title,
+          price: priceText,
+          stripeAccountId: item.sellers ? item.sellers.stripe_account_id : '',
+          listingId: item.id,
+        });
       }
-
-      cart.push({
-        name: item.title,
-        price: priceText,
-        stripeAccountId: item.sellers ? item.sellers.stripe_account_id : '',
-        listingId: item.id,
-      });
       localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
-      addBtn.textContent = 'Ajouté au panier';
-      viewCartLink.style.display = 'inline-block';
+      const cartCountEl = document.querySelector('.cart-count');
+      if (cartCountEl) cartCountEl.textContent = cart.length;
       refreshStock();
-      setTimeout(() => { addBtn.textContent = 'Ajouter au panier'; }, 2000);
+    });
+
+    // Au retour sur la page (bouton « précédent »), le panier a pu changer : on remet le bouton à jour
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) refreshStock();
     });
 
     loadingMessage.style.display = 'none';
@@ -769,6 +771,8 @@
   .report-check input { margin-top:3px; flex-shrink:0; }
   .report-error { margin:0 0 12px; padding:10px 12px; border-radius:10px; background:#FDECEA; color:#C8352F; font-size:0.88rem; font-weight:600; }
   .report-cancel { color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-decoration:none; }
+  #addToCartBtn.in-cart { background:#2F8F3A; box-shadow:0 4px 14px rgba(47,143,58,.4); }
+  #addToCartBtn.in-cart:hover { background:#27782F; box-shadow:0 6px 18px rgba(47,143,58,.48); }
 </style>
 
 <!-- ============ SIGNALER UNE ANNONCE ============ -->

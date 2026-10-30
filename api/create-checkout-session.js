@@ -135,10 +135,10 @@ function todayInParis() {
 }
 
 // Le prix à payer aujourd'hui pour une annonce : le prix promotionnel si une promotion
-// d'un vendeur professionnel est en cours (début et fin inclus), sinon le prix normal.
+// d'un vendeur est en cours (début et fin inclus), sinon le prix normal.
 function currentPrice(listing, seller) {
   const normal = Number(listing.price);
-  if (!seller || seller.seller_type !== 'professionnel') return normal;
+  if (!seller) return normal;
   // Un déstockage n'a pas de date de fin : il dure tant qu'il reste du stock
   const clearance = listing.promo_clearance === true;
   if (!listing.promo_starts_at || (!listing.promo_ends_at && !clearance)) return normal;
@@ -157,9 +157,9 @@ function currentPrice(listing, seller) {
 }
 
 // Le lot en cours d'une annonce (par exemple 3 kg pour 7 €), ou null.
-// Réservé aux vendeurs professionnels, aux mêmes dates qu'une promotion (début et fin inclus).
+// Aux mêmes dates qu'une promotion (début et fin inclus).
 function activeLot(listing, seller) {
-  if (!seller || seller.seller_type !== 'professionnel') return null;
+  if (!seller) return null;
   if (listing.lot_quantity == null || listing.lot_price == null) return null;
   if (!listing.promo_starts_at || !listing.promo_ends_at) return null;
 

@@ -35,7 +35,7 @@
     <p id="listingsError" style="color:#C8352F;display:none;margin-top:10px;text-align:center;"></p>
 
     <div id="sellerSection" style="display:none;">
-      <p class="my-intro">Voici les produits que vous avez mis en vente. Suivez leur stock et supprimez l'annonce d'un produit quand vous ne le vendez plus.</p>
+      <p class="my-intro">Voici les produits que vous avez mis en vente. Suivez leur stock, lancez des promotions et supprimez l'annonce d'un produit quand vous ne le vendez plus.</p>
       <div class="my-summary-row">
         <p id="listingsSummary" class="my-summary"></p>
         <a href="publier-annonce.html" class="btn btn-primary">Publier une annonce</a>
@@ -239,7 +239,7 @@
     return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
   }
 
-  // ---------- Promotions (réservées aux professionnels) ----------
+  // ---------- Promotions (professionnels et particuliers) ----------
 
   const PROMO_PERCENTS = [5, 10, 15, 20, 30];
   let isPro = false;
@@ -417,7 +417,7 @@
       (dates ? '<p class="listing-dates">' + escapeHtml(dates) + '</p>' : '') +
       '<div class="listing-actions">' +
       '<a class="btn btn-primary" href="produit.html?id=' + encodeURIComponent(item.id) + '">Voir l\'annonce</a>' +
-      (isPro ? '<button type="button" class="promo-btn" aria-label="Promotions"><span class="promo-word">PROMO</span></button>' : '') +
+      '<button type="button" class="promo-btn" aria-label="Promotions"><span class="promo-word">PROMO</span></button>' +
       '<button type="button" class="btn btn-ghost delete-btn">Supprimer</button>' +
       '</div>' +
       '</div>' +

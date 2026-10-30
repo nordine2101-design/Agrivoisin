@@ -8,7 +8,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
   },
 });
 
-// Les réductions en pourcentage proposées aux professionnels
+// Les réductions en pourcentage proposées aux vendeurs
 const ALLOWED_PERCENTS = [5, 10, 15, 20, 30];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Un lot : de 2 à 50 unités (50 = le maximum d'articles par paiement)
@@ -27,12 +27,8 @@ function isRealDate(value) {
   return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
 
-// Enregistre (ou retire) la promotion d'une annonce. Réservé aux vendeurs professionnels.
+// Enregistre (ou retire) la promotion d'une annonce (professionnels et particuliers).
 async function setPromotion(req, res, seller) {
-  if (seller.seller_type !== 'professionnel') {
-    return res.status(403).json({ error: 'Les promotions sont réservées aux vendeurs professionnels.' });
-  }
-
   const body = req.body || {};
   const { listingId, mode } = body;
 

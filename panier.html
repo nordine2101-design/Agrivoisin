@@ -14,7 +14,7 @@
 <section class="page-header my-page">
   <div class="my-panel">
     <div class="my-topbar">
-      <a href="index.html" class="btn btn-ghost btn-back">Retour</a>
+      <a href="index.html" id="backLink" class="btn btn-ghost btn-back">Retour</a>
       <h1 id="cartTitle">Mon panier</h1>
     </div>
     <p id="cartSubtitle">Vérifiez votre commande avant de passer au paiement sécurisé.</p>
@@ -855,6 +855,22 @@
   });
 
   renderCart();
+</script>
+<script>
+  // Le bouton Retour ramène à la page d'où l'on vient (par exemple la page d'une annonce) ; sinon, à l'accueil
+  (function () {
+    var back = document.getElementById('backLink');
+    if (!back) return;
+    back.addEventListener('click', function (e) {
+      try {
+        var ref = document.referrer ? new URL(document.referrer) : null;
+        if (ref && ref.origin === window.location.origin && ref.pathname !== window.location.pathname && window.history.length > 1) {
+          e.preventDefault();
+          window.history.back();
+        }
+      } catch (err) {}
+    });
+  })();
 </script>
 </body>
 </html>

@@ -623,13 +623,13 @@
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (!session) throw new Error('Session expirée, reconnectez-vous.');
 
-      const r = await fetch('/api/delete-listing', {
+      const r = await fetch('/api/update-listing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ listingId: listingId }),
+        body: JSON.stringify({ action: 'delete', listingId: listingId }),
       });
       let d = {};
       try { d = await r.json(); } catch (parseError) { d = {}; }

@@ -208,6 +208,10 @@
   const photoPreview = document.getElementById('photoPreview');
   const photoPreviewWrap = document.getElementById('photoPreviewWrap');
 
+  // Mode « modifier une annonce » : la page s'ouvre avec ?modifier=identifiant-de-l-annonce
+  const editId = new URLSearchParams(window.location.search).get('modifier');
+  const isEdit = !!editId;
+
   // Description : 200 caractères au maximum, avec un compteur sous le champ
   const DESCRIPTION_MAX = 200;
   const descriptionInput = document.getElementById('description');
@@ -221,7 +225,7 @@
 
   supabaseClient.auth.getSession().then(({ data: { session } }) => {
     if (session) {
-      listingForm.style.display = 'flex';
+      if (!isEdit) listingForm.style.display = 'flex';
     } else {
       notLoggedMessage.style.display = 'block';
       pageSubtitle.style.display = 'none';
@@ -591,10 +595,10 @@
   // puis on ajoute les autres si le vendeur est un professionnel.
   fillCategories('particulier');
 
-  supabaseClient.auth.getSession().then(function (result) {
+  const sellerReady = supabaseClient.auth.getSession().then(function (result) {
     const session = result.data.session;
     if (!session) return;
-    fetch('/api/get-seller-listings', {
+    return fetch('/api/get-seller-listings', {
       headers: { Authorization: 'Bearer ' + session.access_token },
     })
       .then(function (r) { return r.json(); })
@@ -1009,6 +1013,126 @@
   buildPickupDays();
   renderPickupPreview();
 
+  // ---------- Modifier une annonce : le formulaire s'ouvre avec les informations actuelles ----------
+
+  function toLocalInput(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function timeToMinutes(t) {
+    const parts = String(t).split(':');
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  async function loadEdit() {
+    const errorEl = document.getElementById('listingError');
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        notLoggedMessage.style.display = 'block';
+        pageSubtitle.style.display = 'none';
+        return;
+      }
+      const r = await fetch('/api/update-listing?id=' + encodeURIComponent(editId), {
+        headers: { Authorization: 'Bearer ' + session.access_token },
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Erreur');
+      await sellerReady;
+      const l = d.listing;
+
+      fillCategories(d.sellerType === 'professionnel' ? 'professionnel' : 'particulier');
+      document.getElementById('title').value = l.title || '';
+      categorySelect.value = l.category;
+      categorySelect.dispatchEvent(new Event('change'));
+      if (l.subcategory) subcategorySelect.value = l.subcategory;
+
+      if (HARVEST_DATE_REQUIRED_CATEGORIES.includes(l.category)) {
+        if (l.harvest_at) harvestDateInput.value = toLocalInput(l.harvest_at);
+        else if (l.harvest_date) harvestDateInput.value = String(l.harvest_date).slice(0, 10) + 'T00:00';
+      }
+
+      descriptionInput.value = l.description || '';
+      updateDescriptionCount();
+      priceInput.value = l.price;
+      quantityInput.value = l.quantity_available;
+      document.getElementById('proAttest').checked = !!l.pro_attested_at;
+      document.getElementById('isBio').checked = !!l.is_bio;
+
+      const unit = l.unit || 'kg';
+      if (unitPickerOn) {
+        const m = unit.match(/^(pot|bouteille) de ([\d,]+)(g|kg|cl|l|ml)$/);
+        if (m) {
+          setUnitMode(m[1] === 'pot' ? 'pots' : 'bouteilles');
+          unitSizeInput.value = m[2];
+          unitSizeUnit.value = m[3];
+        } else if (unit === 'kg' || unit === 'g') {
+          setUnitMode('poids');
+          unitSizeUnit.value = unit;
+        }
+        applyUnit();
+      } else {
+        unitInput.value = unit;
+      }
+
+      if (deliveryAvailable()) {
+        if (Array.isArray(l.shipping_tiers) && l.shipping_tiers.length > 0) {
+          shipRows = l.shipping_tiers.map(function (t) {
+            return { min: String(t.min), max: String(t.max), price: String(t.price).replace('.', ',') };
+          });
+        }
+        setDeliveryMode(l.delivery_mode || 'retrait');
+      }
+
+      const byDay = {};
+      (d.pickupHours || []).forEach(function (h) {
+        byDay[h.day_of_week] = byDay[h.day_of_week] || {};
+        byDay[h.day_of_week][h.slot] = h;
+      });
+      Object.keys(byDay).forEach(function (n) {
+        const row = pickupDays.querySelector('.day-row[data-day="' + n + '"]');
+        if (!row) return;
+        const box = row.querySelector('.day-open');
+        box.checked = true;
+        box.dispatchEvent(new Event('change'));
+        const first = byDay[n][1];
+        const second = byDay[n][2];
+        const slider1 = row.querySelector('.range[data-slot="1"] .rs');
+        if (first) slider1.setValues(timeToMinutes(first.start_time), timeToMinutes(first.end_time));
+        if (second) {
+          row.querySelector('.add-range').click();
+          row.querySelector('.range[data-slot="2"] .rs').setValues(timeToMinutes(second.start_time), timeToMinutes(second.end_time));
+        }
+        slider1.refresh();
+      });
+      renderPickupPreview();
+
+      if (l.image_url) {
+        photoPreview.src = l.image_url;
+        photoPreviewWrap.style.display = 'block';
+      }
+
+      pageSubtitle.textContent = 'Changez ce que vous voulez, puis enregistrez.';
+      listingForm.style.display = 'flex';
+    } catch (err) {
+      pageSubtitle.style.display = 'none';
+      errorEl.textContent = 'Erreur : ' + err.message;
+      errorEl.style.display = 'block';
+    }
+  }
+
+  if (isEdit) {
+    document.title = 'Modifier une annonce — Agrivoisin';
+    document.querySelector('.my-panel h1').textContent = 'Modifier l\'annonce';
+    document.querySelector('.btn-back').setAttribute('href', 'mes-annonces.html');
+    pageSubtitle.textContent = 'Chargement de votre annonce…';
+    document.getElementById('listingSubmitBtn').textContent = 'Enregistrer les modifications';
+    loadEdit();
+  }
+
   listingForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = document.getElementById('listingSubmitBtn');
@@ -1074,7 +1198,7 @@
       }
     }
 
-    btn.textContent = 'Publication en cours...';
+    btn.textContent = isEdit ? 'Enregistrement en cours...' : 'Publication en cours...';
     btn.disabled = true;
     errorEl.style.display = 'none';
     successEl.style.display = 'none';
@@ -1127,7 +1251,9 @@
         shippingTiers: shipping.tiers,
       };
 
-      const response = await fetch('/api/create-listing', {
+      if (isEdit) payload.listingId = editId;
+
+      const response = await fetch(isEdit ? '/api/update-listing' : '/api/create-listing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1142,8 +1268,9 @@
         throw new Error(data.error || 'Une erreur est survenue');
       }
 
-      successEl.textContent = 'Annonce publiée avec succès !';
+      successEl.textContent = isEdit ? 'Annonce modifiée avec succès !' : 'Annonce publiée avec succès !';
       successEl.style.display = 'block';
+      if (!isEdit) {
       listingForm.reset();
       subcategorySelect.style.display = 'none';
       subcategoryLabel.style.display = 'none';
@@ -1157,6 +1284,7 @@
       resetUnitPicker();
       buildPickupDays();
       renderPickupPreview();
+      }
 
       setTimeout(function () {
         window.location.href = 'mes-annonces.html';
@@ -1166,7 +1294,7 @@
       errorEl.textContent = 'Erreur : ' + err.message;
       errorEl.style.display = 'block';
     } finally {
-      btn.textContent = 'Publier l\'annonce';
+      btn.textContent = isEdit ? 'Enregistrer les modifications' : 'Publier l\'annonce';
       btn.disabled = false;
     }
   });

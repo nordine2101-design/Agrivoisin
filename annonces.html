@@ -13,62 +13,52 @@
 </head>
 <body>
 
-<!-- ============ HEADER ============ -->
-<div style="position:relative;">
+<!-- ============ LES ANNONCES : deux cartes ============ -->
+<section class="page-header ann-page">
+  <a href="index.html" class="btn btn-ghost btn-back ann-back">Retour</a>
   <a href="panier.html" class="cart-icon" aria-label="Panier" style="position:absolute;top:16px;right:32px;">
     <img src="panier-agrivoisin.png" alt="Panier" style="width:100%;height:100%;object-fit:contain;">
     <span class="cart-count">0</span>
   </a>
-</div>
 
-<!-- ============ EN-TÊTE DE PAGE ============ -->
-<section class="page-header">
-  <div class="container">
-    <div style="text-align:left;margin-bottom:-22px;">
-      <a href="index.html" class="btn btn-ghost btn-back">Retour</a>
-    </div>
-  </div>
-</section>
+  <div class="ann-wrap">
+    <h1 class="ann-title">Les trésors du voisinage… chez vous</h1>
 
-<!-- ============ RECHERCHE + VILLE (une seule ligne) ============ -->
-<section class="filters-bar">
-  <div class="container">
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-       <input type="search" id="searchInput" placeholder="Rechercher une récolte (tomates, miel...)" aria-label="Rechercher une annonce" style="flex:2;min-width:220px;padding:10px 20px;border-radius:999px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:0.95rem;">
-      <input type="text" id="buyerCityInput" placeholder="Votre ville" aria-label="Votre ville" style="flex:1;min-width:140px;padding:10px 20px;border-radius:999px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:0.95rem;">
-      
-      <button class="btn btn-primary" id="buyerCityBtn" type="button">Valider</button>
-      <div class="seller-type-filter" role="group" aria-label="Type de vendeur">
-        <label class="type-check"><input type="checkbox" id="typeParticulier"><span>Particuliers</span></label>
-        <label class="type-check"><input type="checkbox" id="typeProfessionnel"><span>Professionnels</span></label>
+    <div class="ann-cols">
+      <!-- Carte de gauche : recherche et filtres -->
+      <aside class="ann-card ann-left">
+        <input type="search" id="searchInput" placeholder="Rechercher une récolte (tomates, miel...)" aria-label="Rechercher une annonce">
+        <input type="text" id="buyerCityInput" placeholder="Votre ville" aria-label="Votre ville">
+        <button class="btn btn-primary" id="buyerCityBtn" type="button">Valider</button>
+        <p id="buyerCityDisplay" style="display:none;font-size:0.8rem;color:#4C7A50;margin-top:8px;"></p>
+
+        <div class="seller-type-filter" role="group" aria-label="Type de vendeur">
+          <label class="type-check"><input type="checkbox" id="typeParticulier"><span>Particuliers</span></label>
+          <label class="type-check"><input type="checkbox" id="typeProfessionnel"><span>Professionnels</span></label>
+        </div>
         <a class="fav-link" href="favoris.html"><img src="favori-banane-epluchee.png" alt="" width="26" height="26"><span>Favoris</span><img src="cerise-pleine.png" alt="" width="26" height="26"></a>
-      </div>
-    </div>
-    <p id="buyerCityDisplay" style="display:none;font-size:0.8rem;color:#4C7A50;margin-top:6px;"></p>
-  </div>
-</section>
 
-<!-- ============ FILTRES ============ -->
-<section class="filters-bar">
-  <div class="container">
-    <div class="filter-chips" id="categoryChips">
-      <button class="chip chip-active" data-category="Tout">Tout</button>
-    </div>
-    <select class="sort-select" id="sortSelect" aria-label="Trier par">
-      <option value="recent">Plus récent</option>
-      <option value="price-asc">Prix croissant</option>
-      <option value="price-desc">Prix décroissant</option>
-      <option value="distance">Plus proche</option>
-    </select>
-  </div>
-</section>
+        <h5 class="ann-left-title">Catégories</h5>
+        <div class="filter-chips" id="categoryChips">
+          <button class="chip chip-active" data-category="Tout">Tout</button>
+        </div>
 
-<!-- ============ GRILLE D'ANNONCES ============ -->
-<section class="listings-section">
-  <div class="container">
-    <div id="realListingsContainer" class="produce-grid listings-grid"></div>
-    <p id="noListingsMessage" style="display:none;text-align:center;margin-top:24px;">Aucune annonce ne correspond à votre recherche pour le moment.</p>
-    <nav id="pager" class="pager" aria-label="Pages d'annonces" style="display:none;"></nav>
+        <h5 class="ann-left-title">Trier par</h5>
+        <select class="sort-select" id="sortSelect" aria-label="Trier par">
+          <option value="recent">Plus récent</option>
+          <option value="price-asc">Prix croissant</option>
+          <option value="price-desc">Prix décroissant</option>
+          <option value="distance">Plus proche</option>
+        </select>
+      </aside>
+
+      <!-- Carte de droite : les annonces -->
+      <main class="ann-card ann-right">
+        <div id="realListingsContainer" class="produce-grid listings-grid"></div>
+        <p id="noListingsMessage" style="display:none;text-align:center;margin-top:24px;">Aucune annonce ne correspond à votre recherche pour le moment.</p>
+        <nav id="pager" class="pager" aria-label="Pages d'annonces" style="display:none;"></nav>
+      </main>
+    </div>
   </div>
 </section>
 
@@ -508,10 +498,9 @@
   });
 
   // Les annonces sont rangées par rangées (3 par rangée, 2 sur tablette, 1 sur téléphone).
-  // Chaque rangée a son fond, en alternant rose très léger et vert très léger, avec un trait entre deux rangées.
   function columnsPerRow() {
     if (window.matchMedia('(max-width: 560px)').matches) return 1;
-    if (window.matchMedia('(max-width: 900px)').matches) return 2;
+    if (window.matchMedia('(max-width: 1100px)').matches) return 2;
     return 3;
   }
 
@@ -771,8 +760,32 @@
 <script src="script.js"></script>
 
 <style>
-  .page-header { background:url('annonces-banniere.jpg') center 85%/cover no-repeat; height:360px; padding:0; }
-  .page-header .container { max-width:none; padding-top:14px; }
+  /* Page à deux cartes (comme Mes commandes) */
+  section.page-header.ann-page { position:relative; background:linear-gradient(180deg,#9FD2A0 0%,#CDEBC9 60%,#EEF8EC 100%); padding:80px 24px 60px; text-align:left; }
+  .ann-back { position:absolute; left:24px; top:18px; }
+  .ann-wrap { position:relative; max-width:1280px; margin:0 auto; }
+  .ann-page .ann-title { position:absolute; left:50%; top:0; transform:translate(-50%,-50%); z-index:3; background:#DDF2D9; color:#2E6B35; font-size:1.6rem; padding:8px 26px; border-radius:999px; white-space:nowrap; margin:0; text-align:center; }
+  .ann-page .ann-title::before { content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:calc(50% + 2px); box-sizing:border-box; border:2px solid #fff; border-bottom:none; border-radius:999px 999px 0 0; pointer-events:none; }
+  .ann-cols { display:flex; gap:24px; align-items:flex-start; }
+  .ann-card { background:#fff; border-radius:28px; box-shadow:var(--shadow-soft); box-sizing:border-box; }
+  .ann-left { width:320px; flex-shrink:0; padding:42px 22px 26px; text-align:left; }
+  .ann-right { flex:1; min-width:0; padding:42px 26px 30px; }
+  .ann-left input[type=search], .ann-left input[type=text] { display:block; width:100%; box-sizing:border-box; padding:10px 14px; margin-bottom:10px; border-radius:999px; border:1.5px solid rgba(107,88,66,0.2); font-family:inherit; font-size:0.85rem; }
+  .ann-left #buyerCityBtn { width:100%; }
+  .ann-left .seller-type-filter { margin:16px 0 0; flex-wrap:nowrap; }
+  .ann-left .type-check { padding:9px 12px; font-size:0.88rem; }
+  .ann-left .fav-link { margin-top:14px; }
+  .ann-left-title { margin:22px 0 8px; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; color:#4C7A50; }
+  .ann-left .sort-select { width:100%; box-sizing:border-box; }
+  .ann-right .produce-card { border:1px solid #e3efe0; }
+  @media (max-width: 900px) {
+    .ann-cols { flex-direction:column; align-items:stretch; }
+    .ann-left { width:100%; }
+    section.page-header.ann-page { padding:80px 12px 40px; }
+  }
+  @media (max-width: 560px) {
+    .ann-page .ann-title { font-size:1.05rem; padding:8px 16px; white-space:normal; width:max-content; max-width:calc(100% - 24px); }
+  }
   .produce-card-body img.ship-sticker { display:block; width:130px; height:auto; margin:4px 0 4px -6px; }
   .seller-type-disc { display:block; background:#fff; color:#C8352F; font-size:0.8rem; font-weight:700; padding:7px 15px 6px 14px; border-radius:0 18px 0 12px; box-shadow:inset 0 0 0 2px #C8352F; position:absolute; top:0; right:0; z-index:2; }
   .produce-card-body p.stock-badge { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
@@ -808,8 +821,7 @@
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
   #favToast a { color:#FFD21F; font-weight:700; }
-  .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; margin-left:90px; }
-  @media (max-width: 900px) { .seller-type-filter { margin-left:0; } }
+  .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; }
   .type-check { position:relative; display:inline-flex; align-items:center; padding:9px 18px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; user-select:none; }
   .type-check input { position:absolute; opacity:0; width:1px; height:1px; margin:0; pointer-events:none; }
   .type-check:has(input:checked) { background:#fff; border-color:#7CCB86; box-shadow:none; color:#3E9B4D; }
@@ -818,12 +830,10 @@
   /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone), chaque rangée sur son fond */
   .bio-pill { display:inline-block; margin-left:6px; background:#fff; border:2px solid #2F8F3A; color:#2F8F3A; border-radius:999px; padding:2px 10px; font-weight:800; font-size:0.72rem; letter-spacing:0.05em; vertical-align:middle; }
   .listings-grid { display: block; }
-  .listings-grid .row-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 22px; margin: 0 -22px; border-radius: 24px; }
-  .listings-grid .row-band-rose { background: #FCE4EC; }
-  .listings-grid .row-band-vert { background: #EAF5E6; }
-  .listings-grid .row-sep { height: 4px; border-radius: 4px; background: #4C7A50; margin: 14px 0; }
-  @media (max-width: 900px) { .listings-grid .row-band { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 560px) { .listings-grid .row-band { grid-template-columns: 1fr; margin: 0 -12px; padding: 12px; } }
+  .listings-grid .row-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .listings-grid .row-sep { height: 0; margin: 10px 0; background: none; }
+  @media (max-width: 1100px) { .listings-grid .row-band { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .listings-grid .row-band { grid-template-columns: 1fr; } }
 
   /* Pages d'annonces : Précédent, numéros, Suivant */
   .pager { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:36px; }

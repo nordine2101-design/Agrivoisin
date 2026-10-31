@@ -11,6 +11,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 // Cette fonction sert à modifier une annonce depuis « Mes annonces » :
 //   GET  /api/update-listing?id=...  -> renvoie l'annonce (et ses horaires de retrait) pour remplir le formulaire
 //   POST /api/update-listing         -> enregistre les modifications
+//   POST /api/update-listing avec { action: 'delete', listingId } -> supprime l'annonce
 // Seul le vendeur qui a publié l'annonce peut la lire ici et la modifier.
 
 const DAY_LABELS = ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -198,6 +199,19 @@ export default async function handler(req, res) {
         listing: existing,
         pickupHours,
       });
+    }
+
+    // ---------- POST « delete » : supprimer l'annonce (remplace l'ancienne fonction delete-listing) ----------
+    if ((req.body || {}).action === 'delete') {
+      const { error: deleteError } = await supabase
+        .from('listings')
+        .delete()
+        .eq('id', existing.id)
+        .eq('seller_id', seller.id);
+
+      if (deleteError) throw deleteError;
+
+      return res.status(200).json({ success: true });
     }
 
     // ---------- POST : enregistrer les modifications ----------

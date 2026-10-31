@@ -55,7 +55,8 @@
       </div>
 
       <label for="description">Description</label>
-      <input type="text" id="description" placeholder="Décrivez votre récolte">
+      <textarea id="description" rows="3" maxlength="200" placeholder="Décrivez votre récolte"></textarea>
+      <p id="descriptionCount" class="desc-count" aria-live="polite">0 / 200</p>
 
       <label for="price">Prix (€)</label>
       <input type="number" step="0.01" id="price" placeholder="Ex : 3.50" required>
@@ -206,6 +207,17 @@
   const photoFileInput = document.getElementById('photoFile');
   const photoPreview = document.getElementById('photoPreview');
   const photoPreviewWrap = document.getElementById('photoPreviewWrap');
+
+  // Description : 200 caractères au maximum, avec un compteur sous le champ
+  const DESCRIPTION_MAX = 200;
+  const descriptionInput = document.getElementById('description');
+  const descriptionCount = document.getElementById('descriptionCount');
+  function updateDescriptionCount() {
+    descriptionCount.textContent = descriptionInput.value.length + ' / ' + DESCRIPTION_MAX;
+  }
+  descriptionInput.addEventListener('input', updateDescriptionCount);
+  listingForm.addEventListener('reset', function () { setTimeout(updateDescriptionCount, 0); });
+  updateDescriptionCount();
 
   supabaseClient.auth.getSession().then(({ data: { session } }) => {
     if (session) {
@@ -1022,6 +1034,13 @@
       return;
     }
 
+    // La description : 200 caractères au maximum
+    if (document.getElementById('description').value.length > DESCRIPTION_MAX) {
+      errorEl.textContent = 'Erreur : La description est trop longue (' + DESCRIPTION_MAX + ' caractères au maximum).';
+      errorEl.style.display = 'block';
+      return;
+    }
+
     // L'unité de vente (pots, bouteilles, au poids) : vérifiée avant tout
     if (unitPickerOn) {
       const chosen = readUnitPicker();
@@ -1164,6 +1183,8 @@
   .my-form-box .auth-form > label:nth-of-type(3n+2) { background:#7FB83F; }
   .my-form-box .auth-form > label:nth-of-type(3n+3) { background:#2E8B57; }
   .my-form-box .auth-form > input:not([type=checkbox]), .my-form-box .auth-form > select { border-color:#9FC49A; }
+  .my-form-box .auth-form textarea { width:100%; box-sizing:border-box; padding:12px 14px; border:1.5px solid #9FC49A; border-radius:var(--radius-sm); font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background:#fff; resize:vertical; }
+  .my-form-box .auth-form .desc-count { font-size:0.85em; color:#888; margin:-8px 0 0; text-align:right; }
   .my-form-box .auth-form #category, .my-form-box .auth-form #subcategory { border-radius:var(--radius-sm); border:1.5px solid #9FC49A; padding:12px 14px; font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background-color:#fff; }
   #listingSubmitBtn { background:#2E8B57; color:#fff; border:1.5px solid #2E8B57; box-shadow:0 4px 14px rgba(46,139,87,0.35); }
   #listingSubmitBtn:hover:not(:disabled) { background:#2E8B57; color:#fff; }

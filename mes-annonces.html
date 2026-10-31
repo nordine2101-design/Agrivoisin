@@ -135,8 +135,8 @@
   .stock-badge.stock-free { background:#eee8da; color:#6B5842; }
   .listing-actions { flex-basis:100%; display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap; margin-top:6px; }
   .listing-actions .btn { font-size:0.85rem; padding:8px 13px; }
-  .listing-actions .edit-btn { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-weight:700; background:#fff; color:#2E8B57; border:1.5px solid #2E8B57; border-radius:999px; cursor:pointer; }
-  .listing-actions .edit-btn:hover { background:#2E8B57; color:#fff; }
+  .listing-actions .edit-btn { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-weight:700; background:#CFD8DC; color:#263238; border:1.5px solid #B0BEC5; border-radius:999px; cursor:pointer; }
+  .listing-actions .edit-btn:hover { background:#B0BEC5; color:#263238; }
   .listing-card > .promo-form { flex-basis:100%; margin-top:0; }
   .listing-actions .btn:disabled { opacity:0.5; cursor:not-allowed; }
   .promo-btn { width:112px; height:112px; padding:0; border:0; background:#00D9D0; color:#fff; font-family:inherit; font-size:0.74rem; font-weight:800; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; text-align:center; clip-path:polygon(50.0% 0.0%, 61.1% 15.8%, 79.4% 9.5%, 79.1% 28.8%, 97.6% 34.5%, 86.0% 50.0%, 97.6% 65.5%, 79.1% 71.2%, 79.4% 90.5%, 61.1% 84.2%, 50.0% 100.0%, 38.9% 84.2%, 20.6% 90.5%, 20.9% 71.2%, 2.4% 65.5%, 14.0% 50.0%, 2.4% 34.5%, 20.9% 28.8%, 20.6% 9.5%, 38.9% 15.8%); transition:transform .15s ease, background .15s ease; }
@@ -422,7 +422,7 @@
       '<div class="listing-actions">' +
       '<a class="btn btn-primary" href="produit.html?id=' + encodeURIComponent(item.id) + '">Voir l\'annonce</a>' +
       '<button type="button" class="promo-btn" aria-label="Promotions"><span class="promo-word">PROMO</span></button>' +
-      '<a class="btn edit-btn" href="publier-annonce.html?modifier=' + encodeURIComponent(item.id) + '">✎ Modifier</a>' +
+      '<a class="btn edit-btn" href="publier-annonce.html?modifier=' + encodeURIComponent(item.id) + '">Modifier</a>' +
       '<button type="button" class="btn btn-ghost delete-btn">Supprimer</button>' +
       '</div>' +
       '</div>'

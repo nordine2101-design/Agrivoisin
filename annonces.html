@@ -357,6 +357,11 @@
     cityChoicePills.innerHTML = '';
   }
 
+  // Quand on efface la ville dans la case, les choix proposés disparaissent aussitôt
+  buyerCityInput.addEventListener('input', () => {
+    if (!buyerCityInput.value.trim()) hideCityChoices();
+  });
+
   // Valide une commune de l'annuaire : c'est elle (et sa position officielle) qui sert de centre
   function applyCommune(commune, withDepartment) {
     const lng = commune.centre.coordinates[0];

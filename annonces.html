@@ -861,10 +861,12 @@
   /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone), chaque rangée sur son fond */
   .bio-pill { display:inline-block; margin-left:6px; background:#fff; border:2px solid #2F8F3A; color:#2F8F3A; border-radius:999px; padding:2px 10px; font-weight:800; font-size:0.72rem; letter-spacing:0.05em; vertical-align:middle; }
   .listings-grid { display: block; }
-  .listings-grid .row-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 0; margin: 0; }
-  .listings-grid .row-sep { height: 0; margin: 11px 0; background: none; }
+  .listings-grid .row-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 16px; margin: 0 -16px; border-radius: 22px; }
+  .listings-grid .row-band-rose { background: #FCEBEE; }
+  .listings-grid .row-band-vert { background: #E4F3E0; }
+  .listings-grid .row-sep { height: 2px; margin: 16px 0; background: #BCD9B8; border-radius: 2px; }
   @media (max-width: 900px) { .listings-grid .row-band { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 560px) { .listings-grid .row-band { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) { .listings-grid .row-band { grid-template-columns: 1fr; padding: 10px; margin: 0 -10px; } }
   .produce-card { border: 1px solid #e3efe0; }
 
   /* Carte des filtres posée sur le bas de la bannière ; annonces sur fond vert très clair */

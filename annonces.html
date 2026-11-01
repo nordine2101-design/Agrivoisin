@@ -297,7 +297,6 @@
   radiusInput.addEventListener('input', () => {
     buyerRadius = Number(radiusInput.value) || 0;
     radiusVal.textContent = buyerRadius + ' km';
-    try { localStorage.setItem('agrivoisin_buyer_radius', String(buyerRadius)); } catch (e) {}
     goToFirstPage();
     renderListings();
   });
@@ -812,11 +811,7 @@
     update();
   })();
 
-  loadBuyerLocation();
-  try {
-    const savedRadius = parseInt(localStorage.getItem('agrivoisin_buyer_radius'), 10);
-    if (!isNaN(savedRadius) && savedRadius >= 0 && savedRadius <= 30) buyerRadius = savedRadius;
-  } catch (e) {}
+  // À l'ouverture de la page, aucune ville n'est choisie : on voit toutes les annonces
   syncCityUi();
   loadFavorites();
 
@@ -987,7 +982,6 @@
 </style>
 </body>
 </html>
-
 
 
 

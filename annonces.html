@@ -708,6 +708,35 @@
     } catch (err) {}
   })();
 
+  // Quand on descend la page, la carte des filtres reste en haut de l'écran et se réduit à sa première ligne
+  // (les catégories et le tri réapparaissent en remontant tout en haut)
+  (function stickyFilters() {
+    const card = document.querySelector('.filters-card');
+    if (!card) return;
+    const bars = card.querySelectorAll('.filters-bar');
+    const extra = bars[1];
+    if (!extra) return;
+    const wide = window.matchMedia('(min-width: 901px)');
+    let compact = false;
+    function update() {
+      const shouldCompact = wide.matches && window.scrollY > 300;
+      if (shouldCompact === compact) return;
+      compact = shouldCompact;
+      if (compact) {
+        // On garde la même hauteur de page pour que les annonces ne sautent pas
+        const h = extra.offsetHeight;
+        extra.style.display = 'none';
+        card.style.marginBottom = (30 + h) + 'px';
+      } else {
+        extra.style.display = '';
+        card.style.marginBottom = '';
+      }
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  })();
+
   loadBuyerLocation();
   loadFavorites();
 
@@ -834,6 +863,8 @@
   .filters-card .container { padding:0; }
   .filters-card .seller-type-filter { margin-left:0; }
   @media (max-width: 560px) { .filters-card { width:calc(100% - 24px); margin-top:-40px; padding:16px 14px 12px; border-radius:22px; } }
+  /* Sur grand écran, la carte des filtres reste visible en haut quand on descend la page */
+  @media (min-width: 901px) { .filters-card { position:sticky; top:8px; } }
 
   /* Pages d'annonces : Précédent, numéros, Suivant */
   .pager { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:36px; }

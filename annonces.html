@@ -357,9 +357,18 @@
     cityChoicePills.innerHTML = '';
   }
 
-  // Quand on efface la ville dans la case, les choix proposés disparaissent aussitôt
+  // Quand on efface la ville dans la case : les choix, le curseur et la phrase « Autour de… » disparaissent
+  // aussitôt, et on revoit toutes les annonces
   buyerCityInput.addEventListener('input', () => {
-    if (!buyerCityInput.value.trim()) hideCityChoices();
+    if (buyerCityInput.value.trim()) return;
+    hideCityChoices();
+    if (buyerLocation) {
+      buyerLocation = null;
+      try { localStorage.removeItem('agrivoisin_buyer_location'); } catch (e) {}
+      syncCityUi();
+      goToFirstPage();
+      renderListings();
+    }
   });
 
   // Valide une commune de l'annuaire : c'est elle (et sa position officielle) qui sert de centre

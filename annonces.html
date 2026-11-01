@@ -36,6 +36,7 @@
 <section class="filters-bar">
   <div class="container">
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <a href="index.html" class="btn btn-ghost btn-back bar-back">Retour</a>
        <input type="search" id="searchInput" placeholder="Rechercher une récolte (tomates, miel...)" aria-label="Rechercher une annonce" style="flex:2;min-width:220px;padding:10px 20px;border-radius:999px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:0.95rem;">
       <input type="text" id="buyerCityInput" placeholder="Votre ville" aria-label="Votre ville" style="flex:1;min-width:140px;padding:10px 20px;border-radius:999px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:0.95rem;">
       
@@ -45,6 +46,7 @@
         <label class="type-check"><input type="checkbox" id="typeProfessionnel"><span>Professionnels</span></label>
         <a class="fav-link" href="favoris.html"><img src="favori-banane-epluchee.png" alt="" width="26" height="26"><span>Favoris</span><img src="cerise-pleine.png" alt="" width="26" height="26"></a>
       </div>
+      <a href="panier.html" class="cart-icon bar-cart" aria-label="Panier"><img src="panier-agrivoisin.png" alt="Panier" style="width:100%;height:100%;object-fit:contain;"><span class="cart-count" id="barCartCount">0</span></a>
     </div>
     <p id="buyerCityDisplay" style="display:none;font-size:0.8rem;color:#4C7A50;margin-top:6px;"></p>
   </div>
@@ -722,6 +724,7 @@
       const shouldCompact = wide.matches && window.scrollY > 300;
       if (shouldCompact === compact) return;
       compact = shouldCompact;
+      card.classList.toggle('is-compact', compact);
       if (compact) {
         // On garde la même hauteur de page pour que les annonces ne sautent pas
         const h = extra.offsetHeight;
@@ -731,6 +734,14 @@
         extra.style.display = '';
         card.style.marginBottom = '';
       }
+    }
+    // Le nombre du panier de la bande suit celui de la bannière
+    const mainCount = document.querySelector('.cart-count');
+    const barCount = document.getElementById('barCartCount');
+    if (mainCount && barCount) {
+      const sync = () => { barCount.textContent = mainCount.textContent; };
+      new MutationObserver(sync).observe(mainCount, { childList: true, characterData: true, subtree: true });
+      sync();
     }
     window.addEventListener('scroll', update, { passive: true });
     window.addEventListener('resize', update);
@@ -865,6 +876,18 @@
   @media (max-width: 560px) { .filters-card { width:calc(100% - 24px); margin-top:-40px; padding:16px 14px 12px; border-radius:22px; } }
   /* Sur grand écran, la carte des filtres reste visible en haut quand on descend la page */
   @media (min-width: 901px) { .filters-card { position:sticky; top:0; } }
+
+  /* Bande réduite (quand on a descendu la page) : Retour à gauche, panier à droite, tout sur une ligne */
+  .bar-back, .bar-cart { display:none; }
+  @media (min-width: 901px) {
+    .filters-card.is-compact { max-width:1240px; }
+    .filters-card.is-compact .bar-back { display:inline-flex; flex:none; }
+    .filters-card.is-compact .bar-cart { display:flex; flex:none; width:48px; height:48px; margin-left:auto; background:none; }
+    .filters-card.is-compact .filters-bar:first-child .container > div { flex-wrap:nowrap; gap:8px !important; }
+    .filters-card.is-compact #searchInput { min-width:120px !important; }
+    .filters-card.is-compact #buyerCityInput { min-width:90px !important; }
+    .filters-card.is-compact .seller-type-filter { flex-wrap:nowrap; flex:none; }
+  }
 
   /* Pages d'annonces : Précédent, numéros, Suivant */
   .pager { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:36px; }

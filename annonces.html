@@ -55,6 +55,14 @@
 <!-- ============ FILTRES ============ -->
 <section class="filters-bar">
   <div class="container">
+    <div class="radius-row" id="radiusRow" style="display:none;">
+      <b id="radiusLabel">Autour de votre ville :</b>
+      <div class="radius-wrap">
+        <input type="range" id="radiusInput" min="0" max="30" step="5" value="0" aria-label="Distance autour de la ville, en kilomètres">
+        <div class="radius-ticks" aria-hidden="true"><span>0</span><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30 km</span></div>
+      </div>
+      <span class="radius-val" id="radiusVal">0 km</span>
+    </div>
     <div class="filter-chips" id="categoryChips">
       <button class="chip chip-active" data-category="Tout">Tout</button>
     </div>
@@ -97,6 +105,7 @@
   let currentSort = 'recent';
   let currentSearch = '';
   let buyerLocation = null;
+  let buyerRadius = 0; // en km : 0 = la ville seule, puis 5, 10 ... 30
 
   // Nombre d'annonces affichées par page
   const PAGE_SIZE = 30;
@@ -113,6 +122,11 @@
   const typeParticulier = document.getElementById('typeParticulier');
   const typeProfessionnel = document.getElementById('typeProfessionnel');
   const pager = document.getElementById('pager');
+  const radiusRow = document.getElementById('radiusRow');
+  const radiusInput = document.getElementById('radiusInput');
+  const radiusVal = document.getElementById('radiusVal');
+  const radiusLabel = document.getElementById('radiusLabel');
+  const DEFAULT_NO_LISTING_TEXT = noListingsMessage.textContent;
 
   CATEGORIES.forEach((cat) => {
     const btn = document.createElement('button');
@@ -256,9 +270,49 @@
     }
   }
 
+  // Un vendeur est dans le rayon choisi autour de la ville de l'acheteur (0 km = la ville elle-même)
+  function sellerInRadius(item) {
+    if (!buyerLocation) return true;
+    const sameCity = !!(item.sellers && item.sellers.city &&
+      normalizeText(item.sellers.city).trim() === normalizeText(buyerLocation.city).trim());
+    if (buyerRadius === 0) return sameCity;
+    const d = getDistanceForListing(item);
+    if (d === null) return sameCity;
+    return d <= buyerRadius;
+  }
+
+  // Le curseur de distance n'apparaît que lorsqu'une ville est validée
+  function syncCityUi() {
+    if (buyerLocation) {
+      buyerCityInput.value = buyerLocation.city;
+      radiusLabel.textContent = 'Autour de ' + buyerLocation.city + ' :';
+      radiusRow.style.display = '';
+    } else {
+      radiusRow.style.display = 'none';
+    }
+    radiusInput.value = String(buyerRadius);
+    radiusVal.textContent = buyerRadius + ' km';
+  }
+
+  radiusInput.addEventListener('input', () => {
+    buyerRadius = Number(radiusInput.value) || 0;
+    radiusVal.textContent = buyerRadius + ' km';
+    try { localStorage.setItem('agrivoisin_buyer_radius', String(buyerRadius)); } catch (e) {}
+    goToFirstPage();
+    renderListings();
+  });
+
   buyerCityBtn.addEventListener('click', async () => {
     const city = buyerCityInput.value.trim();
-    if (!city) return;
+    if (!city) {
+      // Case vide : on enlève la ville et on revoit toutes les annonces
+      buyerLocation = null;
+      try { localStorage.removeItem('agrivoisin_buyer_location'); } catch (e) {}
+      syncCityUi();
+      goToFirstPage();
+      renderListings();
+      return;
+    }
 
     buyerCityBtn.textContent = 'Recherche...';
     buyerCityBtn.disabled = true;
@@ -273,6 +327,7 @@
 
       buyerLocation = { city, lat: data.latitude, lng: data.longitude };
       localStorage.setItem('agrivoisin_buyer_location', JSON.stringify(buyerLocation));
+      syncCityUi();
       goToFirstPage();
       renderListings();
     } catch (err) {
@@ -341,6 +396,11 @@
       });
     }
 
+    // Ville validée : on ne garde que les annonces des vendeurs dans le rayon choisi
+    const countBeforeCity = filtered.length;
+    if (buyerLocation) filtered = filtered.filter(sellerInRadius);
+    const emptyBecauseOfCity = !!buyerLocation && countBeforeCity > 0 && filtered.length === 0;
+
     if (currentSort === 'price-asc') {
       filtered.sort((a, b) => a.price - b.price);
     } else if (currentSort === 'price-desc') {
@@ -358,6 +418,10 @@
     }
 
     if (filtered.length === 0) {
+      noListingsMessage.textContent = emptyBecauseOfCity
+        ? 'Aucune annonce pour cette ville dans ce rayon. Faites une nouvelle recherche.'
+        : DEFAULT_NO_LISTING_TEXT;
+      noListingsMessage.classList.toggle('city-empty', emptyBecauseOfCity);
       noListingsMessage.style.display = 'block';
       pager.style.display = 'none';
       return;
@@ -749,6 +813,11 @@
   })();
 
   loadBuyerLocation();
+  try {
+    const savedRadius = parseInt(localStorage.getItem('agrivoisin_buyer_radius'), 10);
+    if (!isNaN(savedRadius) && savedRadius >= 0 && savedRadius <= 30) buyerRadius = savedRadius;
+  } catch (e) {}
+  syncCityUi();
   loadFavorites();
 
   fetch('/api/get-listings')
@@ -891,6 +960,15 @@
     .filters-card.is-compact .seller-type-filter { flex-wrap:nowrap; flex:none; }
   }
 
+  /* Curseur de distance autour de la ville */
+  .radius-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:2px 8px 10px; }
+  .radius-row b { color:#3E7A4A; font-size:0.95rem; }
+  .radius-wrap { flex:1; min-width:240px; max-width:520px; }
+  .radius-row input[type=range] { width:100%; accent-color:#7CCB86; height:6px; cursor:pointer; }
+  .radius-ticks { display:flex; justify-content:space-between; font-size:0.78rem; color:#6B5842; margin-top:2px; }
+  .radius-val { background:#7CCB86; color:#fff; font-weight:700; border-radius:999px; padding:5px 14px; font-size:0.95rem; white-space:nowrap; }
+  #noListingsMessage.city-empty { color:#4C7A50; font-weight:600; font-size:1.05rem; }
+
   /* Pages d'annonces : Précédent, numéros, Suivant */
   .pager { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:36px; }
   .pager-btn { padding:9px 18px; border-radius:999px; border:1.5px solid #3AA5E3; background:#fff; font-family:inherit; font-size:0.95rem; font-weight:700; color:#1F8FD6; cursor:pointer; }
@@ -909,3 +987,7 @@
 </style>
 </body>
 </html>
+
+
+
+

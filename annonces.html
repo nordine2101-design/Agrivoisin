@@ -57,11 +57,11 @@
   <div class="container">
     <div class="radius-row" id="radiusRow" style="display:none;">
       <b id="radiusLabel">Autour de votre ville :</b>
-      <div class="radius-wrap">
+      <div class="radius-wrap" id="radiusWrap">
+        <span class="radius-bubble" id="radiusVal">0 km</span>
         <input type="range" id="radiusInput" min="0" max="30" step="5" value="0" aria-label="Distance autour de la ville, en kilomètres">
-        <div class="radius-ticks" aria-hidden="true"><span>0</span><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30 km</span></div>
+        <div class="radius-ticks" aria-hidden="true"><span style="left:calc(13px + 0.00000 * (100% - 26px));">0</span><span style="left:calc(13px + 0.16667 * (100% - 26px));">5</span><span style="left:calc(13px + 0.33333 * (100% - 26px));">10</span><span style="left:calc(13px + 0.50000 * (100% - 26px));">15</span><span style="left:calc(13px + 0.66667 * (100% - 26px));">20</span><span style="left:calc(13px + 0.83333 * (100% - 26px));">25</span><span style="left:calc(13px + 1.00000 * (100% - 26px));">30 km</span></div>
       </div>
-      <span class="radius-val" id="radiusVal">0 km</span>
     </div>
     <div class="choice-row" id="cityChoiceRow" style="display:none;">
       <b id="cityChoiceTitle">Plusieurs villes portent ce nom. Choisissez la vôtre :</b>
@@ -129,6 +129,7 @@
   const radiusRow = document.getElementById('radiusRow');
   const radiusInput = document.getElementById('radiusInput');
   const radiusVal = document.getElementById('radiusVal');
+  const radiusWrap = document.getElementById('radiusWrap');
   const radiusLabel = document.getElementById('radiusLabel');
   const cityChoiceRow = document.getElementById('cityChoiceRow');
   const cityChoiceTitle = document.getElementById('cityChoiceTitle');
@@ -306,11 +307,13 @@
     }
     radiusInput.value = String(buyerRadius);
     radiusVal.textContent = buyerRadius + ' km';
+    radiusWrap.style.setProperty('--pct', String(buyerRadius / 30));
   }
 
   radiusInput.addEventListener('input', () => {
     buyerRadius = Number(radiusInput.value) || 0;
     radiusVal.textContent = buyerRadius + ' km';
+    radiusWrap.style.setProperty('--pct', String(buyerRadius / 30));
     goToFirstPage();
     renderListings();
   });
@@ -1084,10 +1087,20 @@
   /* Curseur de distance autour de la ville */
   .radius-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:2px 8px 10px; }
   .radius-row b { color:#3E7A4A; font-size:0.95rem; }
-  .radius-wrap { flex:1; min-width:240px; max-width:520px; }
-  .radius-row input[type=range] { width:100%; accent-color:#7CCB86; height:6px; cursor:pointer; }
-  .radius-ticks { display:flex; justify-content:space-between; font-size:0.78rem; color:#6B5842; margin-top:2px; }
-  .radius-val { background:#7CCB86; color:#fff; font-weight:700; border-radius:999px; padding:5px 14px; font-size:0.95rem; white-space:nowrap; }
+  .radius-wrap { flex:1; min-width:260px; max-width:520px; margin-right:16px; position:relative; height:84px; --pct:0; }
+  /* Le centre de la boule va de 13 px (0 km) à (largeur - 13 px) (30 km) : les chiffres et la bulle suivent le même calcul */
+  .radius-wrap input[type=range] { position:absolute; left:0; top:34px; width:100%; height:26px; margin:0; padding:0; background:transparent; -webkit-appearance:none; appearance:none; cursor:pointer; }
+  .radius-wrap input[type=range]:focus { outline:none; }
+  .radius-wrap input[type=range]::-webkit-slider-runnable-track { height:14px; border-radius:14px; background:linear-gradient(90deg,#9BDDA3 0,#6BBE76 calc(13px + var(--pct) * (100% - 26px)),#DCEBD8 calc(13px + var(--pct) * (100% - 26px))); box-shadow:inset 0 2px 3px rgba(0,0,0,.12); }
+  .radius-wrap input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:26px; height:26px; margin-top:-6px; border-radius:50%; background:#fff; border:3px solid #3E9B4D; box-sizing:border-box; box-shadow:0 2px 5px rgba(0,0,0,.3); }
+  .radius-wrap input[type=range]::-moz-range-track { height:14px; border-radius:14px; background:#DCEBD8; box-shadow:inset 0 2px 3px rgba(0,0,0,.12); }
+  .radius-wrap input[type=range]::-moz-range-progress { height:14px; border-radius:14px; background:#6BBE76; }
+  .radius-wrap input[type=range]::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:#fff; border:3px solid #3E9B4D; box-sizing:border-box; box-shadow:0 2px 5px rgba(0,0,0,.3); }
+  .radius-wrap input[type=range]:focus-visible::-webkit-slider-thumb { outline:2px solid #7CCB86; outline-offset:2px; }
+  .radius-wrap input[type=range]:focus-visible::-moz-range-thumb { outline:2px solid #7CCB86; outline-offset:2px; }
+  .radius-bubble { position:absolute; top:0; left:calc(13px + var(--pct) * (100% - 26px)); transform:translateX(-50%); background:#3E9B4D; color:#fff; font-weight:700; font-size:0.85rem; border-radius:10px; padding:3px 10px; white-space:nowrap; }
+  .radius-bubble:after { content:""; position:absolute; left:50%; bottom:-5px; margin-left:-5px; border:5px solid transparent; border-top-color:#3E9B4D; border-bottom:0; }
+  .radius-ticks span { position:absolute; top:62px; transform:translateX(-50%); font-size:0.78rem; color:#6B5842; white-space:nowrap; }
   /* Choix de la ville quand plusieurs communes portent le même nom */
   .choice-row { padding:4px 8px 10px; }
   .choice-row b { display:block; color:#3E7A4A; font-size:0.95rem; margin-bottom:8px; }
@@ -1115,5 +1128,4 @@
 </style>
 </body>
 </html>
-
 

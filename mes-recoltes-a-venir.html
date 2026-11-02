@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mes récoltes à venir — Agrivoisin</title>
+<meta name="description" content="Vos récoltes prévues dans les 3 jours sur Agrivoisin.">
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+</head>
+<body>
+
+<!-- ============ MES RÉCOLTES À VENIR ============ -->
+<section class="page-header my-page">
+  <div class="my-panel">
+    <div class="my-topbar">
+      <a href="mes-annonces.html" class="btn btn-ghost btn-back">Retour</a>
+      <h1>Bientôt mûr</h1>
+    </div>
+    <p class="my-intro">Vos récoltes prévues dans les 3 jours. Quand la récolte est prête, cliquez sur « Mettre en vente maintenant » : elle passe dans vos annonces, et les personnes qui ont réservé ont 48 h pour commander en premier.</p>
+
+    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#2d6b38;text-align:center;">Vous devez être connecté pour voir vos récoltes. <a href="connexion.html" style="color:#2d6b38;font-weight:700;">Se connecter</a></p>
+    <p id="notSellerMessage" style="display:none;margin-top:16px;color:#2d6b38;text-align:center;">Vous n'avez pas encore de compte vendeur. <a href="vendre.html" style="color:#2d6b38;font-weight:700;">Devenir vendeur</a></p>
+    <p id="loadingMessage" style="margin-top:16px;color:#2d6b38;text-align:center;">Chargement de vos récoltes à venir...</p>
+    <p id="emptyMessage" style="display:none;margin-top:16px;color:#2d6b38;text-align:center;">Aucune récolte à venir pour le moment. <a href="publier-annonce.html" style="color:#2d6b38;font-weight:700;">Publier une annonce</a></p>
+    <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;text-align:center;"></p>
+
+    <div id="comingContainer" class="produce-grid"></div>
+  </div>
+
+  <div class="my-video"></div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 4C16 4 8 9 8 17C8 22.5 11.5 26 16 26C20.5 26 24 22.5 24 17C24 9 16 4 16 4Z" fill="#9FC49A"/>
+          </svg>
+          Agrivoisin
+        </div>
+        <p>La marketplace qui relie les jardiniers particuliers et leurs voisins, récolte après récolte.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Découvrir</h5>
+        <ul>
+          <li><a href="annonces.html">Les annonces</a></li>
+          <li><a href="index.html#comment-ca-marche">Comment ça marche</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Compte</h5>
+        <ul>
+          <li><a href="connexion.html">Se connecter</a></li>
+          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="panier.html">Mon panier</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Informations</h5>
+        <ul>
+          <li><a href="cgv.html">Conditions générales</a></li>
+          <li><a href="conditions-vendeurs.html">Conditions vendeurs professionnels</a></li>
+          <li><a href="confidentialite.html">Confidentialité</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Agrivoisin. Tous droits réservés.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  const loadingMessage = document.getElementById('loadingMessage');
+  const emptyMessage = document.getElementById('emptyMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const notSellerMessage = document.getElementById('notSellerMessage');
+  const container = document.getElementById('comingContainer');
+
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+
+  // Protège l'affichage : un titre saisi par un vendeur n'est jamais interprété comme du code
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  // Une quantité s'écrit toujours avec son unité : « 3 kg », « 1 botte », « 3 bottes », « 2 bocaux »
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'kg';
+    if (count <= 1) return u;
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u;
+    return pluralWord(u);
+  }
+
+  function parisTodayIso() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
+  }
+
+  function plannedLabel(item) {
+    const d = String(item.planned_date || '').slice(0, 10);
+    if (!d) return 'Prévu bientôt';
+    const diff = Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(parisTodayIso() + 'T00:00:00Z')) / 86400000);
+    if (diff < 0) return 'Prévu : hier';
+    if (diff === 0) return "Prévu : aujourd'hui";
+    if (diff === 1) return 'Prévu : demain';
+    if (diff === 2) return 'Prévu : après-demain';
+    return 'Prévu : le ' + d.split('-').reverse().slice(0, 2).join('/');
+  }
+
+  // Petit message en bas de l'écran
+  function showToast(html) {
+    let t = document.getElementById('favToast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'favToast';
+      t.setAttribute('role', 'status');
+      document.body.appendChild(t);
+    }
+    t.innerHTML = html;
+    t.classList.add('show');
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => t.classList.remove('show'), 4500);
+  }
+
+  // « Réservé : 15 kg sur 40 kg (2 personnes) · 1 alerte »
+  function reservedText(item) {
+    const total = Number(item.quantity_available) || 0;
+    const reserved = Number(item.reserved_quantity) || 0;
+    const people = Number(item.reservations_count) || 0;
+    const alerts = Number(item.alerts_count) || 0;
+    let text = 'Réservé : ' + reserved + ' ' + unitLabel(item.unit, reserved) + ' sur ' + total + ' ' + unitLabel(item.unit, total);
+    if (people > 0) text += ' (' + people + ' ' + (people > 1 ? 'personnes' : 'personne') + ')';
+    text += ' · ' + (alerts > 0 ? alerts + ' ' + (alerts > 1 ? 'alertes' : 'alerte') : 'aucune alerte');
+    return text;
+  }
+
+  function buildComingCard(item) {
+    const card = document.createElement('div');
+    card.className = 'produce-card coming-card';
+    const sellerIsPro = item.sellers && item.sellers.seller_type === 'professionnel';
+    const qty = item.quantity_available == null ? null : Number(item.quantity_available);
+    const qtyHtml = qty === null ? '' : '<p class="coming-qty">Environ ' + escapeHtml(qty) + ' ' + escapeHtml(unitLabel(item.unit, qty)) + '</p>';
+    const priceText = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + escapeHtml(item.unit || 'kg');
+    const isPro = pageSellerType === 'professionnel';
+    card.innerHTML = `
+      <div class="produce-card-image" style="display:block;position:relative;">
+        <span class="seller-type-disc">${isPro ? 'Professionnel' : 'Particulier'}</span>
+        <img src="${escapeHtml(item.image_url || 'agrivoisin-logo-final.png')}" alt="${escapeHtml(item.title)}">
+      </div>
+      <div class="produce-card-body">
+        <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${item.is_bio === true ? '<span class="bio-pill">BIO</span>' : ''}
+        <h4>${escapeHtml(item.title)}</h4>
+        <p class="coming-date">${escapeHtml(plannedLabel(item))}</p>
+        ${qtyHtml}
+        <p class="coming-reserved">${escapeHtml(reservedText(item))}</p>
+        <div class="produce-card-footer"><span class="price">${priceText}</span></div>
+        <div class="coming-actions">
+          <button type="button" class="coming-btn coming-open">Mettre en vente maintenant</button>
+          <button type="button" class="coming-btn coming-edit">Modifier</button>
+        </div>
+        <button type="button" class="coming-cancel">Annuler cette récolte</button>
+      </div>
+    `;
+    const soon = () => showToast('Cette fonction arrive bientôt.');
+    card.querySelector('.coming-open').addEventListener('click', soon);
+    card.querySelector('.coming-edit').addEventListener('click', soon);
+    card.querySelector('.coming-cancel').addEventListener('click', soon);
+    return card;
+  }
+
+  let pageSellerType = 'particulier';
+
+  async function init() {
+    let token = null;
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      token = session && session.access_token ? session.access_token : null;
+    } catch (e) {
+      token = null;
+    }
+    if (!token) {
+      loadingMessage.style.display = 'none';
+      notLoggedMessage.style.display = 'block';
+      return;
+    }
+    try {
+      const res = await fetch('/api/get-seller-listings?status=bientot_mur', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      let data = {};
+      try { data = await res.json(); } catch (e) { data = {}; }
+      loadingMessage.style.display = 'none';
+      if (!res.ok) {
+        if (data.error && data.error.includes('vendeur')) {
+          notSellerMessage.style.display = 'block';
+          return;
+        }
+        throw new Error(data.error || 'Réponse ' + res.status);
+      }
+      pageSellerType = data.sellerType === 'professionnel' ? 'professionnel' : 'particulier';
+      const items = (data.listings || []).slice().sort((a, b) => String(a.planned_date || '').localeCompare(String(b.planned_date || '')));
+      if (items.length === 0) {
+        emptyMessage.style.display = 'block';
+        return;
+      }
+      items.forEach((item) => container.appendChild(buildComingCard(item)));
+    } catch (err) {
+      console.error('Erreur chargement récoltes à venir :', err);
+      loadingMessage.style.display = 'none';
+      errorMessage.textContent = 'Impossible de charger vos récoltes à venir pour le moment. Réessayez dans un instant.';
+      errorMessage.style.display = 'block';
+    }
+  }
+
+  init();
+</script>
+
+<style>
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:#fff; }
+  .my-panel { background:#CDEBD0; border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#7CCB86; color:#fff; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-topbar { position:relative; display:flex; justify-content:center; align-items:center; min-height:48px; margin-bottom:16px; }
+  .my-topbar .btn { position:absolute; left:0; top:50%; transform:translateY(-50%); }
+  .my-panel .my-intro { font-size:0.95rem; color:#2d6b38; margin:0 0 22px; text-align:left; }
+  .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:#CDEBD0; border-radius:28px; }
+  .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
+
+  .my-panel .produce-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; }
+  @media (max-width: 640px) { .my-panel .produce-grid { grid-template-columns:1fr; } }
+  .produce-card { position:relative; }
+  .produce-card-body { position:relative; }
+  .seller-type-disc { display:block; background:#fff; color:#C8352F; font-size:0.8rem; font-weight:700; padding:7px 15px 6px 14px; border-radius:0 18px 0 12px; box-shadow:inset 0 0 0 2px #C8352F; position:absolute; top:0; right:0; z-index:2; }
+  .bio-pill { display:inline-block; margin-left:6px; background:#fff; border:2px solid #2F8F3A; color:#2F8F3A; border-radius:999px; padding:2px 10px; font-weight:800; font-size:0.72rem; letter-spacing:0.05em; vertical-align:middle; }
+  .coming-card { background:#E8F5E9; border:2px solid #3E9B4D !important; }
+  .coming-card .produce-card-body h4 { margin:6px 0; }
+  .coming-date { display:inline-block; margin:6px 0; padding:4px 12px; border-radius:999px; border:1px solid #3E9B4D; background:#fff; color:#2d6b38; font-size:0.85rem; font-weight:700; }
+  .coming-card .price { color:#2d6b38; }
+  .coming-qty { margin:4px 0; font-weight:700; color:#2d6b38; }
+  .coming-actions { display:flex; gap:8px; margin-top:12px; }
+  .coming-btn { flex:1; padding:10px 8px; border:0; border-radius:10px; color:#fff; font-family:inherit; font-weight:700; font-size:0.9rem; cursor:pointer; }
+  .coming-btn:disabled { opacity:.6; cursor:default; }
+  .coming-reserved { margin:4px 0; font-weight:700; color:#2d6b38; }
+  .coming-open { background:#2d6b38; }
+  .coming-edit { background:#fff; color:#2d6b38; box-shadow:inset 0 0 0 2px #3E9B4D; }
+  .coming-cancel { display:block; margin:12px auto 0; background:none; border:0; padding:0; color:#C8352F; font-family:inherit; font-size:0.85rem; font-weight:700; text-decoration:underline; cursor:pointer; }
+  #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
+  #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
+</style>
+</body>
+</html>

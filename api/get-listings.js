@@ -687,6 +687,136 @@ function isComingSoonActive(item, today) {
   return String(item.planned_date).slice(0, 10) >= addDaysIso(today, -1);
 }
 
+// ---------- Alertes « Prévenez-moi » (récoltes « Bientôt mûr ») ----------
+// Réservées aux inscrits (e-mail vérifié). 5 alertes en attente au maximum par personne, une seule par annonce.
+// Les e-mails sont envoyés par Agrivoisin seulement : le vendeur ne voit jamais l'adresse de l'acheteur.
+const MAX_ALERTS = 5;
+
+// Renvoie l'utilisateur connecté (e-mail vérifié), ou répond (401 / 403) et renvoie null
+async function requireUser(req, res) {
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!token) {
+    res.status(401).json({ error: 'Connectez-vous pour être prévenu.' });
+    return null;
+  }
+  const { data: userData, error: userError } = await supabase.auth.getUser(token);
+  if (userError || !userData || !userData.user) {
+    res.status(401).json({ error: 'Session invalide, reconnectez-vous.' });
+    return null;
+  }
+  if (!userData.user.email_confirmed_at) {
+    res.status(403).json({ error: 'Confirmez votre adresse e-mail pour être prévenu.' });
+    return null;
+  }
+  return userData.user;
+}
+
+// Parmi ces annonces, celles qui sont encore « Bientôt mûr » et pas expirées
+async function activeComingIds(listingIds) {
+  if (!listingIds.length) return new Set();
+  const { data, error } = await supabase
+    .from('listings')
+    .select('id, availability_status, planned_date')
+    .in('id', listingIds);
+  if (error) throw error;
+  const today = todayInParis();
+  return new Set((data || []).filter((l) => isComingSoonActive(l, today)).map((l) => String(l.id)));
+}
+
+// Les alertes en attente d'une personne (une alerte sur une récolte expirée ou déjà en vente ne compte plus)
+async function pendingAlertIds(userId) {
+  const { data, error } = await supabase
+    .from('listing_alerts')
+    .select('listing_id')
+    .eq('user_id', userId)
+    .is('notified_at', null);
+  if (error) throw error;
+  const ids = (data || []).map((row) => String(row.listing_id));
+  const active = await activeComingIds(ids);
+  return ids.filter((id) => active.has(id));
+}
+
+async function alertsList(req, res) {
+  try {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const alerts = await pendingAlertIds(user.id);
+    return res.status(200).json({ alerts, count: alerts.length, max: MAX_ALERTS });
+  } catch (err) {
+    console.error('Erreur alerts_list :', err);
+    return res.status(500).json({ error: 'Impossible de charger vos alertes pour le moment.' });
+  }
+}
+
+// Un clic active l'alerte, un second clic la retire
+async function alertToggle(req, res) {
+  try {
+    const user = await requireUser(req, res);
+    if (!user) return;
+
+    const body = req.body || {};
+    const listingId = typeof body.listingId === 'string' || typeof body.listingId === 'number' ? String(body.listingId).trim() : '';
+    if (!listingId || listingId.length > 64) {
+      return res.status(400).json({ error: 'Annonce introuvable.' });
+    }
+
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, availability_status, planned_date')
+      .eq('id', listingId)
+      .maybeSingle();
+    if (listingError) throw listingError;
+    if (!listing) {
+      return res.status(404).json({ error: "Cette annonce n'existe plus." });
+    }
+    if (!isComingSoonActive(listing, todayInParis())) {
+      return res.status(400).json({ error: "Cette récolte n'est plus à venir." });
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from('listing_alerts')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('listing_id', listingId)
+      .maybeSingle();
+    if (existingError) throw existingError;
+
+    if (existing) {
+      const { error: deleteError } = await supabase.from('listing_alerts').delete().eq('id', existing.id);
+      if (deleteError) throw deleteError;
+      const alerts = await pendingAlertIds(user.id);
+      return res.status(200).json({ active: false, alerts, count: alerts.length, max: MAX_ALERTS });
+    }
+
+    const pending = await pendingAlertIds(user.id);
+    if (pending.length >= MAX_ALERTS) {
+      return res.status(409).json({ error: 'Vous avez déjà ' + MAX_ALERTS + ' alertes. Retirez-en une pour en ajouter.', code: 'limit', alerts: pending, count: pending.length, max: MAX_ALERTS });
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('listing_alerts')
+      .insert({ user_id: user.id, listing_id: listingId })
+      .select('id')
+      .maybeSingle();
+    if (insertError) {
+      // Déjà enregistrée entre-temps (code 23505) : c'est le résultat voulu
+      if (insertError.code !== '23505') throw insertError;
+    }
+
+    // Deux clics en même temps ne doivent pas dépasser la limite : on vérifie encore une fois
+    let alerts = await pendingAlertIds(user.id);
+    if (alerts.length > MAX_ALERTS && inserted && inserted.id) {
+      await supabase.from('listing_alerts').delete().eq('id', inserted.id);
+      alerts = await pendingAlertIds(user.id);
+      return res.status(409).json({ error: 'Vous avez déjà ' + MAX_ALERTS + ' alertes. Retirez-en une pour en ajouter.', code: 'limit', alerts, count: alerts.length, max: MAX_ALERTS });
+    }
+    return res.status(200).json({ active: true, alerts, count: alerts.length, max: MAX_ALERTS });
+  } catch (err) {
+    console.error('Erreur alert_toggle :', err);
+    return res.status(500).json({ error: "Impossible d'enregistrer votre alerte pour le moment. Réessayez." });
+  }
+}
+
 export default async function handler(req, res) {
   // POST : signalement d'une annonce (ouvert à tous), sinon actions de l'administrateur
   // (modération des commentaires, suivi fiscal des vendeurs)
@@ -696,6 +826,12 @@ export default async function handler(req, res) {
     }
     if (req.body && req.body.action === 'contact_message') {
       return contactMessage(req, res);
+    }
+    if (req.body && req.body.action === 'alerts_list') {
+      return alertsList(req, res);
+    }
+    if (req.body && req.body.action === 'alert_toggle') {
+      return alertToggle(req, res);
     }
     return handleAdminAction(req, res);
   }

@@ -6,6 +6,7 @@
 <title>Bientôt mûr — Agrivoisin</title>
 <meta name="description" content="Les récoltes prévues dans les 3 jours près de chez vous sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
 </head>
 <body>
 
@@ -17,6 +18,8 @@
       <h1>Bientôt mûr</h1>
     </div>
     <p class="my-intro">Des récoltes prévues dans les 3 jours. Elles ne sont pas encore en vente : « Prévenez-moi » pour recevoir un e-mail gratuit à l'ouverture de la vente, ou « Réserver » pour bloquer le prix (1 € de frais de réservation).</p>
+
+    <div id="alertBar" class="alert-bar" style="display:none;"></div>
 
     <p id="loadingMessage" style="margin-top:16px;color:#2d6b38;text-align:center;">Chargement des récoltes à venir...</p>
     <p id="emptyMessage" style="display:none;margin-top:16px;color:#2d6b38;text-align:center;">Aucune récolte à venir pour le moment. <a href="annonces.html" style="color:#2d6b38;font-weight:700;">Voir les annonces disponibles</a></p>
@@ -79,7 +82,16 @@
   const errorMessage = document.getElementById('errorMessage');
   const container = document.getElementById('comingContainer');
 
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+  const alertBar = document.getElementById('alertBar');
+
   let buyerLocation = null;
+  let accessToken = null;          // vide = visiteur non connecté
+  let myAlerts = new Set();        // identifiants des annonces pour lesquelles une alerte est active
+  const MAX_ALERTS = 5;
 
   // Protège l'affichage : un titre ou un nom saisi par un vendeur n'est jamais interprété comme du code
   function escapeHtml(value) {
@@ -163,6 +175,66 @@
     showToast.timer = setTimeout(() => t.classList.remove('show'), 4500);
   }
 
+  // Appel au serveur pour les alertes (toujours avec la session de la personne)
+  async function alertApi(body) {
+    const res = await fetch('/api/get-listings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+      body: JSON.stringify(body),
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e) { data = {}; }
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  // Le bandeau du haut : le compteur pour une personne connectée, une invitation pour un visiteur
+  function renderAlertBar() {
+    alertBar.style.display = 'block';
+    if (!accessToken) {
+      alertBar.className = 'alert-bar alert-bar-visit';
+      alertBar.innerHTML = '🔔 Connectez-vous pour être prévenu. <a href="connexion.html">Se connecter</a>';
+    } else {
+      alertBar.className = 'alert-bar alert-bar-count';
+      alertBar.textContent = '🔔 Vos alertes : ' + myAlerts.size + ' sur ' + MAX_ALERTS;
+    }
+  }
+
+  function refreshAlertButtons() {
+    document.querySelectorAll('.coming-alert').forEach((btn) => {
+      const on = myAlerts.has(String(btn.dataset.listingId));
+      btn.classList.toggle('on', on);
+      btn.textContent = on ? '✓ Alerte activée' : '🔔 Prévenez-moi';
+    });
+  }
+
+  function setAlertsFromServer(data) {
+    if (data && Array.isArray(data.alerts)) myAlerts = new Set(data.alerts.map(String));
+    renderAlertBar();
+    refreshAlertButtons();
+  }
+
+  async function onAlertClick(btn) {
+    if (!accessToken) {
+      showToast('Connectez-vous pour être prévenu. <a href="connexion.html" style="color:#fff;text-decoration:underline;">Se connecter</a>');
+      return;
+    }
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const r = await alertApi({ action: 'alert_toggle', listingId: btn.dataset.listingId });
+      if (r.ok) {
+        setAlertsFromServer(r.data);
+        showToast(r.data.active ? 'Alerte activée : vous recevrez un e-mail à l\'ouverture de la vente.' : 'Alerte retirée.');
+      } else {
+        if (r.data && r.data.alerts) setAlertsFromServer(r.data);
+        showToast(escapeHtml((r.data && r.data.error) || 'Impossible pour le moment. Réessayez.'));
+      }
+    } catch (e) {
+      showToast('Impossible pour le moment. Réessayez.');
+    }
+    btn.disabled = false;
+  }
+
   function buildComingCard(item) {
     const card = document.createElement('div');
     card.className = 'produce-card coming-card';
@@ -193,14 +265,20 @@
         </div>
       </div>
     `;
-    card.querySelectorAll('.coming-btn').forEach((btn) => {
-      btn.addEventListener('click', () => showToast('Cette fonction arrive très bientôt.'));
-    });
+    card.querySelector('.coming-alert').addEventListener('click', (e) => onAlertClick(e.currentTarget));
+    card.querySelector('.coming-reserve').addEventListener('click', () => showToast('Cette fonction arrive très bientôt.'));
     return card;
   }
 
   async function init() {
     loadBuyerLocation();
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      accessToken = session && session.access_token ? session.access_token : null;
+    } catch (e) {
+      accessToken = null;
+    }
+    renderAlertBar();
     try {
       const res = await fetch('/api/get-listings?status=bientot_mur');
       if (!res.ok) throw new Error('Réponse ' + res.status);
@@ -212,6 +290,12 @@
         return;
       }
       items.forEach((item) => container.appendChild(buildComingCard(item)));
+      if (accessToken) {
+        try {
+          const r = await alertApi({ action: 'alerts_list' });
+          if (r.ok) setAlertsFromServer(r.data);
+        } catch (e) { /* le bouton reste « Prévenez-moi » */ }
+      }
     } catch (err) {
       console.error('Erreur chargement récoltes à venir :', err);
       loadingMessage.style.display = 'none';
@@ -248,6 +332,12 @@
   .coming-btn { flex:1; padding:10px 8px; border:0; border-radius:10px; color:#fff; font-family:inherit; font-weight:700; font-size:0.9rem; cursor:pointer; }
   .coming-alert { background:#3E9B4D; }
   .coming-reserve { background:#2d6b38; }
+  .alert-bar { background:#fff; border:2px solid #3E9B4D; color:#2d6b38; font-weight:700; border-radius:999px; padding:10px 18px; margin:0 0 18px; }
+  .alert-bar-count { display:inline-block; }
+  .alert-bar-visit { border-radius:14px; }
+  .alert-bar a { color:#2d6b38; text-decoration:underline; }
+  .coming-alert.on { background:#fff; color:#2d6b38; box-shadow:inset 0 0 0 2px #3E9B4D; }
+  .coming-btn:disabled { opacity:.6; cursor:default; }
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
 </style>

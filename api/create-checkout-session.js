@@ -192,8 +192,12 @@ function addDaysIso(isoDate, days) {
 }
 
 // Une récolte à venir est réservable jusqu'à 1 jour après sa date prévue (comme pour son affichage)
+// Pendant les 3 premières heures après sa publication, la récolte n'est pas encore visible des acheteurs : elle ne se réserve pas
+const COMING_SOON_DELAY_MS = 3 * 60 * 60 * 1000;
+
 function isComingSoonActive(listing, today) {
   if (listing.availability_status !== 'bientot_mur' || !listing.planned_date) return false;
+  if (listing.created_at && Date.now() < new Date(listing.created_at).getTime() + COMING_SOON_DELAY_MS) return false;
   return String(listing.planned_date).slice(0, 10) >= addDaysIso(today, -1);
 }
 
@@ -255,7 +259,7 @@ async function reserveCheckout(req, res) {
 
     const { data: listing, error: listingError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, availability_status, planned_date, sellers(id, user_id, city, latitude, longitude, stripe_account_id)')
+      .select('id, title, price, unit, quantity_available, availability_status, planned_date, created_at, sellers(id, user_id, city, latitude, longitude, stripe_account_id)')
       .eq('id', listingId)
       .maybeSingle();
     if (listingError) {

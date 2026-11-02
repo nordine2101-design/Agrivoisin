@@ -670,6 +670,23 @@ async function contactMessage(req, res) {
   }
 }
 
+// « Bientôt mûr » : les annonces de récoltes à venir ne se mélangent jamais aux annonces disponibles.
+// Par défaut, la liste ne contient que les annonces « Disponible maintenant ». Avec ?status=bientot_mur,
+// elle ne contient que les récoltes à venir. Une récolte à venir disparaît 1 jour après sa date prévue.
+function addDaysIso(isoDate, days) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+function isAvailableNow(item) {
+  return (item.availability_status || 'disponible') === 'disponible';
+}
+
+function isComingSoonActive(item, today) {
+  if (item.availability_status !== 'bientot_mur' || !item.planned_date) return false;
+  return String(item.planned_date).slice(0, 10) >= addDaysIso(today, -1);
+}
+
 export default async function handler(req, res) {
   // POST : signalement d'une annonce (ouvert à tous), sinon actions de l'administrateur
   // (modération des commentaires, suivi fiscal des vendeurs)
@@ -690,7 +707,7 @@ export default async function handler(req, res) {
   try {
     const { data: rawListings, error } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, delivery_mode, shipping_tiers, multi_parcel, is_bio, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, delivery_mode, shipping_tiers, multi_parcel, is_bio, availability_status, planned_date, price_locked, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -705,13 +722,21 @@ export default async function handler(req, res) {
     // et reconnue sur la carte (la distance doit toujours pouvoir être calculée)
     // Une annonce épuisée (stock à 0) disparaît tout de suite de la liste.
     // Une quantité vide veut dire « sans limite » : c'est le cas des anciennes annonces.
-    const visibleListings = (listings || []).filter(
+    const baseVisible = (listings || []).filter(
       (item) =>
         item.sellers &&
         item.sellers.city &&
         item.sellers.latitude != null &&
         item.sellers.longitude != null &&
         (item.quantity_available == null || Number(item.quantity_available) > 0)
+    );
+
+    // Deux listes qui ne se mélangent jamais : les annonces disponibles, et les récoltes « Bientôt mûr »
+    const today = todayInParis();
+    const wantComingSoon = req.query?.status === 'bientot_mur';
+    const comingSoonCount = baseVisible.filter((item) => isComingSoonActive(item, today)).length;
+    const visibleListings = baseVisible.filter((item) =>
+      wantComingSoon ? isComingSoonActive(item, today) : isAvailableNow(item)
     );
 
     // Page vendeur : ?listing=<id d'une annonce> renvoie le profil public de son vendeur.
@@ -795,7 +820,7 @@ export default async function handler(req, res) {
       };
     });
 
-    res.status(200).json({ listings: listingsWithRating });
+    res.status(200).json({ listings: listingsWithRating, comingSoonCount });
 
   } catch (error) {
     console.error(error);

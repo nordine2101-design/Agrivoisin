@@ -122,6 +122,41 @@ function readServiceFee(session) {
   return Number.isInteger(value) && value >= 0 && value <= 100 ? value : 0;
 }
 
+// La réduction « frais de réservation déduits » appliquée à ce paiement (1 € par réservation de l'acheteur), annoncée par le paiement.
+// Valeur prudente : un entier de 0 à 5000 centimes, sinon 0.
+function readReservationDiscount(session) {
+  const value = Number(session.metadata?.reservation_discount_cents);
+  return Number.isInteger(value) && value >= 0 && value <= 5000 ? value : 0;
+}
+
+// Après une commande réussie : les réservations de l'acheteur sur les annonces servies passent à « commandée »
+// (leurs 1 € ont été déduits du paiement). Seules comptent les réservations dans leur fenêtre de 48 h après l'ouverture de la vente,
+// jugée à l'heure où le paiement a été préparé. Jamais bloquant : la commande est déjà enregistrée.
+async function markReservationsOrdered(buyerId, servedListingIds, purchaseMs) {
+  try {
+    const ids = [...servedListingIds];
+    if (ids.length === 0) return;
+    const { data: openedRows, error: openedError } = await supabase
+      .from('listings')
+      .select('id, sale_opened_at')
+      .in('id', ids);
+    if (openedError) throw new Error(openedError.message);
+    const inWindow = (openedRows || [])
+      .filter((l) => l.sale_opened_at && purchaseMs < new Date(l.sale_opened_at).getTime() + 48 * 60 * 60 * 1000)
+      .map((l) => l.id);
+    if (inWindow.length === 0) return;
+    const { error: markError } = await supabase
+      .from('listing_reservations')
+      .update({ status: 'commandee', ordered_at: new Date().toISOString() })
+      .eq('user_id', buyerId)
+      .eq('status', 'active')
+      .in('listing_id', inWindow);
+    if (markError) throw new Error(markError.message);
+  } catch (err) {
+    console.error('Réservations non marquées comme commandées :', err.message);
+  }
+}
+
 // Les frais d'expédition rangés avec le panier : { identifiant de l'annonce : centimes }.
 // Une annonce présente dans cette liste est expédiée (même à 0 centime) ; les autres sont en retrait.
 function readShippingFees(shipping) {
@@ -422,6 +457,8 @@ export default async function handler(req, res) {
     }
 
     const serviceFeeCents = readServiceFee(session);
+    // Les frais de réservation déduits du prix (réduction sur le paiement) : l'acheteur paie ce montant en moins
+    const reservationDiscountCents = readReservationDiscount(session);
 
     // Les frais d'expédition (par annonce expédiée) et l'adresse de livraison de l'acheteur
     const shippingFees = readShippingFees(shipping);
@@ -453,8 +490,8 @@ export default async function handler(req, res) {
 
     // Petite vérification de cohérence (informative)
     const linesTotal = lines.reduce((sum, l) => sum + l.cents, 0);
-    if (linesTotal + serviceFeeCents + shippingTotalCents !== session.amount_total) {
-      console.warn(`Paiement ${session.id} : total des articles (${linesTotal}), frais de service (${serviceFeeCents}) et frais d'expédition (${shippingTotalCents}) différents du montant payé (${session.amount_total}).`);
+    if (linesTotal + serviceFeeCents + shippingTotalCents - reservationDiscountCents !== session.amount_total) {
+      console.warn(`Paiement ${session.id} : total des articles (${linesTotal}), frais de service (${serviceFeeCents}), frais d'expédition (${shippingTotalCents}) et réduction de réservation (${reservationDiscountCents}) différents du montant payé (${session.amount_total}).`);
     }
 
     // 3. Le stock : on prend les unités achetées (jamais plus que ce qui reste)
@@ -650,7 +687,8 @@ export default async function handler(req, res) {
         await stripe.refunds.create(
           {
             payment_intent: session.payment_intent,
-            amount: totalRefundCents,
+            // Jamais plus que ce qui a été payé (la réduction de réservation a baissé le montant payé)
+            amount: Math.min(totalRefundCents, session.amount_total),
             metadata: { raison: 'stock_epuise', paiement: session.id },
           },
           { idempotencyKey: 'stock-refund-' + session.id }
@@ -671,7 +709,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ received: true, refunded: true });
       }
     }
+
+    // 8. Les réservations de l'acheteur sur les annonces servies passent à « commandée » (leurs 1 € ont été déduits)
+    if (reservationDiscountCents > 0) {
+      await markReservationsOrdered(buyerId, servedListingIds, purchaseMs);
+    }
   }
 
   res.status(200).json({ received: true });
 }
+
+

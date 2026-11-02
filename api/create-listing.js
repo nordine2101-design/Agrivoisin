@@ -129,6 +129,40 @@ function validateShippingTiers(input) {
   return { tiers };
 }
 
+// « Bientôt mûr » : une récolte pas encore faite, prévue dans 3 jours au maximum après le dépôt de l'annonce.
+// On compte les jours à l'heure de Paris : la date prévue va d'aujourd'hui à aujourd'hui + 3 jours.
+const MAX_DAYS_AHEAD = 3;
+
+function parisToday() {
+  // Date du jour à Paris, au format AAAA-MM-JJ
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
+}
+
+function addDays(isoDate, days) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  return date.toISOString().slice(0, 10);
+}
+
+function validatePlannedDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return { error: 'Indiquez la date de mise en vente prévue.' };
+  }
+  const check = new Date(value + 'T00:00:00Z');
+  if (Number.isNaN(check.getTime()) || check.toISOString().slice(0, 10) !== value) {
+    return { error: "La date de mise en vente prévue n'est pas valide." };
+  }
+  const today = parisToday();
+  const latest = addDays(today, MAX_DAYS_AHEAD);
+  if (value < today) {
+    return { error: 'La date de mise en vente prévue ne peut pas être dans le passé.' };
+  }
+  if (value > latest) {
+    return { error: 'Une récolte « Bientôt mûr » doit être prévue dans ' + MAX_DAYS_AHEAD + ' jours au maximum après le dépôt de l\'annonce.' };
+  }
+  return { plannedDate: value };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -149,11 +183,28 @@ export default async function handler(req, res) {
     }
 
     const userId = userData.user.id;
-    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers, multiParcel, isBio, harvestAt } = req.body;
+    const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers, multiParcel, isBio, harvestAt, availabilityStatus, plannedDate } = req.body;
+
+    // 0 bis. Statut de l'annonce : disponible tout de suite (par défaut) ou « Bientôt mûr »
+    const status = availabilityStatus == null || availabilityStatus === '' ? 'disponible' : availabilityStatus;
+    if (status !== 'disponible' && status !== 'bientot_mur') {
+      return res.status(400).json({ error: "Statut d'annonce invalide : choisissez « Disponible maintenant » ou « Bientôt mûr »." });
+    }
+    const comingSoon = status === 'bientot_mur';
+
+    let planned = null;
+    if (comingSoon) {
+      const checked = validatePlannedDate(plannedDate);
+      if (checked.error) {
+        return res.status(400).json({ error: checked.error });
+      }
+      planned = checked.plannedDate;
+    }
 
     // 0. Date et heure de la récolte (elles servent à calculer la fraîcheur affichée sur l'annonce)
+    //    Une récolte « Bientôt mûr » n'est pas encore faite : pas de date de récolte à ce stade
     let harvestMoment = null;
-    if (harvestAt != null && harvestAt !== '') {
+    if (!comingSoon && harvestAt != null && harvestAt !== '') {
       const parsed = new Date(harvestAt);
       if (Number.isNaN(parsed.getTime())) {
         return res.status(400).json({ error: "La date et l'heure de récolte ne sont pas valides." });
@@ -225,6 +276,17 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "L'expédition n'est pas possible pour cette catégorie de produits : seul le retrait est proposé." });
     }
 
+    // 3 bis. « Bientôt mûr » : seulement des produits frais de la récolte (fruits, légumes, aromates, fleurs du jardin),
+    //        et seulement en retrait chez le vendeur, pas d'expédition
+    if (comingSoon) {
+      if (!PARTICULIER_CATEGORIES.includes(category)) {
+        return res.status(400).json({ error: 'Une annonce « Bientôt mûr » concerne une récolte à venir : fruits, légumes, aromates ou fleurs du jardin.' });
+      }
+      if (mode !== 'retrait') {
+        return res.status(400).json({ error: 'Une annonce « Bientôt mûr » se retire chez le vendeur : pas d\'expédition.' });
+      }
+    }
+
     // 4. La quantité disponible est obligatoire pour une nouvelle annonce, et vérifiée ici
     const stock = validateQuantity(quantity);
     if (stock.error) {
@@ -264,8 +326,11 @@ export default async function handler(req, res) {
         unit,
         category,
         subcategory,
-        harvest_date: harvestDate || (harvestMoment ? harvestMoment.slice(0, 10) : harvestDate),
+        harvest_date: comingSoon ? planned : (harvestDate || (harvestMoment ? harvestMoment.slice(0, 10) : harvestDate)),
         harvest_at: harvestMoment,
+        availability_status: status,
+        planned_date: planned,
+        price_locked: false,
         image_url: imageUrl,
         quantity_available: stock.quantity,
         pro_attested_at: proAttestedAt,

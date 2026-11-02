@@ -92,6 +92,7 @@
   let accessToken = null;          // vide = visiteur non connecté
   let myAlerts = new Set();        // identifiants des annonces pour lesquelles une alerte est active
   const MAX_ALERTS = 5;
+  const itemsById = {};            // les récoltes affichées, par identifiant
 
   // Protège l'affichage : un titre ou un nom saisi par un vendeur n'est jamais interprété comme du code
   function escapeHtml(value) {
@@ -235,7 +236,139 @@
     btn.disabled = false;
   }
 
+
+  // ---------- Fenêtre « Réserver » : 1 € de frais de réservation, payés chez Stripe ----------
+  function formatEuros(cents) {
+    return (cents / 100).toFixed(2).replace('.', ',') + ' €';
+  }
+
+  function closeReserve() {
+    const old = document.getElementById('rsvOverlay');
+    if (old) old.remove();
+    document.removeEventListener('keydown', onReserveKey);
+  }
+
+  function onReserveKey(e) {
+    if (e.key === 'Escape') closeReserve();
+  }
+
+  function openReserve(item) {
+    if (!accessToken) {
+      showToast('Connectez-vous pour réserver. <a href="connexion.html" style="color:#fff;text-decoration:underline;">Se connecter</a>');
+      return;
+    }
+    closeReserve();
+
+    const unit = String(item.unit || '').trim() || 'kg';
+    const unitCents = Math.round(Number(item.price) * 100);
+    // La quantité encore réservable : celle donnée par le serveur, sinon la quantité annoncée
+    let max = item.reservable_quantity != null ? Number(item.reservable_quantity) : Number(item.quantity_available);
+    if (!Number.isFinite(max) || max < 0) max = 0;
+    let qty = max >= 1 ? 1 : 0;
+
+    const distance = getDistanceForListing(item);
+    let place = item.sellers && item.sellers.city ? item.sellers.city : '';
+    if (distance !== null) {
+      place += ' · à ' + (distance < 1 ? Math.round(distance * 1000) + ' m' : distance.toFixed(1).replace('.', ',') + ' km');
+    }
+    const sub = [plannedLabel(item), place, formatEuros(unitCents) + '/' + unit].filter(Boolean).join(' · ');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'rsvOverlay';
+    overlay.className = 'rsv-overlay';
+    overlay.innerHTML = `
+      <div class="rsv-box" role="dialog" aria-modal="true" aria-labelledby="rsvTitle">
+        <button type="button" class="rsv-close" aria-label="Fermer">×</button>
+        <h3 id="rsvTitle">Réserver : ${escapeHtml(item.title)}</h3>
+        <p class="rsv-sub">${escapeHtml(sub)}</p>
+        <p class="rsv-label">Quantité à réserver</p>
+        <div class="rsv-stepper">
+          <button type="button" class="rsv-step" id="rsvMinus" aria-label="Moins">−</button>
+          <div class="rsv-qty" id="rsvQty"></div>
+          <button type="button" class="rsv-step" id="rsvPlus" aria-label="Plus">+</button>
+        </div>
+        <p class="rsv-left" id="rsvLeft"></p>
+        <div class="rsv-price">
+          <div class="rsv-price-row"><span id="rsvPriceLabel"></span><b id="rsvPriceValue"></b></div>
+          <div class="rsv-price-note">Le prix de ${escapeHtml(formatEuros(unitCents))}/${escapeHtml(unit)} est bloqué pour vous. Vous paierez la récolte quand la vente ouvrira.</div>
+        </div>
+        <ul class="rsv-rules">
+          <li>Aujourd'hui, vous payez seulement <b>1 €</b> de frais de réservation.</li>
+          <li>Ces 1 € sont <b>déduits</b> du prix si vous commandez dans les 48 h après l'ouverture de la vente.</li>
+          <li>Sinon, ils sont gardés par Agrivoisin.</li>
+          <li>Si la récolte n'a pas lieu, ils sont <b>remboursés</b>.</li>
+        </ul>
+        <p class="rsv-error" id="rsvError" style="display:none;"></p>
+        <button type="button" class="rsv-pay" id="rsvPay">Réserver : payer 1 € de frais</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', onReserveKey);
+
+    const qtyEl = overlay.querySelector('#rsvQty');
+    const leftEl = overlay.querySelector('#rsvLeft');
+    const labelEl = overlay.querySelector('#rsvPriceLabel');
+    const valueEl = overlay.querySelector('#rsvPriceValue');
+    const minus = overlay.querySelector('#rsvMinus');
+    const plus = overlay.querySelector('#rsvPlus');
+    const pay = overlay.querySelector('#rsvPay');
+    const errorEl = overlay.querySelector('#rsvError');
+
+    function showError(text) {
+      errorEl.textContent = text;
+      errorEl.style.display = text ? 'block' : 'none';
+    }
+
+    function refresh() {
+      qtyEl.textContent = qty + ' ' + unitLabel(unit, qty);
+      minus.disabled = qty <= 1;
+      plus.disabled = qty >= max;
+      pay.disabled = qty < 1;
+      if (max >= 1) {
+        leftEl.textContent = 'Encore ' + max + ' ' + unitLabel(unit, max) + ' réservables.';
+      } else {
+        leftEl.textContent = 'Tout est déjà réservé pour cette récolte.';
+      }
+      labelEl.textContent = 'Prix de ' + qty + ' ' + unitLabel(unit, qty);
+      valueEl.textContent = formatEuros(unitCents * qty);
+    }
+
+    minus.addEventListener('click', () => { if (qty > 1) { qty -= 1; showError(''); refresh(); } });
+    plus.addEventListener('click', () => { if (qty < max) { qty += 1; showError(''); refresh(); } });
+    overlay.querySelector('.rsv-close').addEventListener('click', closeReserve);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeReserve(); });
+
+    pay.addEventListener('click', async () => {
+      if (pay.disabled) return;
+      pay.disabled = true;
+      showError('');
+      const oldText = pay.textContent;
+      pay.textContent = 'Ouverture du paiement…';
+      try {
+        const res = await fetch('/api/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+          body: JSON.stringify({ action: 'reserve', listingId: item.id, quantity: qty }),
+        });
+        let data = {};
+        try { data = await res.json(); } catch (e) { data = {}; }
+        if (res.ok && data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+          return;
+        }
+        showError(data.error || 'Impossible de préparer votre réservation pour le moment. Réessayez.');
+      } catch (e) {
+        showError('Impossible de préparer votre réservation pour le moment. Réessayez.');
+      }
+      pay.textContent = oldText;
+      pay.disabled = qty < 1;
+    });
+
+    refresh();
+  }
+
   function buildComingCard(item) {
+    itemsById[String(item.id)] = item;
     const card = document.createElement('div');
     card.className = 'produce-card coming-card';
     const distance = getDistanceForListing(item);
@@ -266,12 +399,20 @@
       </div>
     `;
     card.querySelector('.coming-alert').addEventListener('click', (e) => onAlertClick(e.currentTarget));
-    card.querySelector('.coming-reserve').addEventListener('click', () => showToast('Cette fonction arrive très bientôt.'));
+    card.querySelector('.coming-reserve').addEventListener('click', () => openReserve(item));
     return card;
   }
 
   async function init() {
     loadBuyerLocation();
+    // Retour du paiement des 1 € de frais de réservation
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('reservation') === 'ok') {
+        showToast('Merci ! Votre paiement de 1 € est reçu : votre réservation est enregistrée.');
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (e) { /* sans importance */ }
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
       accessToken = session && session.access_token ? session.access_token : null;
@@ -338,8 +479,29 @@
   .alert-bar a { color:#2d6b38; text-decoration:underline; }
   .coming-alert.on { background:#fff; color:#2d6b38; box-shadow:inset 0 0 0 2px #3E9B4D; }
   .coming-btn:disabled { opacity:.6; cursor:default; }
+  .rsv-overlay { position:fixed; inset:0; background:rgba(30,50,32,.55); display:flex; align-items:center; justify-content:center; z-index:100; padding:16px; }
+  .rsv-box { background:#fff; border-radius:24px; max-width:440px; width:100%; max-height:calc(100vh - 32px); overflow-y:auto; box-sizing:border-box; padding:26px 26px 22px; box-shadow:0 20px 60px rgba(0,0,0,.35); border:3px solid #3E9B4D; position:relative; color:#2d6b38; }
+  .rsv-close { position:absolute; right:14px; top:8px; background:none; border:0; font-size:1.7rem; line-height:1; color:#2d6b38; cursor:pointer; }
+  .rsv-box h3 { margin:0 28px 4px 0; font-size:1.3rem; color:#2d6b38; }
+  .rsv-sub { margin:0 0 16px; }
+  .rsv-label { margin:0 0 6px; font-weight:700; }
+  .rsv-stepper { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+  .rsv-step { width:40px; height:40px; border-radius:50%; background:#E8F5E9; border:2px solid #3E9B4D; color:#2d6b38; font-weight:800; font-size:1.3rem; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; font-family:inherit; }
+  .rsv-step:disabled { opacity:.4; cursor:default; }
+  .rsv-qty { font-weight:800; font-size:1.4rem; min-width:110px; text-align:center; }
+  .rsv-left { margin:0 0 14px; font-size:.85rem; color:#5a7a5c; }
+  .rsv-price { background:#E8F5E9; border-radius:14px; padding:12px 14px; margin-bottom:14px; }
+  .rsv-price-row { display:flex; justify-content:space-between; gap:12px; }
+  .rsv-price-note { font-size:.82rem; margin-top:4px; }
+  .rsv-rules { margin:0 0 16px; padding-left:18px; list-style:disc; font-size:.85rem; line-height:1.5; }
+  .rsv-error { margin:0 0 12px; color:#C8352F; font-weight:700; font-size:.9rem; }
+  .rsv-pay { width:100%; background:#C8352F; color:#fff; font-weight:800; text-align:center; padding:13px; border:0; border-radius:12px; font-size:1rem; font-family:inherit; cursor:pointer; }
+  .rsv-pay:disabled { opacity:.6; cursor:default; }
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
 </style>
 </body>
 </html>
+
+
+

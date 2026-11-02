@@ -20,6 +20,17 @@ function todayInParis() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
 
+// « Bientôt mûr » : une récolte à venir reste visible jusqu'à 1 jour après sa date prévue
+function addDaysIso(isoDate, days) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+function isComingSoonActive(item, today) {
+  if (item.availability_status !== 'bientot_mur' || !item.planned_date) return false;
+  return String(item.planned_date).slice(0, 10) >= addDaysIso(today, -1);
+}
+
 // Vérifie qu'une date « AAAA-MM-JJ » existe vraiment (pas de 31 février)
 function isRealDate(value) {
   if (typeof value !== 'string' || !DATE_RE.test(value)) return false;
@@ -137,7 +148,8 @@ async function setPromotion(req, res, seller) {
   return res.status(200).json({ success: true, promotion: update });
 }
 
-// GET : la liste de mes annonces. POST : enregistrer ou retirer une promotion sur une annonce.
+// GET : la liste de mes annonces (sans les récoltes « Bientôt mûr »), ou avec ?status=bientot_mur la liste de mes récoltes à venir.
+// POST : enregistrer ou retirer une promotion sur une annonce.
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -177,13 +189,64 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price')
+      .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, availability_status, planned_date, price_locked')
       .eq('seller_id', seller.id)
       .order('created_at', { ascending: false });
 
     if (listingsError) throw listingsError;
 
-    res.status(200).json({ listings, sellerType: seller.seller_type === 'professionnel' ? 'professionnel' : 'particulier' });
+    const sellerType = seller.seller_type === 'professionnel' ? 'professionnel' : 'particulier';
+
+    // Les deux listes ne se mélangent jamais : « Mes annonces » ne contient que les annonces en vente,
+    // les récoltes « Bientôt mûr » sont sur leur page à part.
+    if (req.query && req.query.status === 'bientot_mur') {
+      const today = todayInParis();
+      const coming = (listings || []).filter((item) => isComingSoonActive(item, today));
+      const ids = coming.map((item) => item.id);
+
+      // Pour chaque récolte : la quantité réservée, le nombre de personnes, et le nombre d'alertes (jamais leurs noms ni leurs e-mails)
+      const reserved = {};
+      const people = {};
+      const alerts = {};
+      if (ids.length > 0) {
+        const { data: heldRows, error: heldError } = await supabase
+          .from('listing_reservations')
+          .select('listing_id, quantity')
+          .in('listing_id', ids)
+          .eq('status', 'active');
+        if (heldError) throw heldError;
+        (heldRows || []).forEach((row) => {
+          const key = String(row.listing_id);
+          reserved[key] = (reserved[key] || 0) + (Number(row.quantity) || 0);
+          people[key] = (people[key] || 0) + 1;
+        });
+
+        const { data: alertRows, error: alertError } = await supabase
+          .from('listing_alerts')
+          .select('listing_id')
+          .in('listing_id', ids)
+          .is('notified_at', null);
+        if (alertError) throw alertError;
+        (alertRows || []).forEach((row) => {
+          const key = String(row.listing_id);
+          alerts[key] = (alerts[key] || 0) + 1;
+        });
+      }
+
+      return res.status(200).json({
+        listings: coming.map((item) => ({
+          ...item,
+          reserved_quantity: reserved[String(item.id)] || 0,
+          reservations_count: people[String(item.id)] || 0,
+          alerts_count: alerts[String(item.id)] || 0,
+        })),
+        sellerType,
+      });
+    }
+
+    const onSale = (listings || []).filter((item) => (item.availability_status || 'disponible') === 'disponible');
+
+    res.status(200).json({ listings: onSale, sellerType });
 
   } catch (error) {
     console.error(error);

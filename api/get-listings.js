@@ -875,6 +875,28 @@ export default async function handler(req, res) {
       wantComingSoon ? isComingSoonActive(item, today) : isAvailableNow(item)
     );
 
+    // Récoltes « Bientôt mûr » : la quantité encore réservable (quantité annoncée moins les réservations payées).
+    // Une panne de lecture ne doit pas empêcher d'afficher les récoltes : la quantité est alors laissée vide.
+    const reservedByListing = new Map();
+    let reservationsKnown = false;
+    if (wantComingSoon && visibleListings.length > 0) {
+      try {
+        const { data: heldRows, error: heldError } = await supabase
+          .from('listing_reservations')
+          .select('listing_id, quantity')
+          .in('listing_id', visibleListings.map((item) => item.id))
+          .eq('status', 'active');
+        if (heldError) throw heldError;
+        (heldRows || []).forEach((row) => {
+          const key = String(row.listing_id);
+          reservedByListing.set(key, (reservedByListing.get(key) || 0) + (Number(row.quantity) || 0));
+        });
+        reservationsKnown = true;
+      } catch (reservedError) {
+        console.error('Lecture des réservations impossible :', reservedError);
+      }
+    }
+
     // Page vendeur : ?listing=<id d'une annonce> renvoie le profil public de son vendeur.
     // L'identifiant du vendeur n'est jamais envoyé : on le retrouve ici à partir de l'annonce.
     const wantedListing = typeof req.query?.listing === 'string' ? req.query.listing : null;
@@ -953,6 +975,9 @@ export default async function handler(req, res) {
         ...item,
         seller_rating: rating ? { average: rating.average, count: rating.count } : { average: null, count: 0 },
         seller_legal_name: proNames.get(seller_id) || null,
+        ...(wantComingSoon && reservationsKnown && item.quantity_available != null
+          ? { reservable_quantity: Math.max(0, Number(item.quantity_available) - (reservedByListing.get(String(item.id)) || 0)) }
+          : {}),
       };
     });
 

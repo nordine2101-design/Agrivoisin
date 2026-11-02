@@ -419,7 +419,7 @@
 
       const [favRes, listRes] = await Promise.all([
         supabaseClient.from('favorites').select('listing_id, created_at').eq('user_id', favUserId).order('created_at', { ascending: false }),
-        fetch('/api/get-listings').then((r) => r.json()),
+        fetch('/api/get-listings', { headers: { Authorization: 'Bearer ' + session.access_token } }).then((r) => r.json()),
       ]);
       if (favRes.error) throw favRes.error;
 
@@ -492,3 +492,5 @@
 </style>
 </body>
 </html>
+
+

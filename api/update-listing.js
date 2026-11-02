@@ -12,6 +12,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 //   GET  /api/update-listing?id=...  -> renvoie l'annonce (et ses horaires de retrait) pour remplir le formulaire
 //   POST /api/update-listing         -> enregistre les modifications
 //   POST /api/update-listing avec { action: 'delete', listingId } -> supprime l'annonce
+//   POST /api/update-listing avec { action: 'open_sale', listingId } -> ouvre la vente d'une récolte « Bientôt mûr »
 // Seul le vendeur qui a publié l'annonce peut la lire ici et la modifier.
 
 const DAY_LABELS = ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -214,6 +215,46 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    // ---------- POST « open_sale » : ouvrir la vente d'une récolte « Bientôt mûr » ----------
+    if ((req.body || {}).action === 'open_sale') {
+      const { data: current, error: currentError } = await supabase
+        .from('listings')
+        .select('id, availability_status')
+        .eq('id', existing.id)
+        .single();
+      if (currentError || !current) {
+        return res.status(404).json({ error: 'Annonce introuvable.' });
+      }
+      if (current.availability_status !== 'bientot_mur') {
+        return res.status(400).json({ error: "Cette récolte n'est plus à venir : elle est déjà en vente ou a été retirée." });
+      }
+
+      const now = new Date();
+      const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(now);
+
+      // La condition sur le statut évite une double ouverture si le vendeur clique deux fois
+      const { data: opened, error: openError } = await supabase
+        .from('listings')
+        .update({
+          availability_status: 'disponible',
+          harvest_at: now.toISOString(),
+          harvest_date: todayParis,
+          sale_opened_at: now.toISOString(),
+        })
+        .eq('id', existing.id)
+        .eq('seller_id', seller.id)
+        .eq('availability_status', 'bientot_mur')
+        .select('id')
+        .maybeSingle();
+
+      if (openError) throw openError;
+      if (!opened) {
+        return res.status(409).json({ error: "Cette récolte n'est plus à venir : elle est déjà en vente ou a été retirée." });
+      }
+
+      return res.status(200).json({ success: true, listingId: existing.id });
+    }
+
     // ---------- POST : enregistrer les modifications ----------
     const { title, description, price, unit, category, subcategory, harvestDate, harvestAt, imageUrl, pickupHours, quantity, proAttest, isBio, deliveryMode, shippingTiers } = req.body;
     const isPro = seller.seller_type === 'professionnel';
@@ -409,3 +450,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+
+

@@ -367,6 +367,74 @@
     refresh();
   }
 
+  // ---------- Fenêtre « Annuler ma réservation » ----------
+  function closeCancel() {
+    const old = document.getElementById('cfOverlay');
+    if (old) old.remove();
+  }
+
+  function openCancel(item) {
+    closeCancel();
+    const mine = item.my_reservation;
+    if (!mine || !accessToken) return;
+    const unit = String(item.unit || '').trim() || 'kg';
+    const amount = mine.quantity + ' ' + unitLabel(unit, mine.quantity);
+
+    const overlay = document.createElement('div');
+    overlay.id = 'cfOverlay';
+    overlay.className = 'rsv-overlay';
+    overlay.innerHTML = `
+      <div class="rsv-box" role="dialog" aria-modal="true" aria-labelledby="cfTitle">
+        <button type="button" class="rsv-close" aria-label="Fermer">×</button>
+        <h3 id="cfTitle">Annuler votre réservation ?</h3>
+        <p class="rsv-sub">${escapeHtml(item.title)} · ${escapeHtml(amount)}</p>
+        <ul class="rsv-rules">
+          <li>Ces ${escapeHtml(amount)} seront remis à disposition des autres personnes.</li>
+          <li>Cette réservation compte quand même dans vos 3 réservations du jour.</li>
+        </ul>
+        <p class="rsv-error" id="cfError" style="display:none;"></p>
+        <div class="cf-btns">
+          <button type="button" class="cf-no" id="cfNo">Non, la garder</button>
+          <button type="button" class="cf-yes" id="cfYes">Oui, annuler</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const errorEl = overlay.querySelector('#cfError');
+    const yes = overlay.querySelector('#cfYes');
+    overlay.querySelector('.rsv-close').addEventListener('click', closeCancel);
+    overlay.querySelector('#cfNo').addEventListener('click', closeCancel);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeCancel(); });
+
+    yes.addEventListener('click', async () => {
+      if (yes.disabled) return;
+      yes.disabled = true;
+      errorEl.style.display = 'none';
+      const oldText = yes.textContent;
+      yes.textContent = 'Annulation…';
+      try {
+        const res = await fetch('/api/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+          body: JSON.stringify({ action: 'cancel_reservation', reservationId: mine.id }),
+        });
+        let data = {};
+        try { data = await res.json(); } catch (e) { data = {}; }
+        if (res.ok && data.success) {
+          window.location.href = window.location.pathname + '?reservation=annulee';
+          return;
+        }
+        errorEl.textContent = data.error || "Impossible d'annuler pour le moment. Réessayez.";
+      } catch (e) {
+        errorEl.textContent = "Impossible d'annuler pour le moment. Réessayez.";
+      }
+      errorEl.style.display = 'block';
+      yes.textContent = oldText;
+      yes.disabled = false;
+    });
+  }
+
   function buildComingCard(item) {
     itemsById[String(item.id)] = item;
     const card = document.createElement('div');
@@ -380,6 +448,13 @@
     const qty = item.quantity_available == null ? null : Number(item.quantity_available);
     const qtyHtml = qty === null ? '' : '<p class="coming-qty">Environ ' + escapeHtml(qty) + ' ' + escapeHtml(unitLabel(item.unit, qty)) + '</p>';
     const priceText = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + escapeHtml(item.unit || 'kg');
+    const mine = item.my_reservation || null;
+    const doneHtml = mine
+      ? '<p class="coming-done">✓ Vous avez réservé ' + escapeHtml(mine.quantity) + ' ' + escapeHtml(unitLabel(item.unit, mine.quantity)) + '</p>'
+      : '';
+    const reserveBtnHtml = mine
+      ? '<button type="button" class="coming-btn coming-cancel" data-listing-id="' + escapeHtml(item.id) + '">Annuler ma réservation</button>'
+      : '<button type="button" class="coming-btn coming-reserve" data-listing-id="' + escapeHtml(item.id) + '">Réserver</button>';
     card.innerHTML = `
       <div class="produce-card-image" style="display:block;position:relative;">
         <span class="seller-type-disc">${sellerIsPro ? 'Professionnel' : 'Particulier'}</span>
@@ -392,14 +467,18 @@
         ${qtyHtml}
         <p class="seller">${escapeHtml(locationText)}</p>
         <div class="produce-card-footer"><span class="price">${priceText}</span></div>
+        ${doneHtml}
         <div class="coming-actions">
           <button type="button" class="coming-btn coming-alert" data-listing-id="${escapeHtml(item.id)}">🔔 Prévenez-moi</button>
-          <button type="button" class="coming-btn coming-reserve" data-listing-id="${escapeHtml(item.id)}">Réserver</button>
+          ${reserveBtnHtml}
         </div>
       </div>
     `;
     card.querySelector('.coming-alert').addEventListener('click', (e) => onAlertClick(e.currentTarget));
-    card.querySelector('.coming-reserve').addEventListener('click', () => openReserve(item));
+    const reserveBtn = card.querySelector('.coming-reserve');
+    if (reserveBtn) reserveBtn.addEventListener('click', () => openReserve(item));
+    const cancelBtn = card.querySelector('.coming-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => openCancel(item));
     return card;
   }
 
@@ -408,7 +487,10 @@
     // Retour après une réservation
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('reservation') === 'ok') {
+      if (params.get('reservation') === 'annulee') {
+        showToast('Votre réservation est annulée.');
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (params.get('reservation') === 'ok') {
         showToast('Votre réservation est enregistrée. Vous aurez 48 h pour commander dès l\'ouverture de la vente.');
         window.history.replaceState({}, '', window.location.pathname);
       }
@@ -473,6 +555,13 @@
   .coming-btn { flex:1; padding:10px 8px; border:0; border-radius:10px; color:#fff; font-family:inherit; font-weight:700; font-size:0.9rem; cursor:pointer; }
   .coming-alert { background:#3E9B4D; }
   .coming-reserve { background:#2d6b38; }
+  .coming-cancel { background:#fff; color:#2d6b38; box-shadow:inset 0 0 0 2px #3E9B4D; }
+  .coming-done { margin:8px 0 0; padding:6px 12px; border-radius:10px; background:#fff; color:#2d6b38; font-weight:700; font-size:.88rem; border:1px solid #3E9B4D; }
+  .cf-btns { display:flex; gap:10px; }
+  .cf-btns button { flex:1; padding:12px; border-radius:12px; border:0; font-weight:800; font-family:inherit; font-size:.95rem; cursor:pointer; }
+  .cf-btns button:disabled { opacity:.6; cursor:default; }
+  .cf-no { background:#fff; color:#2d6b38; box-shadow:inset 0 0 0 2px #3E9B4D; }
+  .cf-yes { background:#3d9a4e; color:#fff; }
   .alert-bar { background:#fff; border:2px solid #3E9B4D; color:#2d6b38; font-weight:700; border-radius:999px; padding:10px 18px; margin:0 0 18px; }
   .alert-bar-count { display:inline-block; }
   .alert-bar-visit { border-radius:14px; }

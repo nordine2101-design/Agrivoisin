@@ -682,6 +682,16 @@ function isAvailableNow(item) {
   return (item.availability_status || 'disponible') === 'disponible';
 }
 
+// Combien d'unités une personne peut encore réserver : le quart de la récolte au plus (au moins 1 unité),
+// sans dépasser la moitié de la récolte pour l'ensemble des réservations (réservé : déjà pris par les autres).
+function reservableQuantity(total, reserved) {
+  const whole = Math.floor(Number(total));
+  if (!Number.isFinite(whole)) return 0;
+  const totalMax = Math.floor(whole / 2);
+  const personMax = Math.min(totalMax, Math.max(1, Math.floor(whole / 4)));
+  return Math.max(0, Math.min(personMax, totalMax - reserved));
+}
+
 function isComingSoonActive(item, today) {
   if (item.availability_status !== 'bientot_mur' || !item.planned_date) return false;
   return String(item.planned_date).slice(0, 10) >= addDaysIso(today, -1);
@@ -921,7 +931,9 @@ export default async function handler(req, res) {
       wantComingSoon ? isComingSoonActive(item, today) : isAvailableNow(item)
     );
 
-    // Récoltes « Bientôt mûr » : la quantité encore réservable (quantité annoncée moins les réservations payées).
+    // Récoltes « Bientôt mûr » : la quantité encore réservable par une personne.
+    // Règles (les mêmes que pour la réservation) : au plus le quart de la récolte par personne (au moins 1 unité),
+    // et toutes les réservations ensemble au plus la moitié de la récolte.
     // Une panne de lecture ne doit pas empêcher d'afficher les récoltes : la quantité est alors laissée vide.
     const reservedByListing = new Map();
     let reservationsKnown = false;
@@ -1022,7 +1034,7 @@ export default async function handler(req, res) {
         seller_rating: rating ? { average: rating.average, count: rating.count } : { average: null, count: 0 },
         seller_legal_name: proNames.get(seller_id) || null,
         ...(wantComingSoon && reservationsKnown && item.quantity_available != null
-          ? { reservable_quantity: Math.max(0, Number(item.quantity_available) - (reservedByListing.get(String(item.id)) || 0)) }
+          ? { reservable_quantity: reservableQuantity(item.quantity_available, reservedByListing.get(String(item.id)) || 0) }
           : {}),
       };
     });
@@ -1034,5 +1046,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-
-

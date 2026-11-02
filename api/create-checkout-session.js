@@ -173,9 +173,151 @@ function activeLot(listing, seller) {
   return { quantity, cents };
 }
 
+// ---------------------------------------------------------------------------
+// « Bientôt mûr » : réservation d'une récolte à venir (1 € de frais de réservation).
+// Le paiement de 1 € va à Agrivoisin. Il est déduit du prix si l'acheteur commande dans les 48 h après l'ouverture de la vente,
+// gardé sinon, et remboursé si la récolte n'a pas lieu. La réservation n'est enregistrée qu'après le paiement (voir webhook.js).
+// Le navigateur ne donne que l'annonce et la quantité : le prix, le stock et les règles sont relus ici.
+// ---------------------------------------------------------------------------
+const RESERVATION_FEE_CENTS = 100;
+
+function addDaysIso(isoDate, days) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+// Une récolte à venir est réservable jusqu'à 1 jour après sa date prévue (comme pour son affichage)
+function isComingSoonActive(listing, today) {
+  if (listing.availability_status !== 'bientot_mur' || !listing.planned_date) return false;
+  return String(listing.planned_date).slice(0, 10) >= addDaysIso(today, -1);
+}
+
+async function reserveCheckout(req, res) {
+  try {
+    const token = (req.headers.authorization || '').replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Connectez-vous pour réserver.' });
+    }
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData || !userData.user) {
+      return res.status(401).json({ error: 'Session invalide, reconnectez-vous.' });
+    }
+    if (!userData.user.email_confirmed_at) {
+      return res.status(403).json({ error: 'Confirmez votre adresse e-mail pour réserver.' });
+    }
+    const buyerId = userData.user.id;
+
+    const body = req.body || {};
+    const listingId = typeof body.listingId === 'string' || typeof body.listingId === 'number' ? String(body.listingId).trim() : '';
+    const quantity = Number(body.quantity);
+    if (!listingId || listingId.length > 64) {
+      return res.status(400).json({ error: 'Annonce introuvable.' });
+    }
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
+      return res.status(400).json({ error: 'Indiquez une quantité valide.' });
+    }
+
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, title, price, unit, quantity_available, availability_status, planned_date, sellers(id, city, latitude, longitude, stripe_account_id)')
+      .eq('id', listingId)
+      .maybeSingle();
+    if (listingError) {
+      console.error('Erreur Supabase (réservation, lecture annonce) :', listingError);
+      return res.status(500).json({ error: 'Impossible de préparer votre réservation pour le moment. Réessayez.' });
+    }
+    if (!listing) {
+      return res.status(404).json({ error: "Cette annonce n'existe plus." });
+    }
+    if (!isComingSoonActive(listing, todayInParis())) {
+      return res.status(400).json({ error: "Cette récolte n'est plus à venir." });
+    }
+
+    const seller = Array.isArray(listing.sellers) ? listing.sellers[0] : listing.sellers;
+    const sellerIsValid = seller && seller.stripe_account_id && seller.city && seller.latitude != null && seller.longitude != null;
+    if (!sellerIsValid) {
+      return res.status(400).json({ error: "Cette annonce n'est plus disponible." });
+    }
+    if (String(seller.id) === String(buyerId)) {
+      return res.status(400).json({ error: 'Vous ne pouvez pas réserver votre propre récolte.' });
+    }
+
+    // La quantité annoncée par le vendeur, moins ce qui est déjà réservé (premier arrivé, premier servi)
+    const total = Number(listing.quantity_available);
+    if (listing.quantity_available == null || !Number.isFinite(total) || total <= 0) {
+      return res.status(400).json({ error: "Le vendeur n'a pas indiqué de quantité pour cette récolte : elle ne peut pas être réservée." });
+    }
+    const { data: held, error: heldError } = await supabase
+      .from('listing_reservations')
+      .select('user_id, quantity')
+      .eq('listing_id', listing.id)
+      .eq('status', 'active');
+    if (heldError) {
+      console.error('Erreur Supabase (réservation, lecture des réservations) :', heldError);
+      return res.status(500).json({ error: 'Impossible de préparer votre réservation pour le moment. Réessayez.' });
+    }
+    const rows = held || [];
+    if (rows.some((r) => String(r.user_id) === String(buyerId))) {
+      return res.status(409).json({ error: 'Vous avez déjà réservé cette récolte.' });
+    }
+    const reserved = rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+    const remaining = total - reserved;
+    if (remaining <= 0) {
+      return res.status(409).json({ error: 'Tout est déjà réservé pour cette récolte.' });
+    }
+    if (quantity > remaining) {
+      return res.status(409).json({ error: `Il ne reste que ${remaining} ${unitLabel(listing.unit, remaining)} à réserver.` });
+    }
+
+    // Le prix est celui de l'annonce : il sera bloqué dès la première réservation
+    const unitCents = Math.round(Number(listing.price) * 100);
+    if (!Number.isFinite(unitCents) || unitCents <= 0) {
+      return res.status(400).json({ error: "Le prix de cette annonce est invalide." });
+    }
+
+    const unit = String(listing.unit == null ? '' : listing.unit).trim() || 'kg';
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: `Frais de réservation — ${listing.title || 'Récolte Agrivoisin'}`.slice(0, 120),
+            description: (`Réservation de ${quantity} ${unitLabel(unit, quantity)} au prix de ${formatEuros(unitCents)}/${unit}. ` +
+              "Déduits du prix si vous commandez dans les 48 h après l'ouverture de la vente, remboursés si la récolte n'a pas lieu.").slice(0, 450),
+          },
+          unit_amount: RESERVATION_FEE_CENTS,
+        },
+        quantity: 1,
+      }],
+      metadata: {
+        type: 'reservation',
+        buyer_id: buyerId,
+        listing_id: String(listing.id),
+        quantity: String(quantity),
+        unit_price_cents: String(unitCents),
+        fee_cents: String(RESERVATION_FEE_CENTS),
+      },
+      success_url: `${req.headers.origin}/bientot-mur.html?reservation=ok`,
+      cancel_url: `${req.headers.origin}/bientot-mur.html`,
+    });
+
+    return res.status(200).json({ checkoutUrl: session.url });
+  } catch (error) {
+    console.error('Erreur réservation :', error);
+    return res.status(500).json({ error: 'Impossible de préparer votre réservation pour le moment. Réessayez.' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
+  }
+
+  // Réservation d'une récolte « Bientôt mûr » (1 € de frais)
+  if (req.body && req.body.action === 'reserve') {
+    return reserveCheckout(req, res);
   }
 
   try {

@@ -936,18 +936,28 @@ export default async function handler(req, res) {
     // et toutes les réservations ensemble au plus la moitié de la récolte.
     // Une panne de lecture ne doit pas empêcher d'afficher les récoltes : la quantité est alors laissée vide.
     const reservedByListing = new Map();
+    const myReservations = new Map(); // la réservation de la personne connectée, par annonce : { id, quantity }
     let reservationsKnown = false;
     if (wantComingSoon && visibleListings.length > 0) {
       try {
+        let comingViewerId = null;
+        const comingToken = (req.headers.authorization || '').replace('Bearer ', '');
+        if (comingToken) {
+          const { data: comingViewer } = await supabase.auth.getUser(comingToken);
+          comingViewerId = comingViewer && comingViewer.user ? comingViewer.user.id : null;
+        }
         const { data: heldRows, error: heldError } = await supabase
           .from('listing_reservations')
-          .select('listing_id, quantity')
+          .select('id, listing_id, user_id, quantity')
           .in('listing_id', visibleListings.map((item) => item.id))
           .eq('status', 'active');
         if (heldError) throw heldError;
         (heldRows || []).forEach((row) => {
           const key = String(row.listing_id);
           reservedByListing.set(key, (reservedByListing.get(key) || 0) + (Number(row.quantity) || 0));
+          if (comingViewerId && String(row.user_id) === String(comingViewerId)) {
+            myReservations.set(key, { id: row.id, quantity: Number(row.quantity) || 0 });
+          }
         });
         reservationsKnown = true;
       } catch (reservedError) {
@@ -1036,6 +1046,7 @@ export default async function handler(req, res) {
         ...(wantComingSoon && reservationsKnown && item.quantity_available != null
           ? { reservable_quantity: reservableQuantity(item.quantity_available, reservedByListing.get(String(item.id)) || 0) }
           : {}),
+        ...(wantComingSoon && myReservations.has(String(item.id)) ? { my_reservation: myReservations.get(String(item.id)) } : {}),
       };
     });
 

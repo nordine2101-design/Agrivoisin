@@ -691,6 +691,7 @@ function isComingSoonActive(item, today) {
 // Réservées aux inscrits (e-mail vérifié). 5 alertes en attente au maximum par personne, une seule par annonce.
 // Les e-mails sont envoyés par Agrivoisin seulement : le vendeur ne voit jamais l'adresse de l'acheteur.
 const MAX_ALERTS = 5;
+const RESERVATION_WINDOW_MS = 48 * 60 * 60 * 1000; // après l'ouverture de la vente, les personnes qui ont réservé commandent en premier pendant 48 h
 
 // Renvoie l'utilisateur connecté (e-mail vérifié), ou répond (401 / 403) et renvoie null
 async function requireUser(req, res) {
@@ -843,7 +844,7 @@ export default async function handler(req, res) {
   try {
     const { data: rawListings, error } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, delivery_mode, shipping_tiers, multi_parcel, is_bio, availability_status, planned_date, price_locked, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, delivery_mode, shipping_tiers, multi_parcel, is_bio, availability_status, planned_date, price_locked, sale_opened_at, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -852,7 +853,52 @@ export default async function handler(req, res) {
 
     // Pendant une promotion, « price » devient le prix promotionnel (c'est lui que les acheteurs voient,
     // trient et paient) et « original_price » garde le prix normal pour l'afficher barré.
-    const listings = (rawListings || []).map(withCurrentPrice);
+    let listings = (rawListings || []).map(withCurrentPrice);
+
+    // Pendant 48 h après l'ouverture de la vente, les quantités réservées par d'autres personnes sont gardées pour elles :
+    // le public ne voit (et ne peut mettre au panier) que la quantité encore libre. Une personne connectée voit en plus sa propre
+    // réservation (si la page envoie sa session). Une panne de lecture ne doit pas empêcher d'afficher les annonces
+    // (le paiement vérifie de toute façon les quantités).
+    const nowMs = Date.now();
+    const inWindow = listings.filter((item) =>
+      isAvailableNow(item) && item.quantity_available != null && item.sale_opened_at &&
+      nowMs < new Date(item.sale_opened_at).getTime() + RESERVATION_WINDOW_MS
+    );
+    if (inWindow.length > 0) {
+      try {
+        let viewerId = null;
+        const viewerToken = (req.headers.authorization || '').replace('Bearer ', '');
+        if (viewerToken) {
+          const { data: viewerData } = await supabase.auth.getUser(viewerToken);
+          viewerId = viewerData && viewerData.user ? viewerData.user.id : null;
+        }
+        const { data: windowHeld, error: windowError } = await supabase
+          .from('listing_reservations')
+          .select('listing_id, user_id, quantity')
+          .in('listing_id', inWindow.map((item) => item.id))
+          .eq('status', 'active');
+        if (windowError) throw windowError;
+        const heldOthers = new Map();
+        (windowHeld || []).forEach((row) => {
+          if (viewerId && row.user_id === viewerId) return;
+          const key = String(row.listing_id);
+          heldOthers.set(key, (heldOthers.get(key) || 0) + (Number(row.quantity) || 0));
+        });
+        const windowIds = new Set(inWindow.map((item) => String(item.id)));
+        listings = listings.map((item) => {
+          if (!windowIds.has(String(item.id))) return item;
+          const held = Math.min(heldOthers.get(String(item.id)) || 0, Number(item.quantity_available));
+          return {
+            ...item,
+            quantity_available: Math.max(0, Number(item.quantity_available) - held),
+            reserved_held: held,
+            reservation_ends_at: new Date(new Date(item.sale_opened_at).getTime() + RESERVATION_WINDOW_MS).toISOString(),
+          };
+        });
+      } catch (windowErr) {
+        console.error('Lecture des réservations (stock des 48 h) impossible :', windowErr);
+      }
+    }
 
     // Une annonce n'apparaît sur le site que si la ville de son vendeur est connue
     // et reconnue sur la carte (la distance doit toujours pouvoir être calculée)
@@ -988,3 +1034,5 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+

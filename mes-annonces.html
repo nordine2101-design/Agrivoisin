@@ -38,7 +38,10 @@
       <p class="my-intro">Voici les produits que vous avez mis en vente. Suivez leur stock, lancez des promotions et supprimez l'annonce d'un produit quand vous ne le vendez plus.</p>
       <div class="my-summary-row">
         <p id="listingsSummary" class="my-summary"></p>
-        <a href="publier-annonce.html" class="btn btn-primary">Publier une annonce</a>
+        <div class="my-summary-actions">
+          <a class="coming-pill" href="mes-recoltes-a-venir.html"><span>Bientôt mûr</span></a>
+          <a href="publier-annonce.html" class="btn btn-primary">Publier une annonce</a>
+        </div>
       </div>
       <div id="myListingsContainer"></div>
     </div>
@@ -115,6 +118,9 @@
   .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
   .my-summary-row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 0; border-top:1px solid #CFD8DC; border-bottom:1px solid #CFD8DC; margin-bottom:18px; }
   .my-summary { font-weight:700; color:#455A64; margin:0; text-align:left; }
+  .my-summary-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .coming-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; box-sizing:border-box; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; text-decoration:none; cursor:pointer; }
+  .coming-pill:focus-visible { outline:2px solid #3E9B4D; outline-offset:2px; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
   .my-video video { width:480px; height:580px; object-fit:contain; display:block; border-radius:20px; }
 

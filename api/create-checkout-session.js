@@ -180,6 +180,7 @@ function activeLot(listing, seller) {
 // Le navigateur ne donne que l'annonce et la quantité : le prix, le stock et les règles sont relus ici.
 // ---------------------------------------------------------------------------
 const RESERVATION_FEE_CENTS = 100;
+const RESERVATION_WINDOW_MS = 48 * 60 * 60 * 1000; // après l'ouverture de la vente, les personnes qui ont réservé commandent en premier pendant 48 h
 
 function addDaysIso(isoDate, days) {
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -361,7 +362,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, delivery_mode, shipping_tiers, multi_parcel, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
+      .select('id, title, price, unit, quantity_available, delivery_mode, shipping_tiers, multi_parcel, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, availability_status, sale_opened_at, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
       .in('id', listingIds);
 
     if (listingsError) {
@@ -398,6 +399,13 @@ export default async function handler(req, res) {
         });
       }
 
+      // Une récolte « Bientôt mûr » n'est pas encore en vente : elle ne s'achète pas
+      if (listing.availability_status === 'bientot_mur') {
+        return res.status(400).json({
+          error: `La récolte « ${label} » n'est pas encore en vente. Retirez-la de votre panier.`,
+        });
+      }
+
       // Le prix payé est celui d'aujourd'hui : le prix promotionnel pendant une promotion, sinon le prix normal
       const cents = Math.round(currentPrice(listing, seller) * 100);
       if (!Number.isFinite(cents) || cents <= 0) {
@@ -416,14 +424,55 @@ export default async function handler(req, res) {
       requested[key] = (requested[key] || 0) + 1;
     });
 
+    // Pendant 48 h après l'ouverture de la vente, les quantités réservées par d'autres personnes sont gardées pour elles.
+    // Les réservations de l'acheteur lui-même restent à sa disposition (et ses 1 € de frais sont déduits du prix).
+    const nowMs = Date.now();
+    const windowListingIds = Object.keys(requested).filter((key) => {
+      const l = listingsById[key];
+      return l && l.sale_opened_at && nowMs < new Date(l.sale_opened_at).getTime() + RESERVATION_WINDOW_MS;
+    });
+
+    const heldByOthers = {};
+    let reservationDiscountCents = 0;
+    if (windowListingIds.length > 0) {
+      const { data: heldRows, error: heldError } = await supabase
+        .from('listing_reservations')
+        .select('listing_id, user_id, quantity')
+        .in('listing_id', windowListingIds)
+        .eq('status', 'active');
+      if (heldError) {
+        console.error('Erreur Supabase (lecture des réservations) :', heldError);
+        return res.status(500).json({
+          error: 'Impossible de vérifier votre panier pour le moment. Réessayez dans quelques instants.',
+        });
+      }
+      (heldRows || []).forEach((r) => {
+        const key = String(r.listing_id);
+        if (r.user_id === buyerId) {
+          reservationDiscountCents += RESERVATION_FEE_CENTS;
+        } else {
+          heldByOthers[key] = (heldByOthers[key] || 0) + (Number(r.quantity) || 0);
+        }
+      });
+    }
+
     const stockProblems = [];
     Object.keys(requested).forEach((key) => {
       const listing = listingsById[key];
       if (!listing || listing.quantity_available == null) return; // annonce sans limite
       const stock = Number(listing.quantity_available);
       const title = String(listing.title || 'cette annonce').slice(0, 60);
+      const held = Math.min(heldByOthers[key] || 0, Math.max(stock, 0));
+      const allowed = stock - held;
       if (stock <= 0) {
         stockProblems.push(`L'annonce « ${title} » est épuisée. Retirez-la de votre panier.`);
+      } else if (requested[key] > allowed && held > 0) {
+        stockProblems.push(
+          allowed <= 0
+            ? `Toute la quantité restante de « ${title} » est réservée par d'autres personnes pendant 48 h après l'ouverture de la vente. Retirez-la de votre panier.`
+            : `Pendant 48 h après l'ouverture de la vente, ${held} ${unitLabel(listing.unit, held)} de « ${title} » sont réservés par d'autres personnes. ` +
+              `Il vous en reste ${allowed} ${unitLabel(listing.unit, allowed)}, et votre panier en contient ${requested[key]} ${unitLabel(listing.unit, requested[key])}. Réduisez la quantité.`
+        );
       } else if (requested[key] > stock) {
         stockProblems.push(
           `Il ne reste que ${stock} ${unitLabel(listing.unit, stock)} de « ${title} », ` +
@@ -621,14 +670,30 @@ export default async function handler(req, res) {
 
     let session;
     try {
+      // Les frais de réservation (1 € par réservation) sont déduits du prix : une réduction sur le paiement.
+      // Agrivoisin les a déjà reçus ; le vendeur est payé sur le prix complet.
+      const discounts = [];
+      if (reservationDiscountCents > 0) {
+        const coupon = await stripe.coupons.create({
+          amount_off: reservationDiscountCents,
+          currency: 'eur',
+          duration: 'once',
+          max_redemptions: 1,
+          name: 'Frais de réservation déduits',
+        });
+        discounts.push({ coupon: coupon.id });
+      }
+
       session = await stripe.checkout.sessions.create({
         mode: 'payment',
         payment_method_types: ['card'],
         line_items: lineItems,
+        ...(discounts.length > 0 ? { discounts } : {}),
         metadata: {
           cart_id: savedCart.id,
           buyer_id: buyerId,
           service_fee_cents: String(SERVICE_FEE_CENTS),
+          ...(reservationDiscountCents > 0 ? { reservation_discount_cents: String(reservationDiscountCents) } : {}),
         },
         success_url: `${req.headers.origin}/paiement-succes.html?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.headers.origin}/panier.html`,
@@ -646,3 +711,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+
+

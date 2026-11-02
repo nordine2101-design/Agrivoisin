@@ -403,6 +403,75 @@ async function reserveCheckout(req, res) {
   }
 }
 
+// Annulation d'une réservation par l'acheteur, tant que la récolte est encore « Bientôt mûr ».
+// La réservation reste enregistrée (état « annulee ») : elle compte toujours dans les 3 réservations du jour.
+async function cancelReservation(req, res) {
+  try {
+    const token = (req.headers.authorization || '').replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ error: 'Connectez-vous pour annuler.' });
+    }
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData || !userData.user) {
+      return res.status(401).json({ error: 'Session invalide, reconnectez-vous.' });
+    }
+    const buyerId = userData.user.id;
+
+    const body = req.body || {};
+    const reservationId = typeof body.reservationId === 'string' || typeof body.reservationId === 'number' ? String(body.reservationId).trim() : '';
+    if (!reservationId || reservationId.length > 64) {
+      return res.status(400).json({ error: 'Réservation introuvable.' });
+    }
+
+    const { data: reservation, error: readError } = await supabase
+      .from('listing_reservations')
+      .select('id, user_id, listing_id, status')
+      .eq('id', reservationId)
+      .maybeSingle();
+    if (readError) {
+      console.error('Erreur Supabase (annulation, lecture) :', readError);
+      return res.status(500).json({ error: "Impossible d'annuler pour le moment. Réessayez." });
+    }
+    if (!reservation || String(reservation.user_id) !== String(buyerId)) {
+      return res.status(404).json({ error: 'Réservation introuvable.' });
+    }
+    if (reservation.status !== 'active') {
+      return res.status(409).json({ error: "Cette réservation n'est plus active." });
+    }
+
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, availability_status')
+      .eq('id', reservation.listing_id)
+      .maybeSingle();
+    if (listingError) {
+      console.error('Erreur Supabase (annulation, lecture annonce) :', listingError);
+      return res.status(500).json({ error: "Impossible d'annuler pour le moment. Réessayez." });
+    }
+    if (!listing || listing.availability_status !== 'bientot_mur') {
+      return res.status(409).json({ error: 'La vente est ouverte : cette réservation ne peut plus être annulée ici.' });
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from('listing_reservations')
+      .update({ status: 'annulee' })
+      .eq('id', reservation.id)
+      .eq('status', 'active')
+      .select('id');
+    if (updateError) {
+      console.error('Erreur Supabase (annulation, enregistrement) :', updateError);
+      return res.status(500).json({ error: "Impossible d'annuler pour le moment. Réessayez." });
+    }
+    if (!updated || updated.length === 0) {
+      return res.status(409).json({ error: "Cette réservation n'est plus active." });
+    }
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Erreur annulation de réservation :', error);
+    return res.status(500).json({ error: "Impossible d'annuler pour le moment. Réessayez." });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -411,6 +480,11 @@ export default async function handler(req, res) {
   // Réservation gratuite d'une récolte « Bientôt mûr »
   if (req.body && req.body.action === 'reserve') {
     return reserveCheckout(req, res);
+  }
+
+  // Annulation d'une réservation par l'acheteur
+  if (req.body && req.body.action === 'cancel_reservation') {
+    return cancelReservation(req, res);
   }
 
   try {

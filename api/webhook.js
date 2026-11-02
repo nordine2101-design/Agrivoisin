@@ -220,6 +220,156 @@ async function takeStock(lines) {
   return { taken, missing };
 }
 
+// ---------------------------------------------------------------------------
+// « Bientôt mûr » : paiement des 1 € de frais de réservation.
+// La réservation n'est enregistrée qu'ici, une fois le paiement fait. La quantité est garantie dans l'ordre d'arrivée :
+// si, au même moment, quelqu'un d'autre a pris la dernière quantité (ou si la récolte n'est plus à venir), les 1 € sont remboursés.
+// ---------------------------------------------------------------------------
+
+// Rembourse les frais de réservation (la clé empêche de rembourser deux fois si Stripe réessaie)
+async function refundReservationFee(session, reason) {
+  if (!session.payment_intent) {
+    throw new Error('paiement Stripe introuvable');
+  }
+  await stripe.refunds.create(
+    {
+      payment_intent: session.payment_intent,
+      amount: session.amount_total,
+      metadata: { raison: 'reservation_' + reason, paiement: session.id },
+    },
+    { idempotencyKey: 'reservation-refund-' + session.id }
+  );
+}
+
+// Le prix de la récolte est bloqué dès la première réservation (le vendeur ne peut plus le changer)
+async function lockListingPrice(listingId) {
+  const { error } = await supabase.from('listings').update({ price_locked: true }).eq('id', listingId);
+  if (error) {
+    throw new Error('prix bloqué : ' + error.message);
+  }
+}
+
+async function handleReservationPayment(session, res) {
+  const meta = session.metadata || {};
+  const buyerId = meta.buyer_id || '';
+  const listingId = meta.listing_id || '';
+  const quantity = Number(meta.quantity);
+  const unitPriceCents = Number(meta.unit_price_cents);
+  const feeCents = Number(meta.fee_cents);
+
+  if (!buyerId || !listingId || !Number.isInteger(quantity) || quantity < 1
+    || !Number.isInteger(unitPriceCents) || unitPriceCents < 1
+    || !Number.isInteger(feeCents) || feeCents < 0 || feeCents > 100000) {
+    console.error(`Paiement ${session.id} : réservation illisible, rien à enregistrer.`);
+    return res.status(200).json({ received: true });
+  }
+
+  // Anti-doublon : l'identifiant du paiement Stripe ne peut être enregistré qu'une fois
+  const { data: row, error: insertError } = await supabase
+    .from('listing_reservations')
+    .insert({
+      listing_id: listingId,
+      user_id: buyerId,
+      quantity,
+      unit_price_cents: unitPriceCents,
+      fee_cents: feeCents,
+      status: 'active',
+      stripe_session_id: session.id,
+      stripe_payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+    })
+    .select('id')
+    .single();
+
+  if (insertError) {
+    if (insertError.code === '23505') {
+      // Déjà traité : on s'assure seulement que le prix est bien bloqué
+      try {
+        const { data: existing } = await supabase
+          .from('listing_reservations')
+          .select('status')
+          .eq('stripe_session_id', session.id)
+          .maybeSingle();
+        if (existing && existing.status === 'active') await lockListingPrice(listingId);
+      } catch (err) {
+        console.error('Réservation déjà traitée, prix non bloqué :', err.message);
+        return res.status(500).json({ error: 'Nouvel essai attendu.' });
+      }
+      console.log(`Paiement ${session.id} déjà traité (réservation), message ignoré.`);
+      return res.status(200).json({ received: true, duplicate: true });
+    }
+    if (insertError.code === '23503') {
+      // L'annonce n'existe plus : les frais sont remboursés
+      try {
+        await refundReservationFee(session, 'annonce_supprimee');
+      } catch (err) {
+        console.error('Remboursement de réservation impossible :', err.message);
+        return res.status(500).json({ error: 'Nouvel essai attendu.' });
+      }
+      return res.status(200).json({ received: true, refunded: true });
+    }
+    console.error('Erreur enregistrement de la réservation :', insertError.message);
+    return res.status(500).json({ error: 'Réservation non enregistrée, nouvel essai attendu.' });
+  }
+
+  try {
+    // La quantité est-elle encore disponible pour cette réservation ? (premier arrivé, premier servi)
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, quantity_available, availability_status')
+      .eq('id', listingId)
+      .maybeSingle();
+    if (listingError) throw new Error('annonce : ' + listingError.message);
+
+    const { data: held, error: heldError } = await supabase
+      .from('listing_reservations')
+      .select('id, user_id, quantity, created_at')
+      .eq('listing_id', listingId)
+      .eq('status', 'active');
+    if (heldError) throw new Error('réservations : ' + heldError.message);
+
+    const ordered = (held || []).slice().sort((a, b) => {
+      if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1;
+      return String(a.id) < String(b.id) ? -1 : 1;
+    });
+    let before = 0;
+    let sameBuyerBefore = false;
+    for (const r of ordered) {
+      if (String(r.id) === String(row.id)) break;
+      before += Number(r.quantity) || 0;
+      if (String(r.user_id) === String(buyerId)) sameBuyerBefore = true;
+    }
+
+    const total = listing ? Number(listing.quantity_available) : NaN;
+    const stillComing = !!listing && listing.availability_status === 'bientot_mur';
+    const fits = stillComing && Number.isFinite(total) && before + quantity <= total && !sameBuyerBefore;
+
+    if (!fits) {
+      try {
+        await refundReservationFee(session, 'plus_de_place');
+      } catch (err) {
+        // Pas remboursé : on retire la réservation pour que le nouvel essai de Stripe reparte de zéro
+        console.error('Remboursement de réservation impossible :', err.message);
+        await supabase.from('listing_reservations').delete().eq('id', row.id);
+        return res.status(500).json({ error: 'Nouvel essai attendu.' });
+      }
+      await supabase
+        .from('listing_reservations')
+        .update({ status: 'remboursee', refunded_at: new Date().toISOString() })
+        .eq('id', row.id);
+      console.log(`Paiement ${session.id} : réservation refusée (plus de place), frais remboursés.`);
+      return res.status(200).json({ received: true, refunded: true });
+    }
+
+    await lockListingPrice(listingId);
+    console.log(`Réservation ${row.id} enregistrée (${quantity} sur l'annonce ${listingId}).`);
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    // La réservation reste enregistrée : au nouvel essai, Stripe retombera sur « déjà traité » et le prix sera bloqué
+    console.error('Erreur réservation :', err.message);
+    return res.status(500).json({ error: 'Nouvel essai attendu.' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).send('Méthode non autorisée');
@@ -238,6 +388,12 @@ export default async function handler(req, res) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+
+    // Paiement des frais de réservation d'une récolte « Bientôt mûr »
+    if (session.metadata?.type === 'reservation') {
+      return handleReservationPayment(session, res);
+    }
+
     const buyerId = session.metadata?.buyer_id || '';
 
     if (!buyerId) {

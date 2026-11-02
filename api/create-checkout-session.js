@@ -183,7 +183,6 @@ function activeLot(listing, seller) {
 //  - premier arrivé, premier servi ; le prix est bloqué dès la première réservation.
 // Le navigateur ne donne que l'annonce et la quantité : le prix, le stock et les règles sont relus ici.
 // ---------------------------------------------------------------------------
-const RESERVATION_FEE_CENTS = 100; // encore utilisé par l'ancien calcul de réduction (retiré au nettoyage)
 const RESERVATION_WINDOW_MS = 48 * 60 * 60 * 1000; // après l'ouverture de la vente, les personnes qui ont réservé commandent en premier pendant 48 h
 const MAX_RESERVATIONS_PER_DAY = 3;
 
@@ -591,7 +590,7 @@ export default async function handler(req, res) {
     });
 
     // Pendant 48 h après l'ouverture de la vente, les quantités réservées par d'autres personnes sont gardées pour elles.
-    // Les réservations de l'acheteur lui-même restent à sa disposition (et ses 1 € de frais sont déduits du prix).
+    // Les réservations de l'acheteur lui-même restent à sa disposition.
     const nowMs = Date.now();
     const windowListingIds = Object.keys(requested).filter((key) => {
       const l = listingsById[key];
@@ -599,7 +598,6 @@ export default async function handler(req, res) {
     });
 
     const heldByOthers = {};
-    let reservationDiscountCents = 0;
     if (windowListingIds.length > 0) {
       const { data: heldRows, error: heldError } = await supabase
         .from('listing_reservations')
@@ -614,9 +612,7 @@ export default async function handler(req, res) {
       }
       (heldRows || []).forEach((r) => {
         const key = String(r.listing_id);
-        if (r.user_id === buyerId) {
-          reservationDiscountCents += RESERVATION_FEE_CENTS;
-        } else {
+        if (r.user_id !== buyerId) {
           heldByOthers[key] = (heldByOthers[key] || 0) + (Number(r.quantity) || 0);
         }
       });
@@ -836,30 +832,14 @@ export default async function handler(req, res) {
 
     let session;
     try {
-      // Les frais de réservation (1 € par réservation) sont déduits du prix : une réduction sur le paiement.
-      // Agrivoisin les a déjà reçus ; le vendeur est payé sur le prix complet.
-      const discounts = [];
-      if (reservationDiscountCents > 0) {
-        const coupon = await stripe.coupons.create({
-          amount_off: reservationDiscountCents,
-          currency: 'eur',
-          duration: 'once',
-          max_redemptions: 1,
-          name: 'Frais de réservation déduits',
-        });
-        discounts.push({ coupon: coupon.id });
-      }
-
       session = await stripe.checkout.sessions.create({
         mode: 'payment',
         payment_method_types: ['card'],
         line_items: lineItems,
-        ...(discounts.length > 0 ? { discounts } : {}),
         metadata: {
           cart_id: savedCart.id,
           buyer_id: buyerId,
           service_fee_cents: String(SERVICE_FEE_CENTS),
-          ...(reservationDiscountCents > 0 ? { reservation_discount_cents: String(reservationDiscountCents) } : {}),
         },
         success_url: `${req.headers.origin}/paiement-succes.html?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.headers.origin}/panier.html`,

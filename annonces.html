@@ -45,7 +45,7 @@
         <label class="type-check"><input type="checkbox" id="typeParticulier"><span>Particuliers</span></label>
         <label class="type-check"><input type="checkbox" id="typeProfessionnel"><span>Professionnels</span></label>
         <a class="fav-link" href="favoris.html"><img src="favori-banane-epluchee.png" alt="" width="26" height="26"><span>Favoris</span><img src="cerise-pleine.png" alt="" width="26" height="26"></a>
-        <button type="button" class="coming-pill" id="comingBtn" aria-pressed="false"><span>Bientôt mûr</span></button>
+        <a class="coming-pill" href="bientot-mur.html"><span>Bientôt mûr</span></a>
       </div>
       <a href="panier.html" class="cart-icon bar-cart" aria-label="Panier"><img src="panier-agrivoisin.png" alt="Panier" style="width:100%;height:100%;object-fit:contain;"><span class="cart-count" id="barCartCount">0</span></a>
     </div>
@@ -84,10 +84,6 @@
 <!-- ============ GRILLE D'ANNONCES ============ -->
 <section class="listings-section">
   <div class="container">
-    <div id="comingNote" class="coming-note" style="display:none;">
-      <p><b>Récoltes prévues dans les 3 jours.</b> Ces produits ne sont pas encore récoltés : vous ne pouvez pas les commander maintenant. « Prévenez-moi » : un e-mail gratuit à l'ouverture de la vente. « Réserver » : prix bloqué, 1 € de frais de réservation.</p>
-      <button type="button" class="coming-back" id="comingBack">← Retour aux annonces disponibles</button>
-    </div>
     <div id="realListingsContainer" class="produce-grid listings-grid"></div>
     <p id="noListingsMessage" style="display:none;text-align:center;margin-top:24px;">Aucune annonce ne correspond à votre recherche pour le moment.</p>
     <nav id="pager" class="pager" aria-label="Pages d'annonces" style="display:none;"></nav>
@@ -110,9 +106,6 @@
   ];
 
   let allListings = [];
-  let comingListings = [];
-  let comingLoaded = false;
-  let viewMode = 'dispo'; // 'dispo' = disponible maintenant, 'bientot' = bientôt mûr (jamais mélangés)
   let currentCategory = 'Tout';
   let currentSort = 'recent';
   let currentSearch = '';
@@ -143,10 +136,6 @@
   const cityChoiceTitle = document.getElementById('cityChoiceTitle');
   const cityChoicePills = document.getElementById('cityChoicePills');
   const DEFAULT_NO_LISTING_TEXT = noListingsMessage.textContent;
-  const COMING_NO_LISTING_TEXT = 'Aucune récolte à venir ne correspond à votre recherche pour le moment.';
-  const comingBtn = document.getElementById('comingBtn');
-  const comingNote = document.getElementById('comingNote');
-  const comingBack = document.getElementById('comingBack');
 
   CATEGORIES.forEach((cat) => {
     const btn = document.createElement('button');
@@ -518,99 +507,12 @@
     grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
-  // ---------- Bientôt mûr : récoltes prévues dans les 3 jours (jamais mélangées aux annonces disponibles) ----------
-  function parisTodayIso() {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
-  }
-
-  function plannedLabel(item) {
-    const d = String(item.planned_date || '').slice(0, 10);
-    if (!d) return 'Prévu bientôt';
-    const diff = Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(parisTodayIso() + 'T00:00:00Z')) / 86400000);
-    if (diff < 0) return 'Prévu : hier';
-    if (diff === 0) return "Prévu : aujourd'hui";
-    if (diff === 1) return 'Prévu : demain';
-    if (diff === 2) return 'Prévu : après-demain';
-    return 'Prévu : le ' + d.split('-').reverse().slice(0, 2).join('/');
-  }
-
-  function buildComingCard(item) {
-    const card = document.createElement('div');
-    card.className = 'produce-card coming-card';
-    const distance = getDistanceForListing(item);
-    let locationText = item.sellers && item.sellers.city ? item.sellers.city : 'Vendeur Agrivoisin';
-    if (distance !== null) {
-      locationText += ' · à ' + (distance < 1 ? Math.round(distance * 1000) + ' m' : distance.toFixed(1).replace('.', ',') + ' km');
-    }
-    const sellerIsPro = item.sellers && item.sellers.seller_type === 'professionnel';
-    const qty = stockOf(item);
-    const qtyHtml = qty === null ? '' : '<p class="coming-qty">Environ ' + escapeHtml(qty) + ' ' + escapeHtml(unitLabel(item.unit, qty)) + '</p>';
-    const priceText = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + escapeHtml(item.unit || 'kg');
-    card.innerHTML = `
-      <div class="produce-card-image" style="display:block;position:relative;">
-        <span class="seller-type-disc">${sellerIsPro ? 'Professionnel' : 'Particulier'}</span>
-        <img src="${escapeHtml(item.image_url || 'agrivoisin-logo-final.png')}" alt="${escapeHtml(item.title)}">
-      </div>
-      <div class="produce-card-body">
-        <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${item.is_bio === true ? '<span class="bio-pill">BIO</span>' : ''}
-        <h4>${escapeHtml(item.title)}</h4>
-        <p class="coming-date">${escapeHtml(plannedLabel(item))}</p>
-        ${qtyHtml}
-        <p class="seller">${escapeHtml(locationText)}</p>
-        <div class="produce-card-footer"><span class="price">${priceText}</span></div>
-        <div class="coming-actions">
-          <button type="button" class="coming-btn coming-alert" data-listing-id="${escapeHtml(item.id)}">🔔 Prévenez-moi</button>
-          <button type="button" class="coming-btn coming-reserve" data-listing-id="${escapeHtml(item.id)}">Réserver</button>
-        </div>
-      </div>
-    `;
-    card.querySelectorAll('.coming-btn').forEach((btn) => {
-      btn.addEventListener('click', () => showToast('Cette fonction arrive très bientôt.'));
-    });
-    return card;
-  }
-
-  function setViewMode(mode) {
-    viewMode = mode;
-    const coming = mode === 'bientot';
-    comingBtn.classList.toggle('is-active', coming);
-    comingBtn.setAttribute('aria-pressed', coming ? 'true' : 'false');
-    comingNote.style.display = coming ? 'block' : 'none';
-    goToFirstPage();
-    if (coming && !comingLoaded) {
-      container.innerHTML = '';
-      noListingsMessage.textContent = 'Chargement des récoltes à venir…';
-      noListingsMessage.style.display = 'block';
-      pager.style.display = 'none';
-      fetch('/api/get-listings?status=bientot_mur')
-        .then((res) => res.json())
-        .then((data) => {
-          comingListings = data.listings || [];
-          comingLoaded = true;
-          if (viewMode === 'bientot') renderListings();
-        })
-        .catch((err) => {
-          console.error('Erreur chargement récoltes à venir :', err);
-          noListingsMessage.textContent = 'Impossible de charger les récoltes à venir. Réessayez dans un instant.';
-        });
-      return;
-    }
-    renderListings();
-  }
-
-  comingBtn.addEventListener('click', () => setViewMode(viewMode === 'bientot' ? 'dispo' : 'bientot'));
-  comingBack.addEventListener('click', () => {
-    setViewMode('dispo');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
   function renderListings() {
     container.innerHTML = '';
 
-    const sourceListings = viewMode === 'bientot' ? comingListings : allListings;
     let filtered = currentCategory === 'Tout'
-      ? [...sourceListings]
-      : sourceListings.filter((item) => item.category === currentCategory);
+      ? [...allListings]
+      : allListings.filter((item) => item.category === currentCategory);
 
     filtered = filtered.filter((item) => matchesSearch(item, currentSearch));
 
@@ -647,7 +549,7 @@
     if (filtered.length === 0) {
       noListingsMessage.textContent = emptyBecauseOfCity
         ? 'Aucune annonce pour cette ville dans ce rayon. Faites une nouvelle recherche.'
-        : (viewMode === 'bientot' ? COMING_NO_LISTING_TEXT : DEFAULT_NO_LISTING_TEXT);
+        : DEFAULT_NO_LISTING_TEXT;
       noListingsMessage.classList.toggle('city-empty', emptyBecauseOfCity);
       noListingsMessage.style.display = 'block';
       pager.style.display = 'none';
@@ -662,10 +564,6 @@
     filtered = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
     filtered.forEach((item) => {
-      if (viewMode === 'bientot') {
-        container.appendChild(buildComingCard(item));
-        return;
-      }
       const card = document.createElement('div');
       card.className = 'produce-card';
 
@@ -1147,20 +1045,8 @@
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
   #favToast a { color:#FFD21F; font-weight:700; }
-  .coming-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; box-sizing:border-box; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; }
-  .coming-pill.is-active { box-shadow:0 0 0 3px #7CCB86; }
+  .coming-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; box-sizing:border-box; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; text-decoration:none; cursor:pointer; }
   .coming-pill:focus-visible { outline:2px solid #3E9B4D; outline-offset:2px; }
-  .coming-note { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 14px; padding:12px 18px; border:2px solid #3E9B4D; border-radius:12px; background:#fff; color:#2d6b38; font-size:0.9rem; }
-  .coming-note p { margin:0; flex:1; min-width:240px; }
-  .coming-back { border:0; background:none; font-family:inherit; font-weight:700; color:#2d6b38; cursor:pointer; font-size:0.9rem; text-decoration:underline; }
-  .coming-card { background:#E8F5E9; border:2px solid #3E9B4D !important; }
-  .coming-card .produce-card-body h4 { margin:6px 0; }
-  .coming-date { display:inline-block; margin:6px 0; padding:4px 12px; border-radius:999px; border:1px solid #3E9B4D; background:#fff; color:#2d6b38; font-size:0.85rem; font-weight:700; }
-  .coming-qty { margin:4px 0; font-weight:700; color:#2d6b38; }
-  .coming-actions { display:flex; gap:8px; margin-top:12px; }
-  .coming-btn { flex:1; padding:10px 8px; border:0; border-radius:10px; color:#fff; font-family:inherit; font-weight:700; font-size:0.9rem; cursor:pointer; }
-  .coming-alert { background:#3E9B4D; }
-  .coming-reserve { background:#2d6b38; }
   .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; margin-left:90px; }
   @media (max-width: 900px) { .seller-type-filter { margin-left:0; } }
   .type-check { position:relative; display:inline-flex; align-items:center; padding:9px 18px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; user-select:none; }
@@ -1245,4 +1131,3 @@
 </style>
 </body>
 </html>
-

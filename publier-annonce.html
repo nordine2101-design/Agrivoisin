@@ -36,6 +36,21 @@
         <option value="" disabled selected>Choisissez une sous-catégorie</option>
       </select>
 
+      <div id="statusWrap" class="dm-wrap" style="display:none;">
+        <label class="dm-pill" id="statusLabel">Ce produit est…</label>
+        <div class="dm-modes" role="radiogroup" aria-labelledby="statusLabel">
+          <div class="st-mode" data-status="disponible" role="radio" tabindex="0" aria-checked="true"><b>Disponible maintenant</b><span>Déjà récolté, prêt à vendre.</span></div>
+          <div class="st-mode" data-status="bientot_mur" role="radio" tabindex="0" aria-checked="false"><b>Bientôt mûr</b><span>Récolte prévue dans 3 jours au maximum.</span></div>
+        </div>
+      </div>
+
+      <div id="plannedWrap" class="dm-wrap" style="display:none;">
+        <label class="dm-pill" for="plannedDate">Date de mise en vente prévue</label>
+        <input type="date" id="plannedDate" class="st-date">
+        <p id="plannedHint" style="text-align:left;font-size:0.85rem;line-height:1.4;color:#888;margin:0;"></p>
+        <div class="st-note"><b>Important :</b> une fois qu'un acheteur a réservé, vous devez vendre au prix indiqué, même si les prix montent. Si vous ne mettez pas le produit en vente à la date prévue, l'annonce disparaît 1 jour après et les acheteurs sont remboursés.</div>
+      </div>
+
       <label for="harvestDate" id="harvestDateLabel" style="display:none;">Date et heure de récolte</label>
       <input type="datetime-local" id="harvestDate" style="display:none;">
       <p id="harvestDateHint" style="display:none;font-size:0.85em;color:#888;margin-top:-8px;">Cette date et cette heure déterminent le niveau de fraîcheur affiché sur votre annonce : « Très frais » pendant 24 h après la récolte.</p>
@@ -204,6 +219,10 @@
   const harvestDateInput = document.getElementById('harvestDate');
   const harvestDateLabel = document.getElementById('harvestDateLabel');
   const harvestDateHint = document.getElementById('harvestDateHint');
+  const statusWrap = document.getElementById('statusWrap');
+  const plannedWrap = document.getElementById('plannedWrap');
+  const plannedInput = document.getElementById('plannedDate');
+  const plannedHint = document.getElementById('plannedHint');
   const photoFileInput = document.getElementById('photoFile');
   const photoPreview = document.getElementById('photoPreview');
   const photoPreviewWrap = document.getElementById('photoPreviewWrap');
@@ -236,6 +255,71 @@
   const PARTICULIER_CATEGORIES = ["Fruits", "Légumes", "Aromates", "Fleurs du jardin"];
 
   let currentSellerType = 'particulier';
+
+  // ---------- « Bientôt mûr » : une récolte pas encore faite, prévue dans 3 jours au maximum ----------
+
+  const MAX_DAYS_AHEAD = 3;
+  let listingStatus = 'disponible';
+
+  // Date du jour à Paris (AAAA-MM-JJ), comme sur le serveur
+  function parisTodayIso() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
+  }
+  function addDaysIso(iso, days) {
+    const parts = iso.split('-').map(Number);
+    return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days)).toISOString().slice(0, 10);
+  }
+  function frenchDate(iso) {
+    const parts = iso.split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  }
+
+  function isFreshCategory() {
+    return PARTICULIER_CATEGORIES.includes(categorySelect.value);
+  }
+
+  // Met à jour tout ce qui dépend du statut : choix visible, date prévue, date de récolte
+  function updateStatusUi() {
+    const canChoose = !isEdit && isFreshCategory();
+    statusWrap.style.display = canChoose ? '' : 'none';
+    if (!canChoose) listingStatus = 'disponible';
+    document.querySelectorAll('.st-mode').forEach(function (card) {
+      card.setAttribute('aria-checked', card.dataset.status === listingStatus ? 'true' : 'false');
+    });
+
+    const soon = canChoose && listingStatus === 'bientot_mur';
+    plannedWrap.style.display = soon ? '' : 'none';
+    plannedInput.required = soon;
+    if (soon) {
+      const today = parisTodayIso();
+      const latest = addDaysIso(today, MAX_DAYS_AHEAD);
+      plannedInput.min = today;
+      plannedInput.max = latest;
+      plannedHint.textContent = 'Choisissez une date entre le ' + frenchDate(today) + ' et le ' + frenchDate(latest) + ' (3 jours au maximum après aujourd\'hui).';
+    } else {
+      plannedInput.value = '';
+    }
+
+    // La date de récolte n'existe que pour un produit déjà récolté (fruits et légumes)
+    const needHarvest = HARVEST_DATE_REQUIRED_CATEGORIES.includes(categorySelect.value) && !soon;
+    harvestDateInput.style.display = needHarvest ? '' : 'none';
+    harvestDateLabel.style.display = needHarvest ? '' : 'none';
+    harvestDateHint.style.display = needHarvest ? '' : 'none';
+    harvestDateInput.required = needHarvest;
+    if (!needHarvest) harvestDateInput.value = '';
+  }
+
+  function setListingStatus(status) {
+    listingStatus = status;
+    updateStatusUi();
+  }
+
+  document.querySelectorAll('.st-mode').forEach(function (card) {
+    card.addEventListener('click', function () { setListingStatus(card.dataset.status); });
+    card.addEventListener('keydown', function (e) {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setListingStatus(card.dataset.status); }
+    });
+  });
 
   // La case de confirmation n'apparaît que pour un professionnel qui choisit une catégorie réservée aux professionnels
   function updateProAttest() {
@@ -632,18 +716,7 @@
       subcategorySelect.value = '';
     }
 
-    if (HARVEST_DATE_REQUIRED_CATEGORIES.includes(categorySelect.value)) {
-      harvestDateInput.style.display = '';
-      harvestDateLabel.style.display = '';
-      harvestDateHint.style.display = '';
-      harvestDateInput.required = true;
-    } else {
-      harvestDateInput.style.display = 'none';
-      harvestDateLabel.style.display = 'none';
-      harvestDateHint.style.display = 'none';
-      harvestDateInput.required = false;
-      harvestDateInput.value = '';
-    }
+    updateStatusUi();
   });
 
   photoFileInput.addEventListener('change', function () {
@@ -1151,6 +1224,24 @@
       return;
     }
 
+    // « Bientôt mûr » : la date de mise en vente prévue est obligatoire, dans les 3 jours au maximum
+    const soonNow = !isEdit && isFreshCategory() && listingStatus === 'bientot_mur';
+    if (soonNow) {
+      const today = parisTodayIso();
+      const latest = addDaysIso(today, MAX_DAYS_AHEAD);
+      const wanted = plannedInput.value;
+      if (!wanted) {
+        errorEl.textContent = 'Erreur : Indiquez la date de mise en vente prévue.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      if (wanted < today || wanted > latest) {
+        errorEl.textContent = 'Erreur : La date de mise en vente prévue doit être comprise entre le ' + frenchDate(today) + ' et le ' + frenchDate(latest) + ' (3 jours au maximum).';
+        errorEl.style.display = 'block';
+        return;
+      }
+    }
+
     // La récolte ne peut pas être dans le futur (vérifié à l'instant de la publication, avec 5 minutes de tolérance)
     if (harvestDateInput.value && new Date(harvestDateInput.value).getTime() > Date.now() + 5 * 60 * 1000) {
       errorEl.textContent = 'Erreur : La date et l\'heure de récolte ne peuvent pas être dans le futur.';
@@ -1251,6 +1342,11 @@
         shippingTiers: shipping.tiers,
       };
 
+      if (!isEdit) {
+        payload.availabilityStatus = soonNow ? 'bientot_mur' : 'disponible';
+        payload.plannedDate = soonNow ? plannedInput.value : null;
+      }
+
       if (isEdit) payload.listingId = editId;
 
       const response = await fetch(isEdit ? '/api/update-listing' : '/api/create-listing', {
@@ -1282,6 +1378,7 @@
       document.getElementById('bioWrap').style.display = currentSellerType === 'professionnel' ? '' : 'none';
       resetDelivery();
       resetUnitPicker();
+      setListingStatus('disponible');
       buildPickupDays();
       renderPickupPreview();
       }
@@ -1363,6 +1460,13 @@
   .dm-remove { margin-left:auto; background:none; border:none; cursor:pointer; font-family:inherit; color:#C8352F; font-weight:600; font-size:0.8rem; padding:4px 0; }
   .dm-add { background:none; border:none; cursor:pointer; font-family:inherit; margin-top:10px; padding:4px 0; color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-align:left; align-self:flex-start; }
   .dm-add:disabled { opacity:0.4; cursor:not-allowed; }
+  .st-mode { flex:1; min-width:140px; box-sizing:border-box; border:2px solid #e6e0d3; border-radius:14px; padding:12px; text-align:left; font-size:0.9rem; background:#fff; cursor:pointer; }
+  .st-mode b { display:block; color:var(--leaf-deep); margin-bottom:2px; }
+  .st-mode[aria-checked="true"] { border-color:var(--leaf-deep); background:#E8F5E9; }
+  .st-mode[aria-checked="true"] b::before { content:"\2713\00a0"; }
+  .st-mode:focus-visible { outline:3px solid rgba(131,193,61,0.55); outline-offset:2px; }
+  .st-date { width:100%; box-sizing:border-box; padding:12px 14px; border:1.5px solid #9FC49A; border-radius:var(--radius-sm); font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background:#fff; }
+  .st-note { background:#E8F5E9; border:1px solid #3E9B4D; border-radius:12px; padding:12px 14px; text-align:left; font-size:0.85rem; line-height:1.45; color:#2d6b38; }
 
   /* Unité de vente : pots, bouteilles, au poids */
   .un-wrap { display:flex; flex-direction:column; gap:6px; }

@@ -945,7 +945,11 @@
   syncCityUi();
   loadFavorites();
 
-  fetch('/api/get-listings')
+  // Si la personne est connectée, sa session est envoyée : elle voit ainsi sa propre réservation (48 h après l'ouverture de la vente)
+  supabaseClient.auth.getSession()
+    .then(({ data: { session } }) => fetch('/api/get-listings', {
+      headers: session && session.access_token ? { Authorization: 'Bearer ' + session.access_token } : {},
+    }))
     .then((res) => res.json())
     .then((data) => {
       allListings = data.listings || [];
@@ -1131,3 +1135,5 @@
 </style>
 </body>
 </html>
+
+

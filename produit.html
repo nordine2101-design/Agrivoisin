@@ -6,6 +6,7 @@
 <title>Annonce — Agrivoisin</title>
 <meta name="description" content="Détail d'une annonce de récolte sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
 </head>
 <body>
 
@@ -679,7 +680,21 @@
   if (!listingId) {
     showError('Cette annonce est introuvable. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>');
   } else {
-    fetch('/api/get-listings')
+    // Si la personne est connectée, sa session est envoyée : elle voit ainsi sa propre réservation (48 h après l'ouverture de la vente)
+    (async () => {
+      let headers = {};
+      try {
+        const authClient = window.supabase.createClient(
+          'https://eipksfszadhratfvavvs.supabase.co',
+          'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+        );
+        const { data: { session } } = await authClient.auth.getSession();
+        if (session && session.access_token) headers = { Authorization: 'Bearer ' + session.access_token };
+      } catch (authError) {
+        headers = {};
+      }
+      return fetch('/api/get-listings', { headers });
+    })()
       .then((res) => res.json())
       .then((data) => {
         const item = (data.listings || []).find((l) => String(l.id) === String(listingId));
@@ -923,3 +938,5 @@
 </script>
 </body>
 </html>
+
+

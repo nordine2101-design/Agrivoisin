@@ -45,7 +45,7 @@
         <label class="type-check"><input type="checkbox" id="typeParticulier"><span>Particuliers</span></label>
         <label class="type-check"><input type="checkbox" id="typeProfessionnel"><span>Professionnels</span></label>
         <a class="fav-link" href="favoris.html"><img src="favori-banane-epluchee.png" alt="" width="26" height="26"><span>Favoris</span><img src="cerise-pleine.png" alt="" width="26" height="26"></a>
-        <button type="button" class="coming-pill" id="comingBtn" aria-pressed="false"><span class="coming-pill-icon" aria-hidden="true">🌱</span><span>Bientôt mûr</span><span class="coming-pill-count" id="comingCount">0</span></button>
+        <button type="button" class="coming-pill" id="comingBtn" aria-pressed="false"><span>Bientôt mûr</span></button>
       </div>
       <a href="panier.html" class="cart-icon bar-cart" aria-label="Panier"><img src="panier-agrivoisin.png" alt="Panier" style="width:100%;height:100%;object-fit:contain;"><span class="cart-count" id="barCartCount">0</span></a>
     </div>
@@ -85,7 +85,7 @@
 <section class="listings-section">
   <div class="container">
     <div id="comingNote" class="coming-note" style="display:none;">
-      <p><span aria-hidden="true">🌱</span> <b>Récoltes prévues dans les 3 jours.</b> Ces produits ne sont pas encore récoltés : vous ne pouvez pas les commander maintenant. « Prévenez-moi » : un e-mail gratuit à l'ouverture de la vente. « Réserver » : prix bloqué, 1 € de frais de réservation.</p>
+      <p><b>Récoltes prévues dans les 3 jours.</b> Ces produits ne sont pas encore récoltés : vous ne pouvez pas les commander maintenant. « Prévenez-moi » : un e-mail gratuit à l'ouverture de la vente. « Réserver » : prix bloqué, 1 € de frais de réservation.</p>
       <button type="button" class="coming-back" id="comingBack">← Retour aux annonces disponibles</button>
     </div>
     <div id="realListingsContainer" class="produce-grid listings-grid"></div>
@@ -145,7 +145,6 @@
   const DEFAULT_NO_LISTING_TEXT = noListingsMessage.textContent;
   const COMING_NO_LISTING_TEXT = 'Aucune récolte à venir ne correspond à votre recherche pour le moment.';
   const comingBtn = document.getElementById('comingBtn');
-  const comingCount = document.getElementById('comingCount');
   const comingNote = document.getElementById('comingNote');
   const comingBack = document.getElementById('comingBack');
 
@@ -588,7 +587,6 @@
         .then((data) => {
           comingListings = data.listings || [];
           comingLoaded = true;
-          comingCount.textContent = comingListings.length;
           if (viewMode === 'bientot') renderListings();
         })
         .catch((err) => {
@@ -1053,7 +1051,6 @@
     .then((res) => res.json())
     .then((data) => {
       allListings = data.listings || [];
-      comingCount.textContent = data.comingSoonCount || 0;
       renderListings();
       if (scrollToRestore !== null) {
         const y = scrollToRestore;
@@ -1150,10 +1147,8 @@
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
   #favToast a { color:#FFD21F; font-weight:700; }
-  .coming-pill { display:inline-flex; align-items:center; gap:8px; padding:5px 18px; height:64px; box-sizing:border-box; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; }
+  .coming-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; box-sizing:border-box; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; }
   .coming-pill.is-active { box-shadow:0 0 0 3px #7CCB86; }
-  .coming-pill-icon { font-size:34px; line-height:1; }
-  .coming-pill-count { background:#fff; color:#4C7A50; border-radius:999px; padding:1px 9px; font-size:0.8rem; }
   .coming-pill:focus-visible { outline:2px solid #3E9B4D; outline-offset:2px; }
   .coming-note { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 14px; padding:12px 18px; border:2px solid #3E9B4D; border-radius:12px; background:#fff; color:#2d6b38; font-size:0.9rem; }
   .coming-note p { margin:0; flex:1; min-width:240px; }

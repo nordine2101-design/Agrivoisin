@@ -692,8 +692,13 @@ function reservableQuantity(total, reserved) {
   return Math.max(0, Math.min(personMax, totalMax - reserved));
 }
 
+// Une récolte « Bientôt mûr » n'est visible des acheteurs que 3 heures après sa publication
+// (pendant ce délai, le vendeur peut encore tout changer ou supprimer sans que personne ne la voie)
+const COMING_SOON_DELAY_MS = 3 * 60 * 60 * 1000;
+
 function isComingSoonActive(item, today) {
   if (item.availability_status !== 'bientot_mur' || !item.planned_date) return false;
+  if (item.created_at && Date.now() < new Date(item.created_at).getTime() + COMING_SOON_DELAY_MS) return false;
   return String(item.planned_date).slice(0, 10) >= addDaysIso(today, -1);
 }
 
@@ -727,7 +732,7 @@ async function activeComingIds(listingIds) {
   if (!listingIds.length) return new Set();
   const { data, error } = await supabase
     .from('listings')
-    .select('id, availability_status, planned_date')
+    .select('id, availability_status, planned_date, created_at')
     .in('id', listingIds);
   if (error) throw error;
   const today = todayInParis();
@@ -773,7 +778,7 @@ async function alertToggle(req, res) {
 
     const { data: listing, error: listingError } = await supabase
       .from('listings')
-      .select('id, availability_status, planned_date')
+      .select('id, availability_status, planned_date, created_at')
       .eq('id', listingId)
       .maybeSingle();
     if (listingError) throw listingError;

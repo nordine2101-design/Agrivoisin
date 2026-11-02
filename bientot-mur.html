@@ -17,7 +17,7 @@
       <a href="annonces.html" class="btn btn-ghost btn-back">Retour</a>
       <h1>Bientôt mûr</h1>
     </div>
-    <p class="my-intro">Des récoltes prévues dans les 3 jours. Elles ne sont pas encore en vente : « Prévenez-moi » pour recevoir un e-mail gratuit à l'ouverture de la vente, ou « Réserver » pour bloquer le prix (1 € de frais de réservation).</p>
+    <p class="my-intro">Des récoltes prévues dans les 3 jours. Elles ne sont pas encore en vente : « Prévenez-moi » pour recevoir un e-mail gratuit à l'ouverture de la vente, ou « Réserver » pour bloquer le prix gratuitement (premier arrivé, premier servi).</p>
 
     <div id="alertBar" class="alert-bar" style="display:none;"></div>
 
@@ -237,7 +237,7 @@
   }
 
 
-  // ---------- Fenêtre « Réserver » : 1 € de frais de réservation, payés chez Stripe ----------
+  // ---------- Fenêtre « Réserver » : réservation gratuite ----------
   function formatEuros(cents) {
     return (cents / 100).toFixed(2).replace('.', ',') + ' €';
   }
@@ -293,13 +293,13 @@
           <div class="rsv-price-note">Le prix de ${escapeHtml(formatEuros(unitCents))}/${escapeHtml(unit)} est bloqué pour vous. Vous paierez la récolte quand la vente ouvrira.</div>
         </div>
         <ul class="rsv-rules">
-          <li>Aujourd'hui, vous payez seulement <b>1 €</b> de frais de réservation.</li>
-          <li>Ces 1 € sont <b>déduits</b> du prix si vous commandez dans les 48 h après l'ouverture de la vente.</li>
-          <li>Sinon, ils sont gardés par Agrivoisin.</li>
-          <li>Si la récolte n'a pas lieu, ils sont <b>remboursés</b>.</li>
+          <li>La réservation est <b>gratuite</b> : vous ne payez rien aujourd'hui.</li>
+          <li>À l'ouverture de la vente, vous avez <b>48 h</b> pour commander en premier. Ensuite, la quantité est remise en vente pour tout le monde.</li>
+          <li>Si la récolte n'a pas lieu, votre réservation est annulée.</li>
+          <li>Si vous ne commandez pas deux fois dans les 48 h, vous ne pourrez plus réserver pendant 30 jours.</li>
         </ul>
         <p class="rsv-error" id="rsvError" style="display:none;"></p>
-        <button type="button" class="rsv-pay" id="rsvPay">Réserver : payer 1 € de frais</button>
+        <button type="button" class="rsv-pay" id="rsvPay">Réserver gratuitement</button>
       </div>
     `;
     document.body.appendChild(overlay);
@@ -325,9 +325,9 @@
       plus.disabled = qty >= max;
       pay.disabled = qty < 1;
       if (max >= 1) {
-        leftEl.textContent = 'Encore ' + max + ' ' + unitLabel(unit, max) + ' réservables.';
+        leftEl.textContent = 'Vous pouvez réserver jusqu\'à ' + max + ' ' + unitLabel(unit, max) + '.';
       } else {
-        leftEl.textContent = 'Tout est déjà réservé pour cette récolte.';
+        leftEl.textContent = 'Le maximum de réservations est atteint pour cette récolte.';
       }
       labelEl.textContent = 'Prix de ' + qty + ' ' + unitLabel(unit, qty);
       valueEl.textContent = formatEuros(unitCents * qty);
@@ -343,7 +343,7 @@
       pay.disabled = true;
       showError('');
       const oldText = pay.textContent;
-      pay.textContent = 'Ouverture du paiement…';
+      pay.textContent = 'Réservation en cours…';
       try {
         const res = await fetch('/api/create-checkout-session', {
           method: 'POST',
@@ -405,11 +405,11 @@
 
   async function init() {
     loadBuyerLocation();
-    // Retour du paiement des 1 € de frais de réservation
+    // Retour après une réservation
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get('reservation') === 'ok') {
-        showToast('Merci ! Votre paiement de 1 € est reçu : votre réservation est enregistrée.');
+        showToast('Votre réservation est enregistrée. Vous aurez 48 h pour commander dès l\'ouverture de la vente.');
         window.history.replaceState({}, '', window.location.pathname);
       }
     } catch (e) { /* sans importance */ }
@@ -421,7 +421,7 @@
     }
     renderAlertBar();
     try {
-      const res = await fetch('/api/get-listings?status=bientot_mur');
+      const res = await fetch('/api/get-listings?status=bientot_mur', accessToken ? { headers: { Authorization: 'Bearer ' + accessToken } } : undefined);
       if (!res.ok) throw new Error('Réponse ' + res.status);
       const data = await res.json();
       const items = (data.listings || []).slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -495,7 +495,7 @@
   .rsv-price-note { font-size:.82rem; margin-top:4px; }
   .rsv-rules { margin:0 0 16px; padding-left:18px; list-style:disc; font-size:.85rem; line-height:1.5; }
   .rsv-error { margin:0 0 12px; color:#C8352F; font-weight:700; font-size:.9rem; }
-  .rsv-pay { width:100%; background:#C8352F; color:#fff; font-weight:800; text-align:center; padding:13px; border:0; border-radius:12px; font-size:1rem; font-family:inherit; cursor:pointer; }
+  .rsv-pay { width:100%; background:#3d9a4e; color:#fff; font-weight:800; text-align:center; padding:13px; border:0; border-radius:12px; font-size:1rem; font-family:inherit; cursor:pointer; }
   .rsv-pay:disabled { opacity:.6; cursor:default; }
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }

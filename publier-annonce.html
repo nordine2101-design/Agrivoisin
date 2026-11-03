@@ -187,6 +187,23 @@
   </div>
 </footer>
 
+<div class="pc-overlay" id="priceConfirm" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="pcTitle">
+  <div class="pc-modal">
+    <h3 id="pcTitle">Vérifiez votre prix</h3>
+    <p>Voici ce que les acheteurs verront :</p>
+    <div class="pc-recap">
+      <span id="pcName"></span><br>
+      <span class="pc-big" id="pcPrice"></span><br>
+      <span id="pcDetails"></span>
+    </div>
+    <p class="pc-warn">⚠️ Dès la première réservation, ce prix ne pourra plus être modifié.</p>
+    <div class="pc-actions">
+      <button type="button" class="pc-btn pc-btn-no" id="pcNo">Corriger</button>
+      <button type="button" class="pc-btn pc-btn-yes" id="pcYes">Oui, publier</button>
+    </div>
+  </div>
+</div>
+
 <script src="script.js"></script>
 <script>
   const supabaseClient = window.supabase.createClient(
@@ -1225,6 +1242,36 @@
     loadEdit();
   }
 
+  // « Bientôt mûr » : fenêtre de confirmation du prix. Renvoie true si le vendeur confirme, false s'il veut corriger.
+  function askPriceConfirm(info) {
+    return new Promise(function (resolve) {
+      const box = document.getElementById('priceConfirm');
+      document.getElementById('pcName').textContent = info.title;
+      document.getElementById('pcPrice').textContent = info.price;
+      document.getElementById('pcDetails').textContent = info.details;
+      box.style.display = 'flex';
+      const yes = document.getElementById('pcYes');
+      const no = document.getElementById('pcNo');
+      function done(answer) {
+        box.style.display = 'none';
+        yes.removeEventListener('click', onYes);
+        no.removeEventListener('click', onNo);
+        box.removeEventListener('click', onBackdrop);
+        document.removeEventListener('keydown', onKey);
+        resolve(answer);
+      }
+      function onYes() { done(true); }
+      function onNo() { done(false); }
+      function onBackdrop(ev) { if (ev.target === box) done(false); }
+      function onKey(ev) { if (ev.key === 'Escape') done(false); }
+      yes.addEventListener('click', onYes);
+      no.addEventListener('click', onNo);
+      box.addEventListener('click', onBackdrop);
+      document.addEventListener('keydown', onKey);
+      no.focus();
+    });
+  }
+
   listingForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = document.getElementById('listingSubmitBtn');
@@ -1306,6 +1353,18 @@
         errorEl.style.display = 'block';
         return;
       }
+    }
+
+    // « Bientôt mûr » : le prix est bloqué dès la première réservation, le vendeur le confirme avant de publier
+    if (soonNow) {
+      const priceNum = parseFloat(document.getElementById('price').value);
+      const unitTxt = String(document.getElementById('unit').value || '').trim() || 'kg';
+      const confirmed = await askPriceConfirm({
+        title: document.getElementById('title').value.trim(),
+        price: priceNum.toFixed(2).replace('.', ',') + ' € par ' + unitTxt,
+        details: 'Récolte prévue : ' + quantityValue + ' ' + unitLabel(unitTxt, quantityValue) + ' · mise en vente le ' + frenchDate(plannedInput.value),
+      });
+      if (!confirmed) return;
     }
 
     btn.textContent = isEdit ? 'Enregistrement en cours...' : 'Publication en cours...';
@@ -1502,6 +1561,17 @@
   .auth-form .un-free input { width:90px; padding:7px 10px; border:1px solid #e6e0d3; border-radius:8px; font:inherit; font-weight:400; box-sizing:border-box; }
   .auth-form .un-free select { width:auto; padding:7px 10px; border:1px solid #e6e0d3; border-radius:8px; font:inherit; font-weight:400; background:#fff; }
   .un-result { margin:10px 0 0; padding:10px 12px; border-radius:10px; background:#fff; font-size:0.9rem; color:var(--soil); text-align:left; }
+  .pc-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
+  .pc-modal { background:#fff; border-radius:22px; max-width:420px; width:100%; box-sizing:border-box; padding:26px 24px; box-shadow:0 12px 40px rgba(0,0,0,.3); border:3px solid #3E9B4D; }
+  .pc-modal h3 { margin:0 0 10px; color:#2d6b38; font-size:1.2rem; }
+  .pc-modal p { margin:0 0 8px; color:#333; font-size:0.95rem; line-height:1.5; }
+  .pc-recap { margin:12px 0; padding:12px 14px; border-radius:12px; background:#F1F8F2; border:1.5px solid #3E9B4D; font-size:0.95rem; color:#222; line-height:1.6; }
+  .pc-big { font-size:1.25rem; font-weight:800; color:#2d6b38; }
+  .pc-modal p.pc-warn { margin:10px 0 16px; padding:9px 12px; border-radius:10px; background:#FFF4C2; border:1.5px solid #E0B400; color:#6b5400; font-size:0.85rem; line-height:1.35; }
+  .pc-actions { display:flex; gap:10px; }
+  .pc-btn { flex:1; padding:11px 8px; border:0; border-radius:10px; font-family:inherit; font-weight:700; font-size:0.95rem; cursor:pointer; }
+  .pc-btn-no { background:#fff; color:#2d6b38; box-shadow:inset 0 0 0 2px #3E9B4D; }
+  .pc-btn-yes { background:#2d6b38; color:#fff; }
 </style>
 </body>
 </html>

@@ -185,6 +185,8 @@ function activeLot(listing, seller) {
 // ---------------------------------------------------------------------------
 const RESERVATION_WINDOW_MS = 48 * 60 * 60 * 1000; // après l'ouverture de la vente, les personnes qui ont réservé commandent en premier pendant 48 h
 const MAX_RESERVATIONS_PER_DAY = 3;
+const UNUSED_RESERVATIONS_TOLERATED = 1; // 2 réservations laissées expirer sans commander => plus de réservation pendant 30 jours
+const UNUSED_RESERVATIONS_BLOCK_DAYS = 30;
 
 function addDaysIso(isoDate, days) {
   const [y, m, d] = isoDate.split('-').map(Number);
@@ -229,6 +231,36 @@ async function reservationsOfToday(userId) {
   if (error) throw new Error('réservations du jour : ' + error.message);
   const today = todayInParis();
   return (data || []).filter((r) => parisDay(r.created_at) === today).sort(byArrival);
+}
+
+// Réservations que cette personne a laissé expirer sans commander (la vente est ouverte depuis plus de 48 h
+// et la réservation est restée « active »). Les réservations annulées ou suivies d'une commande ne comptent pas.
+// Renvoie la date (AAAA-MM-JJ) jusqu'à laquelle les réservations sont bloquées, ou null.
+async function reservationBlockedUntil(userId) {
+  const { data: mine, error } = await supabase
+    .from('listing_reservations')
+    .select('id, listing_id')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+  if (error) throw new Error('réservations non utilisées : ' + error.message);
+  const ids = [...new Set((mine || []).map((r) => r.listing_id).filter(Boolean))];
+  if (ids.length === 0) return null;
+  const { data: lst, error: lstError } = await supabase
+    .from('listings')
+    .select('id, sale_opened_at')
+    .in('id', ids);
+  if (lstError) throw new Error('annonces des réservations : ' + lstError.message);
+  const byId = new Map((lst || []).filter((l) => ids.includes(l.id)).map((l) => [l.id, l]));
+  const expiries = [];
+  for (const r of mine || []) {
+    const l = byId.get(r.listing_id);
+    if (!l || !l.sale_opened_at) continue;
+    const end = new Date(l.sale_opened_at).getTime() + RESERVATION_WINDOW_MS;
+    if (end < Date.now()) expiries.push(end);
+  }
+  if (expiries.length <= UNUSED_RESERVATIONS_TOLERATED) return null;
+  const until = Math.max(...expiries) + UNUSED_RESERVATIONS_BLOCK_DAYS * 24 * 60 * 60 * 1000;
+  return until > Date.now() ? parisDay(until) : null;
 }
 
 async function reserveCheckout(req, res) {
@@ -280,6 +312,12 @@ async function reserveCheckout(req, res) {
     }
     if (String(seller.user_id) === String(buyerId)) {
       return res.status(400).json({ error: 'Vous ne pouvez pas réserver votre propre récolte.' });
+    }
+
+    const blockedUntil = await reservationBlockedUntil(buyerId);
+    if (blockedUntil) {
+      const fr = blockedUntil.split('-').reverse().join('/');
+      return res.status(403).json({ error: `Vous avez laissé 2 réservations expirer sans commander. Vous ne pouvez plus réserver jusqu'au ${fr}. Vous pouvez toujours acheter normalement.` });
     }
 
     const total = Number(listing.quantity_available);

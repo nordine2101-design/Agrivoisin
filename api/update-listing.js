@@ -14,6 +14,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 //   POST /api/update-listing avec { action: 'delete', listingId } -> supprime l'annonce
 //   (une récolte « Bientôt mûr » ne peut plus être supprimée ni modifiée après 3 h)
 //   POST /api/update-listing avec { action: 'open_sale', listingId } -> ouvre la vente d'une récolte « Bientôt mûr »
+//   POST /api/update-listing avec { action: 'cancel_info' | 'cancel_harvest', listingId } -> annule une récolte « Bientôt mûr » (après 3 h)
 // Seul le vendeur qui a publié l'annonce peut la lire ici et la modifier.
 
 const DAY_LABELS = ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -26,6 +27,25 @@ const MAX_PRICE = 10000;
 const MAX_TIERS = 10;
 const MAX_SHIPPING_PRICE = 500;
 const DELIVERY_MODES = ['retrait', 'expedition', 'les_deux'];
+
+// Annulation d'une récolte « Bientôt mûr » : 2 annulations tolérées sur 90 jours ; à la 3e, plus de « Bientôt mûr » pendant 30 jours
+const CANCEL_WINDOW_DAYS = 90;
+const CANCEL_TOLERATED = 2;
+const CANCEL_BLOCK_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Combien de récoltes ce vendeur a annulées ces 90 derniers jours
+async function countRecentCancellations(sellerId) {
+  const since = new Date(Date.now() - CANCEL_WINDOW_DAYS * DAY_MS).toISOString();
+  const { data, error } = await supabase
+    .from('listings')
+    .select('cancelled_at')
+    .eq('seller_id', sellerId)
+    .not('cancelled_at', 'is', null)
+    .gte('cancelled_at', since);
+  if (error) throw error;
+  return (data || []).length;
+}
 
 // Catégories que les particuliers peuvent vendre (produits frais, non transformés).
 // Toutes les autres sont réservées aux vendeurs professionnels.
@@ -206,13 +226,61 @@ export default async function handler(req, res) {
     // ---------- Récolte « Bientôt mûr » : après les 3 premières heures, plus de suppression ni de modification ----------
     // (des acheteurs ont pu la voir et réserver : le vendeur doit passer par « Annuler cette récolte »)
     const postAction = (req.body || {}).action;
-    if (existing.availability_status === 'bientot_mur' && existing.created_at && postAction !== 'open_sale'
+    if (existing.availability_status === 'bientot_mur' && existing.created_at && postAction !== 'open_sale' && postAction !== 'cancel_info' && postAction !== 'cancel_harvest'
         && Date.now() >= new Date(existing.created_at).getTime() + 3 * 60 * 60 * 1000) {
       return res.status(400).json({
         error: postAction === 'delete'
           ? "Cette récolte est visible des acheteurs depuis plus de 3 h : vous ne pouvez plus la supprimer. Utilisez « Annuler cette récolte »."
           : "Cette récolte est visible des acheteurs depuis plus de 3 h : vous ne pouvez plus la modifier. Utilisez « Annuler cette récolte » si vous ne pouvez pas la tenir.",
       });
+    }
+
+    // ---------- POST « cancel_info » : ce que l'annulation d'une récolte « Bientôt mûr » va entraîner pour le vendeur ----------
+    if (postAction === 'cancel_info') {
+      const before = await countRecentCancellations(seller.id);
+      const after = before + 1;
+      return res.status(200).json({
+        cancellationsAfter: after,
+        tolerated: CANCEL_TOLERATED,
+        willBlock: after > CANCEL_TOLERATED,
+        blockDays: CANCEL_BLOCK_DAYS,
+        windowDays: CANCEL_WINDOW_DAYS,
+      });
+    }
+
+    // ---------- POST « cancel_harvest » : annuler une récolte « Bientôt mûr » (après les 3 premières heures) ----------
+    if (postAction === 'cancel_harvest') {
+      if (existing.availability_status !== 'bientot_mur') {
+        return res.status(400).json({ error: "Cette récolte n'est plus à venir : elle est déjà en vente ou a été retirée." });
+      }
+      if (existing.created_at && Date.now() < new Date(existing.created_at).getTime() + 3 * 60 * 60 * 1000) {
+        return res.status(400).json({ error: 'Pendant les 3 premières heures, utilisez « Supprimer » : l\'annonce n\'est pas encore visible des acheteurs.' });
+      }
+
+      // La condition sur le statut évite une double annulation si le vendeur clique deux fois
+      const { data: cancelled, error: cancelError } = await supabase
+        .from('listings')
+        .update({ availability_status: 'annulee', cancelled_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .eq('seller_id', seller.id)
+        .eq('availability_status', 'bientot_mur')
+        .select('id')
+        .maybeSingle();
+      if (cancelError) throw cancelError;
+      if (!cancelled) {
+        return res.status(409).json({ error: "Cette récolte n'est plus à venir : elle est déjà en vente ou a été retirée." });
+      }
+
+      // Les réservations de cette récolte sont annulées (elles étaient gratuites : rien à rembourser)
+      const { error: reservationsError } = await supabase
+        .from('listing_reservations')
+        .update({ status: 'annulee' })
+        .eq('listing_id', existing.id)
+        .eq('status', 'active');
+      if (reservationsError) console.error('Erreur Supabase (annulation des réservations) :', reservationsError);
+
+      const total = await countRecentCancellations(seller.id);
+      return res.status(200).json({ success: true, cancellations: total, blocked: total > CANCEL_TOLERATED, blockDays: CANCEL_BLOCK_DAYS });
     }
 
     // ---------- POST « delete » : supprimer l'annonce (remplace l'ancienne fonction delete-listing) ----------

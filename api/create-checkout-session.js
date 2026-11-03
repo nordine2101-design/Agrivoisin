@@ -568,6 +568,13 @@ export default async function handler(req, res) {
         });
       }
 
+      // Une récolte annulée par son vendeur ne s'achète plus
+      if (listing.availability_status === 'annulee') {
+        return res.status(400).json({
+          error: `L'annonce « ${label} » n'est plus disponible. Retirez-la de votre panier.`,
+        });
+      }
+
       // Une récolte « Bientôt mûr » n'est pas encore en vente : elle ne s'achète pas
       if (listing.availability_status === 'bientot_mur') {
         return res.status(400).json({

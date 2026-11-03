@@ -399,7 +399,7 @@
     const delBtn = card.querySelector('.coming-del');
     const cancelBtn = card.querySelector('.coming-cancel');
     if (openBtn && !openBtn.disabled) openBtn.addEventListener('click', () => askOpenSale(item, card));
-    if (editBtn && !editBtn.disabled) editBtn.addEventListener('click', soon);
+    if (editBtn && !editBtn.disabled) editBtn.addEventListener('click', () => { window.location.href = 'publier-annonce.html?modifier=' + encodeURIComponent(item.id); });
     if (delBtn) delBtn.addEventListener('click', () => askDelete(item, card));
     if (cancelBtn) cancelBtn.addEventListener('click', soon);
     return card;

@@ -58,6 +58,21 @@
   </div>
 </div>
 
+<!-- ============ FENÊTRE : ANNULER UNE RÉCOLTE ============ -->
+<div id="cancelOverlay" class="sale-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="cancelTitle">
+  <div class="sale-modal">
+    <h3 id="cancelTitle"></h3>
+    <p id="cancelText1"></p>
+    <p id="cancelText2">Cette annulation est enregistrée sur votre profil vendeur.</p>
+    <p id="cancelInfo" class="cancel-info" style="display:none;"></p>
+    <p id="cancelError" class="sale-error" style="display:none;" role="alert"></p>
+    <div class="sale-modal-actions">
+      <button type="button" class="sale-btn sale-btn-no" id="cancelNo">Non, la garder</button>
+      <button type="button" class="sale-btn sale-btn-danger" id="cancelYes">Oui, annuler</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ FOOTER ============ -->
 <footer class="site-footer">
   <div class="container">
@@ -343,6 +358,103 @@
     }
   });
 
+  // ---------- Annuler une récolte (après les 3 premières heures) ----------
+  const cancelOverlay = document.getElementById('cancelOverlay');
+  const cancelTitle = document.getElementById('cancelTitle');
+  const cancelText1 = document.getElementById('cancelText1');
+  const cancelInfo = document.getElementById('cancelInfo');
+  const cancelError = document.getElementById('cancelError');
+  const cancelNo = document.getElementById('cancelNo');
+  const cancelYes = document.getElementById('cancelYes');
+  let cancelTarget = null;
+
+  function closeCancel() {
+    cancelOverlay.style.display = 'none';
+    cancelTarget = null;
+  }
+
+  async function postListingAction(action, listingId) {
+    const res = await fetch('/api/update-listing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+      body: JSON.stringify({ action, listingId }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e) { data = {}; }
+    if (!res.ok) throw new Error(data.error || 'Réponse ' + res.status);
+    return data;
+  }
+
+  async function askCancel(item, card) {
+    cancelTarget = { item, card };
+    const people = Number(item.reservations_count) || 0;
+    const reserved = Number(item.reserved_quantity) || 0;
+    cancelTitle.textContent = 'Annuler « ' + item.title + ' » ?';
+    cancelText1.textContent = people > 0
+      ? people + ' ' + (people > 1 ? 'personnes avaient réservé' : 'personne avait réservé') + ' (' + reserved + ' ' + unitLabel(item.unit, reserved) + '). '
+        + (people > 1 ? 'Leurs réservations seront annulées' : 'Sa réservation sera annulée') + " et l'annonce disparaîtra."
+      : "Personne n'a réservé. L'annonce disparaîtra.";
+    cancelInfo.style.display = 'none';
+    cancelInfo.className = 'cancel-info';
+    cancelError.style.display = 'none';
+    cancelNo.disabled = false;
+    cancelYes.disabled = true;
+    cancelYes.textContent = 'Oui, annuler';
+    cancelOverlay.style.display = 'flex';
+    cancelNo.focus();
+    try {
+      const info = await postListingAction('cancel_info', item.id);
+      if (!cancelTarget || cancelTarget.item !== item) return;
+      const n = info.cancellationsAfter;
+      if (info.willBlock) {
+        cancelInfo.className = 'cancel-info cancel-info-red';
+        cancelInfo.textContent = "⛔ C'est votre " + n + 'e annulation en ' + info.windowDays + ' jours. Vous ne pourrez plus publier de récolte « Bientôt mûr » pendant ' + info.blockDays + ' jours (vos annonces « Disponible maintenant » ne changent pas).';
+      } else {
+        cancelInfo.innerHTML = '⚠️ Annulations des ' + escapeHtml(info.windowDays) + ' derniers jours : <b>' + escapeHtml(n) + ' sur ' + escapeHtml(info.tolerated) + '</b>. À la ' + (info.tolerated + 1) + 'e, vous ne pourrez plus publier de récolte « Bientôt mûr » pendant ' + escapeHtml(info.blockDays) + ' jours.';
+      }
+      cancelInfo.style.display = 'block';
+      cancelYes.disabled = false;
+    } catch (err) {
+      console.error('Erreur infos annulation :', err);
+      if (!cancelTarget || cancelTarget.item !== item) return;
+      cancelError.textContent = err.message && !/^Réponse \d+$/.test(err.message)
+        ? err.message
+        : 'Impossible de vérifier pour le moment. Réessayez dans un instant.';
+      cancelError.style.display = 'block';
+    }
+  }
+
+  cancelNo.addEventListener('click', closeCancel);
+  cancelOverlay.addEventListener('click', (e) => { if (e.target === cancelOverlay && !cancelNo.disabled) closeCancel(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && cancelOverlay.style.display !== 'none' && !cancelNo.disabled) closeCancel(); });
+
+  cancelYes.addEventListener('click', async () => {
+    if (!cancelTarget || !authToken) return;
+    const { item, card } = cancelTarget;
+    cancelYes.disabled = true;
+    cancelNo.disabled = true;
+    cancelYes.textContent = 'Un instant...';
+    cancelError.style.display = 'none';
+    try {
+      const result = await postListingAction('cancel_harvest', item.id);
+      closeCancel();
+      card.remove();
+      if (container.children.length === 0) {
+        emptyMessage.style.display = 'block';
+      }
+      showToast('« ' + escapeHtml(item.title) + ' » est annulée.' + (result.blocked ? ' Vous ne pouvez plus publier de « Bientôt mûr » pendant ' + escapeHtml(result.blockDays) + ' jours.' : ''));
+    } catch (err) {
+      console.error('Erreur annulation :', err);
+      cancelError.textContent = err.message && !/^Réponse \d+$/.test(err.message)
+        ? err.message
+        : "Impossible d'annuler pour le moment. Réessayez dans un instant.";
+      cancelError.style.display = 'block';
+      cancelYes.disabled = false;
+      cancelNo.disabled = false;
+      cancelYes.textContent = 'Oui, annuler';
+    }
+  });
+
   function buildComingCard(item) {
     const card = document.createElement('div');
     card.className = 'produce-card coming-card';
@@ -393,7 +505,6 @@
         ${stateHtml}
       </div>
     `;
-    const soon = () => showToast('Cette fonction arrive bientôt.');
     const openBtn = card.querySelector('.coming-open');
     const editBtn = card.querySelector('.coming-edit');
     const delBtn = card.querySelector('.coming-del');
@@ -401,7 +512,7 @@
     if (openBtn && !openBtn.disabled) openBtn.addEventListener('click', () => askOpenSale(item, card));
     if (editBtn && !editBtn.disabled) editBtn.addEventListener('click', () => { window.location.href = 'publier-annonce.html?modifier=' + encodeURIComponent(item.id); });
     if (delBtn) delBtn.addEventListener('click', () => askDelete(item, card));
-    if (cancelBtn) cancelBtn.addEventListener('click', soon);
+    if (cancelBtn) cancelBtn.addEventListener('click', () => askCancel(item, card));
     return card;
   }
 
@@ -496,6 +607,9 @@
   .sale-btn:disabled { opacity:.6; cursor:default; }
   .sale-btn-no { background:#fff; color:#2d6b38; box-shadow:inset 0 0 0 2px #3E9B4D; }
   .sale-btn-yes { background:#2d6b38; color:#fff; }
+  .sale-btn-danger { background:#C8352F; color:#fff; }
+  .sale-modal p.cancel-info { margin:10px 0 16px; padding:9px 12px; border-radius:10px; background:#FFF4C2; border:1.5px solid #E0B400; color:#6b5400; font-size:0.85rem; line-height:1.35; }
+  .sale-modal p.cancel-info-red { background:#FFE3E0; border-color:#C8352F; color:#8a1f1a; }
   #favToast a { color:#FFD21F; font-weight:700; }
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }

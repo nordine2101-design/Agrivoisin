@@ -12,6 +12,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 //   GET  /api/update-listing?id=...  -> renvoie l'annonce (et ses horaires de retrait) pour remplir le formulaire
 //   POST /api/update-listing         -> enregistre les modifications
 //   POST /api/update-listing avec { action: 'delete', listingId } -> supprime l'annonce
+//   (une récolte « Bientôt mûr » ne peut plus être supprimée ni modifiée après 3 h)
 //   POST /api/update-listing avec { action: 'open_sale', listingId } -> ouvre la vente d'une récolte « Bientôt mûr »
 // Seul le vendeur qui a publié l'annonce peut la lire ici et la modifier.
 
@@ -168,7 +169,7 @@ export default async function handler(req, res) {
     // L'annonce doit exister et appartenir à ce vendeur
     const { data: existing, error: existingError } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, quantity_available, pro_attested_at, is_bio, delivery_mode, shipping_tiers')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, quantity_available, pro_attested_at, is_bio, delivery_mode, shipping_tiers, availability_status, created_at')
       .eq('id', listingId)
       .single();
 
@@ -199,6 +200,18 @@ export default async function handler(req, res) {
         sellerType: seller.seller_type,
         listing: existing,
         pickupHours,
+      });
+    }
+
+    // ---------- Récolte « Bientôt mûr » : après les 3 premières heures, plus de suppression ni de modification ----------
+    // (des acheteurs ont pu la voir et réserver : le vendeur doit passer par « Annuler cette récolte »)
+    const postAction = (req.body || {}).action;
+    if (existing.availability_status === 'bientot_mur' && existing.created_at && postAction !== 'open_sale'
+        && Date.now() >= new Date(existing.created_at).getTime() + 3 * 60 * 60 * 1000) {
+      return res.status(400).json({
+        error: postAction === 'delete'
+          ? "Cette récolte est visible des acheteurs depuis plus de 3 h : vous ne pouvez plus la supprimer. Utilisez « Annuler cette récolte »."
+          : "Cette récolte est visible des acheteurs depuis plus de 3 h : vous ne pouvez plus la modifier. Utilisez « Annuler cette récolte » si vous ne pouvez pas la tenir.",
       });
     }
 

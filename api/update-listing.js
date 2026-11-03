@@ -169,7 +169,7 @@ export default async function handler(req, res) {
     // L'annonce doit exister et appartenir à ce vendeur
     const { data: existing, error: existingError } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, quantity_available, pro_attested_at, is_bio, delivery_mode, shipping_tiers, availability_status, created_at')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, quantity_available, pro_attested_at, is_bio, delivery_mode, shipping_tiers, availability_status, created_at, planned_date')
       .eq('id', listingId)
       .single();
 
@@ -276,7 +276,7 @@ export default async function handler(req, res) {
     }
 
     // ---------- POST : enregistrer les modifications ----------
-    const { title, description, price, unit, category, subcategory, harvestDate, harvestAt, imageUrl, pickupHours, quantity, proAttest, isBio, deliveryMode, shippingTiers } = req.body;
+    const { title, description, price, unit, category, subcategory, harvestDate, harvestAt, imageUrl, pickupHours, quantity, proAttest, isBio, deliveryMode, shippingTiers, plannedDate } = req.body;
     const isPro = seller.seller_type === 'professionnel';
 
     // Titre et description : mêmes limites que sur la page « Publier une annonce »
@@ -382,6 +382,28 @@ export default async function handler(req, res) {
       }
     }
 
+    // Récolte « Bientôt mûr » (pendant les 3 premières heures) : la date de mise en vente prévue se modifie ici,
+    // et il n'y a pas de date de récolte puisque la récolte n'est pas encore faite
+    const isComing = existing.availability_status === 'bientot_mur';
+    let plannedIso = null;
+    if (isComing) {
+      if (!PARTICULIER_CATEGORIES.includes(category)) {
+        return res.status(400).json({ error: 'Une récolte « Bientôt mûr » doit être un fruit, un légume, un aromate ou une fleur du jardin.' });
+      }
+      const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+      const latestDate = new Date(todayParis + 'T00:00:00Z');
+      latestDate.setUTCDate(latestDate.getUTCDate() + 3);
+      const latestParis = latestDate.toISOString().slice(0, 10);
+      plannedIso = typeof plannedDate === 'string' ? plannedDate.slice(0, 10) : '';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(plannedIso)) {
+        return res.status(400).json({ error: 'Indiquez la date de mise en vente prévue.' });
+      }
+      if (plannedIso < todayParis || plannedIso > latestParis) {
+        const fr = (iso) => iso.split('-').reverse().join('/');
+        return res.status(400).json({ error: 'La date de mise en vente prévue doit être comprise entre le ' + fr(todayParis) + ' et le ' + fr(latestParis) + ' (3 jours au maximum).' });
+      }
+    }
+
     // Ce qui change dans l'annonce
     const changes = {
       title: cleanTitle,
@@ -399,6 +421,12 @@ export default async function handler(req, res) {
       shipping_tiers: shipping.tiers,
       multi_parcel: mode !== 'retrait',
     };
+
+    if (isComing) {
+      changes.planned_date = plannedIso;
+      changes.harvest_date = null;
+      changes.harvest_at = null;
+    }
 
     // Une nouvelle photo n'est enregistrée que si le vendeur en a choisi une ; sinon l'ancienne reste
     if (typeof imageUrl === 'string' && imageUrl) {

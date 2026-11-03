@@ -45,6 +45,19 @@
   </div>
 </div>
 
+<!-- ============ FENÊTRE : SUPPRIMER UNE RÉCOLTE ============ -->
+<div id="deleteOverlay" class="sale-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+  <div class="sale-modal">
+    <h3 id="deleteTitle"></h3>
+    <p id="deleteText1">Elle disparaît définitivement. Personne ne l'a encore vue.</p>
+    <p id="deleteError" class="sale-error" style="display:none;" role="alert"></p>
+    <div class="sale-modal-actions">
+      <button type="button" class="sale-btn sale-btn-no" id="deleteNo">Non, la garder</button>
+      <button type="button" class="sale-btn sale-btn-yes" id="deleteYes">Oui, supprimer</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ FOOTER ============ -->
 <footer class="site-footer">
   <div class="container">
@@ -245,6 +258,91 @@
     }
   });
 
+  // ---------- Délai de 3 h : l'annonce n'est pas encore visible des acheteurs ----------
+  const DELAY_MS = 3 * 60 * 60 * 1000;
+
+  // Il reste combien de temps avant que les acheteurs voient l'annonce (0 = elle est déjà visible)
+  function delayLeftMs(item) {
+    if (!item.created_at) return 0;
+    const left = new Date(item.created_at).getTime() + DELAY_MS - Date.now();
+    return left > 0 ? left : 0;
+  }
+
+  // « 2 h 15 », « 2 h », « 45 min »
+  function formatLeft(ms) {
+    const total = Math.max(1, Math.ceil(ms / 60000));
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    if (h === 0) return total + ' min';
+    return m === 0 ? h + ' h' : h + ' h ' + String(m).padStart(2, '0');
+  }
+
+  function frenchPlanned(item) {
+    return String(item.planned_date || '').slice(0, 10).split('-').reverse().join('/');
+  }
+
+  // ---------- Supprimer une récolte (pendant le délai de 3 h) ----------
+  const deleteOverlay = document.getElementById('deleteOverlay');
+  const deleteTitle = document.getElementById('deleteTitle');
+  const deleteError = document.getElementById('deleteError');
+  const deleteNo = document.getElementById('deleteNo');
+  const deleteYes = document.getElementById('deleteYes');
+  let deleteTarget = null;
+
+  function closeDelete() {
+    deleteOverlay.style.display = 'none';
+    deleteTarget = null;
+  }
+
+  function askDelete(item, card) {
+    deleteTarget = { item, card };
+    deleteTitle.textContent = 'Supprimer « ' + item.title + ' » ?';
+    deleteError.style.display = 'none';
+    deleteYes.disabled = false;
+    deleteNo.disabled = false;
+    deleteYes.textContent = 'Oui, supprimer';
+    deleteOverlay.style.display = 'flex';
+    deleteNo.focus();
+  }
+
+  deleteNo.addEventListener('click', closeDelete);
+  deleteOverlay.addEventListener('click', (e) => { if (e.target === deleteOverlay && !deleteYes.disabled) closeDelete(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && deleteOverlay.style.display !== 'none' && !deleteYes.disabled) closeDelete(); });
+
+  deleteYes.addEventListener('click', async () => {
+    if (!deleteTarget || !authToken) return;
+    const { item, card } = deleteTarget;
+    deleteYes.disabled = true;
+    deleteNo.disabled = true;
+    deleteYes.textContent = 'Un instant...';
+    deleteError.style.display = 'none';
+    try {
+      const res = await fetch('/api/update-listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+        body: JSON.stringify({ action: 'delete', listingId: item.id }),
+      });
+      let data = {};
+      try { data = await res.json(); } catch (e) { data = {}; }
+      if (!res.ok) throw new Error(data.error || 'Réponse ' + res.status);
+      closeDelete();
+      card.remove();
+      if (container.children.length === 0) {
+        emptyMessage.style.display = 'block';
+      }
+      showToast('« ' + escapeHtml(item.title) + ' » est supprimée.');
+    } catch (err) {
+      console.error('Erreur suppression :', err);
+      deleteError.textContent = err.message && !/^Réponse \d+$/.test(err.message)
+        ? err.message
+        : 'Impossible de supprimer pour le moment. Réessayez dans un instant.';
+      deleteError.style.display = 'block';
+      deleteYes.disabled = false;
+      deleteNo.disabled = false;
+      deleteYes.textContent = 'Oui, supprimer';
+    }
+  });
+
   function buildComingCard(item) {
     const card = document.createElement('div');
     card.className = 'produce-card coming-card';
@@ -253,6 +351,33 @@
     const qtyHtml = qty === null ? '' : '<p class="coming-qty">Environ ' + escapeHtml(qty) + ' ' + escapeHtml(unitLabel(item.unit, qty)) + '</p>';
     const priceText = Number(item.price).toFixed(2).replace('.', ',') + ' €/' + escapeHtml(item.unit || 'kg');
     const isPro = pageSellerType === 'professionnel';
+
+    // Trois états : pendant les 3 premières heures, puis avant la date prévue, puis à partir de la date prévue
+    const left = delayLeftMs(item);
+    const plannedIso = String(item.planned_date || '').slice(0, 10);
+    const dateArrived = !plannedIso || plannedIso <= parisTodayIso();
+    let stateHtml;
+    if (left > 0) {
+      stateHtml = `
+        <div class="delay-note">⏳ Visible par les acheteurs dans <b>${escapeHtml(formatLeft(left))}</b>. D'ici là, vous pouvez tout changer ou supprimer.</div>
+        <div class="coming-actions">
+          <button type="button" class="coming-btn coming-edit">Modifier</button>
+          <button type="button" class="coming-btn coming-del">Supprimer</button>
+        </div>`;
+    } else if (!dateArrived) {
+      stateHtml = `
+        <div class="coming-actions">
+          <button type="button" class="coming-btn coming-open" disabled>Disponible le ${escapeHtml(frenchPlanned(item))}</button>
+          <button type="button" class="coming-btn coming-edit" disabled>Modifier</button>
+        </div>
+        <button type="button" class="coming-cancel">Annuler cette récolte</button>`;
+    } else {
+      stateHtml = `
+        <div class="coming-actions">
+          <button type="button" class="coming-btn coming-open">Mettre en vente maintenant</button>
+        </div>
+        <button type="button" class="coming-cancel">Annuler cette récolte</button>`;
+    }
     card.innerHTML = `
       <div class="produce-card-image" style="display:block;position:relative;">
         <span class="seller-type-disc">${isPro ? 'Professionnel' : 'Particulier'}</span>
@@ -265,17 +390,18 @@
         ${qtyHtml}
         <p class="coming-reserved">${escapeHtml(reservedText(item))}</p>
         <div class="produce-card-footer"><span class="price">${priceText}</span></div>
-        <div class="coming-actions">
-          <button type="button" class="coming-btn coming-open">Mettre en vente maintenant</button>
-          <button type="button" class="coming-btn coming-edit">Modifier</button>
-        </div>
-        <button type="button" class="coming-cancel">Annuler cette récolte</button>
+        ${stateHtml}
       </div>
     `;
     const soon = () => showToast('Cette fonction arrive bientôt.');
-    card.querySelector('.coming-open').addEventListener('click', () => askOpenSale(item, card));
-    card.querySelector('.coming-edit').addEventListener('click', soon);
-    card.querySelector('.coming-cancel').addEventListener('click', soon);
+    const openBtn = card.querySelector('.coming-open');
+    const editBtn = card.querySelector('.coming-edit');
+    const delBtn = card.querySelector('.coming-del');
+    const cancelBtn = card.querySelector('.coming-cancel');
+    if (openBtn && !openBtn.disabled) openBtn.addEventListener('click', () => askOpenSale(item, card));
+    if (editBtn && !editBtn.disabled) editBtn.addEventListener('click', soon);
+    if (delBtn) delBtn.addEventListener('click', () => askDelete(item, card));
+    if (cancelBtn) cancelBtn.addEventListener('click', soon);
     return card;
   }
 
@@ -355,6 +481,9 @@
   .coming-reserved { margin:4px 0; font-weight:700; color:#2d6b38; }
   .coming-open { background:#2d6b38; }
   .coming-edit { background:#fff; color:#2d6b38; box-shadow:inset 0 0 0 2px #3E9B4D; }
+  .delay-note { margin:12px 0 0; padding:9px 12px; border-radius:10px; background:#FFF4C2; border:1.5px solid #E0B400; color:#6b5400; font-size:0.85rem; line-height:1.35; }
+  .coming-del { background:#fff; color:#C8352F; box-shadow:inset 0 0 0 2px #C8352F; }
+  .coming-btn:disabled { opacity:.55; }
   .coming-cancel { display:block; margin:12px auto 0; background:none; border:0; padding:0; color:#C8352F; font-family:inherit; font-size:0.85rem; font-weight:700; text-decoration:underline; cursor:pointer; }
   .sale-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:16px; z-index:100; }
   .sale-modal { background:#fff; border-radius:22px; max-width:420px; width:100%; box-sizing:border-box; padding:26px 24px; box-shadow:0 12px 40px rgba(0,0,0,.3); border:3px solid #3E9B4D; }

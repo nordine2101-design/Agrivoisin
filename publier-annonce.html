@@ -260,6 +260,8 @@
 
   const MAX_DAYS_AHEAD = 3;
   let listingStatus = 'disponible';
+  // Vrai quand on modifie une récolte « Bientôt mûr » (pendant les 3 premières heures)
+  let editSoon = false;
 
   // Date du jour à Paris (AAAA-MM-JJ), comme sur le serveur
   function parisTodayIso() {
@@ -287,7 +289,7 @@
       card.setAttribute('aria-checked', card.dataset.status === listingStatus ? 'true' : 'false');
     });
 
-    const soon = canChoose && listingStatus === 'bientot_mur';
+    const soon = (canChoose && listingStatus === 'bientot_mur') || editSoon;
     plannedWrap.style.display = soon ? '' : 'none';
     plannedInput.required = soon;
     if (soon) {
@@ -1119,8 +1121,11 @@
 
       fillCategories(d.sellerType === 'professionnel' ? 'professionnel' : 'particulier');
       document.getElementById('title').value = l.title || '';
+      editSoon = l.availability_status === 'bientot_mur';
       categorySelect.value = l.category;
       categorySelect.dispatchEvent(new Event('change'));
+      updateStatusUi();
+      if (editSoon) plannedInput.value = String(l.planned_date || '').slice(0, 10);
       if (l.subcategory) subcategorySelect.value = l.subcategory;
 
       if (HARVEST_DATE_REQUIRED_CATEGORIES.includes(l.category)) {
@@ -1189,6 +1194,20 @@
       }
 
       pageSubtitle.textContent = 'Changez ce que vous voulez, puis enregistrez.';
+      if (editSoon) {
+        document.querySelector('.btn-back').setAttribute('href', 'mes-recoltes-a-venir.html');
+        const leftMs = l.created_at ? new Date(l.created_at).getTime() + 3 * 60 * 60 * 1000 - Date.now() : 0;
+        const totalMin = Math.max(1, Math.ceil(leftMs / 60000));
+        const hh = Math.floor(totalMin / 60);
+        const mm = totalMin % 60;
+        const leftText = hh === 0 ? totalMin + ' min' : (mm === 0 ? hh + ' h' : hh + ' h ' + String(mm).padStart(2, '0'));
+        if (leftMs > 0) {
+          const note = document.createElement('div');
+          note.style.cssText = 'margin:0 0 14px;padding:9px 12px;border-radius:10px;background:#FFF4C2;border:1.5px solid #E0B400;color:#6b5400;font-size:0.85rem;line-height:1.35;text-align:left;';
+          note.innerHTML = '⏳ Visible par les acheteurs dans <b>' + leftText + '</b>. D\'ici là, vous pouvez tout changer.';
+          listingForm.parentNode.insertBefore(note, listingForm);
+        }
+      }
       listingForm.style.display = 'flex';
     } catch (err) {
       pageSubtitle.style.display = 'none';
@@ -1225,7 +1244,7 @@
     }
 
     // « Bientôt mûr » : la date de mise en vente prévue est obligatoire, dans les 3 jours au maximum
-    const soonNow = !isEdit && isFreshCategory() && listingStatus === 'bientot_mur';
+    const soonNow = (!isEdit && isFreshCategory() && listingStatus === 'bientot_mur') || editSoon;
     if (soonNow) {
       const today = parisTodayIso();
       const latest = addDaysIso(today, MAX_DAYS_AHEAD);
@@ -1348,6 +1367,7 @@
       }
 
       if (isEdit) payload.listingId = editId;
+      if (isEdit && editSoon) payload.plannedDate = plannedInput.value;
 
       const response = await fetch(isEdit ? '/api/update-listing' : '/api/create-listing', {
         method: 'POST',
@@ -1384,7 +1404,7 @@
       }
 
       setTimeout(function () {
-        window.location.href = 'mes-annonces.html';
+        window.location.href = editSoon ? 'mes-recoltes-a-venir.html' : 'mes-annonces.html';
       }, 1000);
 
     } catch (err) {

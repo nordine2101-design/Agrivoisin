@@ -219,7 +219,7 @@ export default async function handler(req, res) {
     if ((req.body || {}).action === 'open_sale') {
       const { data: current, error: currentError } = await supabase
         .from('listings')
-        .select('id, availability_status')
+        .select('id, availability_status, planned_date')
         .eq('id', existing.id)
         .single();
       if (currentError || !current) {
@@ -231,6 +231,13 @@ export default async function handler(req, res) {
 
       const now = new Date();
       const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(now);
+
+      // La vente ne s'ouvre pas avant la date de mise en vente prévue (la récolte n'est pas encore faite)
+      const plannedIso = String(current.planned_date || '').slice(0, 10);
+      if (plannedIso && todayParis < plannedIso) {
+        const [py, pm, pd] = plannedIso.split('-');
+        return res.status(400).json({ error: 'Cette récolte est prévue le ' + pd + '/' + pm + '/' + py + '. Vous pourrez la mettre en vente à partir de ce jour-là.' });
+      }
 
       // La condition sur le statut évite une double ouverture si le vendeur clique deux fois
       const { data: opened, error: openError } = await supabase

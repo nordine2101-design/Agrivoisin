@@ -236,6 +236,29 @@ export default async function handler(req, res) {
       });
     }
 
+    // 2 ter. Trop d'annulations de récoltes « Bientôt mûr » : plus de nouvelle récolte « Bientôt mûr » pendant 30 jours
+    //        (3e annulation en 90 jours ; les annonces « Disponible maintenant » ne sont pas concernées)
+    if (comingSoon) {
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const { data: cancelledRows, error: cancelledError } = await supabase
+        .from('listings')
+        .select('cancelled_at')
+        .eq('seller_id', seller.id)
+        .not('cancelled_at', 'is', null)
+        .gte('cancelled_at', new Date(Date.now() - 90 * DAY_MS).toISOString());
+      if (cancelledError) throw cancelledError;
+      const times = (cancelledRows || []).map((r) => new Date(r.cancelled_at).getTime()).filter((t) => Number.isFinite(t));
+      if (times.length > 2) {
+        const until = Math.max.apply(null, times) + 30 * DAY_MS;
+        if (until > Date.now()) {
+          const untilFr = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris' }).format(new Date(until));
+          return res.status(403).json({
+            error: 'Vous avez annulé 3 récoltes « Bientôt mûr » en 90 jours : vous ne pouvez plus en publier jusqu\'au ' + untilFr + '. Vos annonces « Disponible maintenant » ne sont pas concernées.',
+          });
+        }
+      }
+    }
+
     // 2 bis. Les catégories de produits transformés, de miel, de plants et de graines
     //        sont réservées aux vendeurs professionnels
     if (seller.seller_type !== 'professionnel' && !PARTICULIER_CATEGORIES.includes(category)) {

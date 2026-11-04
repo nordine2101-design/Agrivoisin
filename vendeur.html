@@ -159,7 +159,26 @@
   // Note moyenne : « 3,5 × [fraise] · 12 avis ». Moins de 3 avis : « Nouveau vendeur ».
   const MIN_REVIEWS_FOR_AVERAGE = 3;
 
-  function renderRating(rating, targetId) {
+  // Annulations de récoltes « Bientôt mûr » sur 90 jours, à côté de la note : vert à 0, orange à 1 ou 2, rouge à 3 et plus
+  function cancellationsSpan(n) {
+    if (n == null || !Number.isFinite(Number(n))) return null;
+    n = Number(n);
+    const span = document.createElement('span');
+    span.className = 'seller-rating-count';
+    span.setAttribute('aria-hidden', 'true');
+    span.style.fontWeight = '700';
+    span.style.color = n === 0 ? '#2d6b38' : (n >= 3 ? '#C8352F' : '#C4590F');
+    span.textContent = '· ' + n + ' annulation' + (n > 1 ? 's' : '') + ' sur 90 jours';
+    return span;
+  }
+
+  function cancellationsText(n) {
+    if (n == null || !Number.isFinite(Number(n))) return '';
+    n = Number(n);
+    return ', ' + n + ' annulation' + (n > 1 ? 's' : '') + ' de récolte sur 90 jours';
+  }
+
+  function renderRating(rating, targetId, cancellations) {
     const el = document.getElementById(targetId || 'sellerRating');
     el.textContent = '';
     el.className = 'seller-rating';
@@ -168,12 +187,14 @@
     if (!rating || rating.average == null || count < MIN_REVIEWS_FOR_AVERAGE) {
       el.classList.add('seller-rating-new');
       el.textContent = 'Nouveau vendeur';
+      const newCancel = cancellationsSpan(cancellations);
+      if (newCancel) el.appendChild(newCancel);
       return;
     }
 
     const average = formatAverage(rating.average);
     el.setAttribute('role', 'img');
-    el.setAttribute('aria-label', 'Note moyenne du vendeur : ' + average + ' fraises sur 4, ' + count + ' avis');
+    el.setAttribute('aria-label', 'Note moyenne du vendeur : ' + average + ' fraises sur 4, ' + count + ' avis' + cancellationsText(cancellations));
 
     const value = document.createElement('span');
     value.setAttribute('aria-hidden', 'true');
@@ -192,6 +213,8 @@
     el.appendChild(value);
     el.appendChild(icon);
     el.appendChild(reviews);
+    const cancelSpan = cancellationsSpan(cancellations);
+    if (cancelSpan) el.appendChild(cancelSpan);
   }
 
   // Commentaires : toujours signés « Acheteur vérifié », jamais de nom ni d'e-mail. Le texte n'est jamais interprété comme du code.
@@ -395,7 +418,7 @@
     subParts.push(seller.city);
     sub.textContent = subParts.join(' · ');
 
-    renderRating(seller.rating, 'shopRating');
+    renderRating(seller.rating, 'shopRating', seller.cancellations);
 
     if (shop.description) {
       document.getElementById('shopDescription').textContent = shop.description;
@@ -441,7 +464,7 @@
     badge.textContent = isPro ? 'Professionnel' : 'Particulier';
     badge.classList.add(isPro ? 'seller-badge-pro' : 'seller-badge-particulier');
 
-    renderRating(seller.rating);
+    renderRating(seller.rating, undefined, seller.cancellations);
     renderReviews(seller.reviews);
     renderListings(seller.listings);
 

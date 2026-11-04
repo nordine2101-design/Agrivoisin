@@ -884,6 +884,8 @@ export default async function handler(req, res) {
       session = await stripe.checkout.sessions.create({
         mode: 'payment',
         payment_method_types: ['card'],
+        // Demande le 3D Secure (validation par la banque) à chaque paiement par carte : protège contre les cartes volées
+        payment_method_options: { card: { request_three_d_secure: 'any' } },
         line_items: lineItems,
         metadata: {
           cart_id: savedCart.id,

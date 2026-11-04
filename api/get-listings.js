@@ -153,6 +153,20 @@ async function loadSellerRatings(sellerIds) {
   return ratings;
 }
 
+// Récoltes « Bientôt mûr » annulées par ce vendeur sur les 90 derniers jours (affiché à côté de sa note)
+const CANCEL_WINDOW_DAYS = 90;
+async function countRecentCancellations(sellerId) {
+  const since = new Date(Date.now() - CANCEL_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('listings')
+    .select('cancelled_at')
+    .eq('seller_id', sellerId)
+    .not('cancelled_at', 'is', null)
+    .gte('cancelled_at', since);
+  if (error) throw error;
+  return (data || []).length;
+}
+
 // Les 5 derniers commentaires visibles d'un vendeur (jamais le nom ni l'identifiant de l'acheteur).
 // Un commentaire masqué (hidden = true) ou vide n'est jamais envoyé.
 const MIN_REVIEWS_FOR_COMMENTS = 3;
@@ -999,6 +1013,14 @@ export default async function handler(req, res) {
         }
       }
 
+      // Une panne de lecture ne doit pas empêcher d'afficher le profil : le nombre est alors simplement absent
+      let cancellations = null;
+      try {
+        cancellations = await countRecentCancellations(sellerId);
+      } catch (cancelError) {
+        console.error('Lecture des annulations impossible :', cancelError);
+      }
+
       const sellerListings = visibleListings
         .filter((item) => item.seller_id === sellerId)
         .map(({ seller_id, ...item }) => item);
@@ -1021,6 +1043,7 @@ export default async function handler(req, res) {
           shop,
           rating: { average: rating.count ? rating.average : null, count: rating.count },
           reviews,
+          cancellations,
           listings: sellerListings,
         },
       });

@@ -552,7 +552,7 @@ async function handleAdminAction(req, res) {
 // ---------------------------------------------------------------------------
 async function handleBuyerAction(req, res) {
   try {
-    const { action, orderId, sellerId, reason } = req.body || {};
+    const { action, orderId, sellerId, payoutId, reason } = req.body || {};
 
     const token = (req.headers.authorization || '').replace('Bearer ', '');
     if (!token) {
@@ -599,16 +599,25 @@ async function handleBuyerAction(req, res) {
       return res.status(404).json({ error: 'Commande introuvable.' });
     }
 
-    const { data: payout, error: payoutError } = await supabase
+    // Un vendeur peut avoir plusieurs versements sur une même commande (un par créneau de retrait) :
+    // la page peut donc préciser lequel (payoutId). Sans précision, on ne répond que s'il n'y en a qu'un.
+    const { data: payoutRows, error: payoutError } = await supabase
       .from('payouts')
       .select('id, status, pickup_start_at')
       .eq('order_id', orderId)
-      .eq('seller_id', sellerId)
-      .maybeSingle();
+      .eq('seller_id', sellerId);
 
     if (payoutError) {
       console.error('Erreur Supabase (versement) :', payoutError);
       return res.status(500).json({ error: 'Impossible de lire le versement pour le moment. Réessayez.' });
+    }
+    let payout = null;
+    if (typeof payoutId === 'string' && payoutId.trim()) {
+      payout = (payoutRows || []).find((r) => String(r.id) === payoutId.trim()) || null;
+    } else if ((payoutRows || []).length === 1) {
+      payout = payoutRows[0];
+    } else if ((payoutRows || []).length > 1) {
+      return res.status(409).json({ error: 'Cette commande compte plusieurs retraits. Actualisez la page puis réessayez.' });
     }
     if (!payout) {
       return res.status(404).json({ error: 'Aucun versement à confirmer pour ce vendeur.' });

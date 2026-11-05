@@ -121,7 +121,9 @@ export default async function handler(req, res) {
 
       const sellersList = Object.values(sellersMap).map((s) => {
         const existingReview = reviews.find((r) => r.order_id === order.id && r.seller_id === s.sellerId);
-        const payoutRow = payouts.find((p) => p.order_id === order.id && p.seller_id === s.sellerId);
+        // Plusieurs versements possibles pour un même vendeur (un par créneau) : celui de l'expédition passe en premier
+        const sellerPayouts = payouts.filter((p) => p.order_id === order.id && p.seller_id === s.sellerId);
+        const payoutRow = sellerPayouts.find((p) => Number(p.shipping_cents) > 0) || sellerPayouts[0];
 
         // L'adresse du vendeur n'est donnée que tant que l'acheteur n'a pas confirmé la réception :
         // dès que le paiement est versé (ou suspendu), elle disparaît et n'est plus jamais renvoyée

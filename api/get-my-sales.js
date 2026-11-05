@@ -8,6 +8,10 @@ const MAX_SALES = 100;
 // Frais de service mensuel d'un vendeur actif : 2 €, retirés une seule fois par mois
 const MONTHLY_FEE_CENTS = 200;
 
+// Retrait avec code : 5 codes faux et le retrait est bloqué ; l'argent est libéré 24 h après la saisie du bon code
+const MAX_CODE_ATTEMPTS = 5;
+const RELEASE_AFTER_PICKUP_HOURS = 24;
+
 // Une commande expédiée : l'argent rejoint le compte de paiement 14 jours après l'envoi du colis
 const SHIPPED_RELEASE_DAYS = 14;
 // Forfait d'Agrivoisin par commande expédiée (déjà compris dans la commission enregistrée)
@@ -125,6 +129,109 @@ async function markShipped(req, res, seller) {
   }
 
   return res.status(200).json({ shipment: { shippedAt: shippedAt.toISOString(), trackingNumber: tracking || null, autoReleaseAt: releaseAt.toISOString() } });
+}
+
+// Un moment à l'heure de Paris : « samedi 7 novembre à 18 h 00 »
+function formatParisMoment(iso) {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' });
+  const time = d.toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' }).replace(':', ' h ');
+  return date + ' à ' + time;
+}
+
+// Le vendeur tape les 4 chiffres donnés par l'acheteur : la commande est alors « retirée »
+// et l'argent sera libéré 24 h plus tard (le temps, pour l'acheteur, de signaler un problème).
+async function confirmPickup(req, res, seller) {
+  const body = req.body || {};
+  const payoutId = String(body.payoutId == null ? '' : body.payoutId).trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(payoutId)) {
+    return res.status(400).json({ error: 'Retrait inconnu.' });
+  }
+  const code = String(body.code == null ? '' : body.code).replace(/\s+/g, '');
+  if (!/^\d{4}$/.test(code)) {
+    return res.status(400).json({ error: 'Le code comporte 4 chiffres.' });
+  }
+
+  const columns = 'id, status, pickup_code, pickup_start_at, picked_up_at, code_attempts';
+  const { data: first, error: readError } = await supabase
+    .from('payouts')
+    .select(columns)
+    .eq('id', payoutId)
+    .eq('seller_id', seller.id)
+    .maybeSingle();
+  if (readError) {
+    console.error('Erreur Supabase (code de retrait) :', readError.message);
+    return res.status(500).json({ error: 'Impossible de vérifier le code pour le moment. Réessayez.' });
+  }
+  if (!first || !first.pickup_code) {
+    return res.status(404).json({ error: "Ce retrait est introuvable." });
+  }
+  if (first.picked_up_at) {
+    return res.status(409).json({ error: 'Cette commande est déjà marquée comme retirée.' });
+  }
+  if (first.status !== 'en_attente') {
+    return res.status(409).json({ error: 'Cette vente ne peut plus être modifiée.' });
+  }
+  if (first.pickup_start_at && new Date(first.pickup_start_at).getTime() > Date.now()) {
+    return res.status(409).json({ error: 'Le code pourra être saisi à partir du ' + formatParisMoment(first.pickup_start_at) + '.' });
+  }
+
+  // Chaque essai est compté AVANT d'être vérifié : plusieurs essais envoyés en même temps ne contournent pas la limite
+  let attempts = Number(first.code_attempts) || 0;
+  let reserved = false;
+  for (let i = 0; i < 5 && !reserved; i += 1) {
+    if (attempts >= MAX_CODE_ATTEMPTS) {
+      return res.status(423).json({ error: "Trop de codes incorrects : ce retrait est bloqué. Écrivez-nous depuis la page Contact.", locked: true, attemptsLeft: 0 });
+    }
+    const { data: bumped, error: bumpError } = await supabase
+      .from('payouts')
+      .update({ code_attempts: attempts + 1 })
+      .eq('id', payoutId)
+      .eq('code_attempts', attempts)
+      .select('id');
+    if (bumpError) {
+      console.error('Erreur Supabase (essai de code) :', bumpError.message);
+      return res.status(500).json({ error: 'Impossible de vérifier le code pour le moment. Réessayez.' });
+    }
+    if (bumped && bumped.length > 0) {
+      reserved = true;
+      attempts += 1;
+    } else {
+      const { data: again } = await supabase.from('payouts').select('code_attempts').eq('id', payoutId).maybeSingle();
+      attempts = again ? Number(again.code_attempts) || 0 : attempts;
+    }
+  }
+  if (!reserved) {
+    return res.status(429).json({ error: 'Trop de demandes en même temps. Réessayez dans un instant.' });
+  }
+
+  if (code !== first.pickup_code) {
+    const left = Math.max(0, MAX_CODE_ATTEMPTS - attempts);
+    if (left === 0) {
+      return res.status(423).json({ error: "Code incorrect. Trop d'essais : ce retrait est bloqué. Écrivez-nous depuis la page Contact.", locked: true, attemptsLeft: 0 });
+    }
+    return res.status(400).json({ error: 'Code incorrect. Il reste ' + left + (left > 1 ? ' essais.' : ' essai.'), attemptsLeft: left });
+  }
+
+  const pickedUpAt = new Date();
+  const releaseAt = new Date(pickedUpAt.getTime() + RELEASE_AFTER_PICKUP_HOURS * 60 * 60 * 1000);
+  // Conditions « en attente » et « pas encore retiré » dans la requête : deux validations ne comptent qu'une fois
+  const { data: updated, error: updateError } = await supabase
+    .from('payouts')
+    .update({ picked_up_at: pickedUpAt.toISOString(), auto_release_at: releaseAt.toISOString() })
+    .eq('id', payoutId)
+    .eq('status', 'en_attente')
+    .is('picked_up_at', null)
+    .select('id');
+  if (updateError) {
+    console.error('Erreur Supabase (retrait confirmé) :', updateError.message);
+    return res.status(500).json({ error: "Impossible d'enregistrer le retrait pour le moment. Réessayez." });
+  }
+  if (!updated || updated.length === 0) {
+    return res.status(409).json({ error: 'Cette commande est déjà marquée comme retirée.' });
+  }
+
+  return res.status(200).json({ pickup: { payoutId, pickedUpAt: pickedUpAt.toISOString(), autoReleaseAt: releaseAt.toISOString() } });
 }
 
 // Le mois d'une vente, à l'heure de Paris (comme dans la base) : « 2026-10 »
@@ -275,7 +382,7 @@ async function saveTaxInfo(req, res, seller) {
 }
 
 export default async function handler(req, res) {
-  // GET : les ventes du vendeur ; POST : l'envoi de ses informations fiscales ou la déclaration d'un colis parti
+  // GET : les ventes du vendeur ; POST : l'envoi de ses informations fiscales, la déclaration d'un colis parti ou le code de retrait
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
@@ -317,6 +424,9 @@ export default async function handler(req, res) {
       if (action === 'mark_shipped') {
         return await markShipped(req, res, seller);
       }
+      if (action === 'confirm_pickup') {
+        return await confirmPickup(req, res, seller);
+      }
       return res.status(400).json({ error: 'Action inconnue.' });
     }
 
@@ -331,7 +441,7 @@ export default async function handler(req, res) {
     // Les articles vendus par CE vendeur (jamais l'identité de l'acheteur)
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('order_id, listing_id, price_at_purchase, delivery_mode, listings(title, unit, shipping_tiers, multi_parcel)')
+      .select('order_id, listing_id, payout_id, price_at_purchase, delivery_mode, listings(title, unit, shipping_tiers, multi_parcel)')
       .eq('seller_id', seller.id);
 
     if (itemsError) throw itemsError;
@@ -358,7 +468,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('order_id, status, auto_release_at, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents')
+      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents')
       .eq('seller_id', seller.id)
       .in('order_id', shownOrderIds);
 
@@ -411,9 +521,14 @@ export default async function handler(req, res) {
         totalCents += cents;
       });
 
-      // Plusieurs versements possibles sur une commande (un par créneau) : celui de l'expédition passe en premier
+      // Plusieurs versements possibles sur une commande : un par créneau de retrait, un pour l'expédition
       const orderPayouts = payouts.filter((p) => p.order_id === order.id);
-      const payoutRow = orderPayouts.find((p) => Number(p.shipping_cents) > 0) || orderPayouts[0];
+      const isSlot = (p) => !!p.pickup_end_at && !(Number(p.shipping_cents) > 0);
+      const slotPayouts = orderPayouts
+        .filter(isSlot)
+        .sort((x, y) => new Date(x.pickup_start_at) - new Date(y.pickup_start_at));
+      // Le versement « sans créneau » : l'expédition en priorité, sinon une ancienne vente sans horaires
+      const payoutRow = orderPayouts.find((p) => Number(p.shipping_cents) > 0) || orderPayouts.find((p) => !isSlot(p)) || null;
 
       // Ce que le vendeur voit de son argent (ses propres chiffres, jamais rien sur l'acheteur) :
       // - argent versé : la commission, les frais retirés et le montant reçu
@@ -421,44 +536,78 @@ export default async function handler(req, res) {
       //   le montant exact de la vente, et ce qui reste à payer des 2 € du mois
       // - problème signalé : aucun chiffre tant que la situation n'est pas réglée
       const toEuros = (cents) => (Number(cents) || 0) / 100;
-      // Expédition : les frais d'expédition de CE vendeur, et le forfait d'Agrivoisin (compris dans la commission enregistrée)
+      const moneyFor = (row) => {
+        if (!row) return null;
+        // Expédition : les frais d'expédition de CE vendeur, et le forfait d'Agrivoisin (compris dans la commission enregistrée)
+        const rowShippingCents = Number(row.shipping_cents) || 0;
+        const flatFeeCents = rowShippingCents > 0 ? Math.min(SHIPPING_FLAT_FEE_CENTS, rowShippingCents) : 0;
+        if (row.status === 'verse') {
+          return {
+            commission: toEuros((Number(row.commission_cents) || 0) - flatFeeCents),
+            flatFee: toEuros(flatFeeCents),
+            cardFee: toEuros(row.stripe_fee_cents),
+            monthlyFee: toEuros(row.monthly_fee_cents),
+            received: row.seller_cents == null ? null : toEuros(row.seller_cents),
+          };
+        }
+        if (row.status === 'en_attente' || row.status === 'en_cours') {
+          const amountCents = Number(row.amount_cents) || 0;
+          const commissionCents = Number(row.commission_cents) || 0;
+          // Ce que l'acheteur a payé à ce vendeur : les articles + l'expédition
+          const grossCents = amountCents + rowShippingCents;
+
+          // Les frais de carte RÉELS, relevés chez Stripe dès le paiement (jamais une supposition).
+          // S'ils ne sont pas encore connus : rien n'est affiché à leur place.
+          const cardFeeKnown = row.stripe_fee_cents !== null && row.stripe_fee_cents !== undefined;
+          const cardFeeCents = cardFeeKnown ? Number(row.stripe_fee_cents) || 0 : 0;
+
+          // Ce qui reste à payer des 2 € de frais de service de ce mois (le mois de la vente, à l'heure de Paris)
+          const feeRow = feesByMonth[parisMonth(order.created_at)];
+          const monthlyFeeDue = Math.max(0, feeRow ? (Number(feeRow.due_cents) || 0) - (Number(feeRow.collected_cents) || 0) : MONTHLY_FEE_CENTS);
+
+          return {
+            commission: toEuros(commissionCents - flatFeeCents),
+            flatFee: toEuros(flatFeeCents),
+            afterCommission: toEuros(grossCents - commissionCents),
+            // Exact : la vente moins la commission moins les vrais frais de carte (jamais en dessous de 0)
+            cardFee: cardFeeKnown ? toEuros(cardFeeCents) : null,
+            saleAmount: cardFeeKnown ? toEuros(Math.max(0, grossCents - commissionCents - cardFeeCents)) : null,
+            // Les 2 € du mois restent en ligne séparée : retirés une seule fois, du premier versement du mois
+            monthlyFeeDue: toEuros(monthlyFeeDue),
+          };
+        }
+        return null;
+      };
       const shippingCents = payoutRow ? Number(payoutRow.shipping_cents) || 0 : 0;
-      const flatFeeCents = shippingCents > 0 ? Math.min(SHIPPING_FLAT_FEE_CENTS, shippingCents) : 0;
-      let money = null;
-      if (payoutRow && payoutRow.status === 'verse') {
-        money = {
-          commission: toEuros((Number(payoutRow.commission_cents) || 0) - flatFeeCents),
-          flatFee: toEuros(flatFeeCents),
-          cardFee: toEuros(payoutRow.stripe_fee_cents),
-          monthlyFee: toEuros(payoutRow.monthly_fee_cents),
-          received: payoutRow.seller_cents == null ? null : toEuros(payoutRow.seller_cents),
+      const money = moneyFor(payoutRow);
+
+      // Les retraits : un bloc par créneau, avec ses produits (le code n'est JAMAIS renvoyé au vendeur)
+      const nowMs = Date.now();
+      const slots = slotPayouts.map((p) => {
+        const slotItems = {};
+        orderItems.filter((it) => it.payout_id === p.id).forEach((it) => {
+          const key = it.listing_id || 'annonce-supprimee';
+          if (!slotItems[key]) {
+            slotItems[key] = { title: byListing[key].title, unit: byListing[key].unit, quantity: 0 };
+          }
+          slotItems[key].quantity += 1;
+        });
+        const attempts = Number(p.code_attempts) || 0;
+        return {
+          payoutId: p.id,
+          startAt: p.pickup_start_at,
+          endAt: p.pickup_end_at,
+          started: new Date(p.pickup_start_at).getTime() <= nowMs,
+          status: p.status,
+          pickedUpAt: p.picked_up_at || null,
+          autoReleaseAt: p.auto_release_at || null,
+          releasedAt: p.released_at || null,
+          locked: attempts >= MAX_CODE_ATTEMPTS,
+          attemptsLeft: Math.max(0, MAX_CODE_ATTEMPTS - attempts),
+          items: Object.values(slotItems),
+          money: moneyFor(p),
         };
-      } else if (payoutRow && (payoutRow.status === 'en_attente' || payoutRow.status === 'en_cours')) {
-        const amountCents = Number(payoutRow.amount_cents) || 0;
-        const commissionCents = Number(payoutRow.commission_cents) || 0;
-        // Ce que l'acheteur a payé à ce vendeur : les articles + l'expédition
-        const grossCents = amountCents + shippingCents;
-
-        // Les frais de carte RÉELS, relevés chez Stripe dès le paiement (jamais une supposition).
-        // S'ils ne sont pas encore connus : rien n'est affiché à leur place.
-        const cardFeeKnown = payoutRow.stripe_fee_cents !== null && payoutRow.stripe_fee_cents !== undefined;
-        const cardFeeCents = cardFeeKnown ? Number(payoutRow.stripe_fee_cents) || 0 : 0;
-
-        // Ce qui reste à payer des 2 € de frais de service de ce mois (le mois de la vente, à l'heure de Paris)
-        const feeRow = feesByMonth[parisMonth(order.created_at)];
-        const monthlyFeeDue = Math.max(0, feeRow ? (Number(feeRow.due_cents) || 0) - (Number(feeRow.collected_cents) || 0) : MONTHLY_FEE_CENTS);
-
-        money = {
-          commission: toEuros(commissionCents - flatFeeCents),
-          flatFee: toEuros(flatFeeCents),
-          afterCommission: toEuros(grossCents - commissionCents),
-          // Exact : la vente moins la commission moins les vrais frais de carte (jamais en dessous de 0)
-          cardFee: cardFeeKnown ? toEuros(cardFeeCents) : null,
-          saleAmount: cardFeeKnown ? toEuros(Math.max(0, grossCents - commissionCents - cardFeeCents)) : null,
-          // Les 2 € du mois restent en ligne séparée : retirés une seule fois, du premier versement du mois
-          monthlyFeeDue: toEuros(monthlyFeeDue),
-        };
-      }
+      });
 
       // L'expédition : l'adresse n'est montrée que tant que le colis n'est pas parti
       let shipment = null;
@@ -494,6 +643,7 @@ export default async function handler(req, res) {
         goodsAmount: totalCents / 100,
         totalAmount: (totalCents + shippingCents) / 100,
         shipment,
+        slots,
         payout: payoutRow
           ? { status: payoutRow.status, autoReleaseAt: payoutRow.auto_release_at, releasedAt: payoutRow.released_at, money }
           : null,

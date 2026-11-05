@@ -257,14 +257,18 @@
   // Le détail de l'argent d'une vente, avec les chiffres du vendeur lui-même :
   // - versé : commission, frais de carte, frais de service du mois (s'il y en a eu) et « Vous recevez »
   // - en attente : commission, vrais frais de carte, montant exact de la vente (et les 2 € du mois à part)
-  function renderMoneyDetail(sale) {
-    const payout = sale.payout;
+  // Pour un retrait (un créneau), on passe ce retrait en second paramètre
+  function renderMoneyDetail(sale, slot) {
+    const payout = slot || sale.payout;
     const m = payout && payout.money;
     if (!m) return '';
 
     // Le pourcentage se calcule sur les articles (les frais d'expédition n'ont pas de commission en pourcentage)
-    const total = Number(sale.goodsAmount != null ? sale.goodsAmount : sale.totalAmount) || 0;
-    const shipment = sale.shipment;
+    // Pour un retrait : la vente du créneau = commission + ce qui reste après commission
+    const total = slot
+      ? (m.afterCommission != null ? Number(m.commission) + Number(m.afterCommission) : 0)
+      : (Number(sale.goodsAmount != null ? sale.goodsAmount : sale.totalAmount) || 0);
+    const shipment = slot ? null : sale.shipment;
     const flatFee = Number(m.flatFee) > 0 ? Number(m.flatFee) : 0;
     const percent = total > 0 ? Math.round((Number(m.commission) / total) * 100) : null;
     const commissionLabel = 'Commission Agrivoisin' + (percent != null ? ' (' + percent + ' %)' : '');
@@ -353,6 +357,87 @@
     return html;
   }
 
+  // « Samedi 7 novembre, de 18 h à 20 h » (à l'heure de Paris)
+  function formatSlotRange(startIso, endIso) {
+    const hour = (iso) => {
+      const parts = {};
+      new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+      return parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
+    };
+    const day = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(startIso));
+    return day.charAt(0).toUpperCase() + day.slice(1) + ', de ' + hour(startIso) + ' à ' + hour(endIso);
+  }
+
+  // « dimanche 8 novembre à 19 h 12 » (à l'heure de Paris)
+  function formatMoment(iso) {
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    const day = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(iso));
+    return day + ' à ' + parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
+  }
+
+  // « 18 h » ou « 18 h 30 » (à l'heure de Paris)
+  function formatHourOnly(iso) {
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    return parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
+  }
+
+  // Un bloc par retrait : les produits du créneau, puis la saisie du code donné par l'acheteur
+  function renderSlots(sale) {
+    const slots = Array.isArray(sale.slots) ? sale.slots : [];
+    if (slots.length === 0) return '';
+    return slots.map((slot, index) => {
+      const title = (slots.length > 1 ? 'Retrait ' + (index + 1) + ' · ' : 'Retrait · ') + formatSlotRange(slot.startAt, slot.endAt);
+      const products = (slot.items || []).map((it) => {
+        const qty = Number(it.quantity) || 1;
+        return escapeHtml(it.title) + ' : ' + escapeHtml(qty + ' ' + unitLabel(it.unit, qty));
+      }).join(' · ');
+
+      let body = '';
+      if (slot.status === 'verse') {
+        body = slot.pickedUpAt
+          ? '<div class="pickup-done">✓ Retirée. L\'argent a été libéré' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>'
+          : '<div class="pickup-done">Argent versé' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>';
+      } else if (slot.status === 'rembourse') {
+        body = '<div class="money-box money-refunded">Commande remboursée à l\'acheteur après un problème signalé : cette vente ne vous sera pas versée.</div>';
+      } else if (slot.status === 'probleme') {
+        body = '<div class="money-box money-problem">Problème signalé par l\'acheteur : le versement est suspendu le temps qu\'Agrivoisin examine la situation.</div>';
+      } else if (slot.status === 'en_cours') {
+        body = '<div class="money-box">Versement en cours de traitement...</div>';
+      } else if (slot.pickedUpAt) {
+        const release = slot.autoReleaseAt ? new Date(slot.autoReleaseAt) : null;
+        body = '<div class="pickup-done">✓ Retirée. L\'argent sera libéré ' +
+          (release && release.getTime() > Date.now() ? 'le ' + escapeHtml(formatMoment(slot.autoReleaseAt)) : 'très prochainement') +
+          '.</div>';
+      } else if (!slot.started) {
+        body = '<div class="pickup-wait">Le code se tape ici à partir de ' + escapeHtml(formatHourOnly(slot.startAt)) +
+          ', quand l\'acheteur vient chercher sa commande.</div>';
+      } else if (slot.locked) {
+        body = '<p class="pickup-error">Ce retrait est bloqué après 5 codes incorrects. Écrivez-nous depuis la <a href="contact.html">page Contact</a>.</p>';
+      } else {
+        const ended = new Date(slot.endAt).getTime() < Date.now();
+        body = '<div class="pickup-action" data-payout="' + escapeHtml(slot.payoutId) + '">' +
+          '<div class="pickup-row"><input type="text" class="pickup-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="Code de retrait à 4 chiffres">' +
+          '<button type="button" class="btn btn-primary pickup-btn">Valider</button></div>' +
+          '<p class="pickup-hint">Demandez à l\'acheteur les 4 chiffres affichés sur sa page « Mes commandes », puis remettez-lui sa commande.' +
+          (slot.attemptsLeft < 5 ? ' Il vous reste ' + slot.attemptsLeft + (slot.attemptsLeft > 1 ? ' essais.' : ' essai.') : '') + '</p>' +
+          (ended && slot.autoReleaseAt ? '<p class="pickup-hint">Le créneau est terminé. Sans code, l\'argent vous est libéré le ' + escapeHtml(formatMoment(slot.autoReleaseAt)) + '.</p>' : '') +
+          '<p class="pickup-error" style="display:none;"></p></div>';
+      }
+
+      const nowClass = slot.status === 'en_attente' && !slot.pickedUpAt && slot.started && !slot.locked ? ' pickup-now' : '';
+      const detail = (slot.status === 'en_attente' || slot.status === 'verse') ? renderMoneyDetail(sale, slot) : '';
+      return '<div class="pickup-slot' + nowClass + '">' +
+        '<div class="pickup-when">' + escapeHtml(title) + '</div>' +
+        '<div class="pickup-prod">' + products + '</div>' +
+        body + detail + '</div>';
+    }).join('');
+  }
+
   function renderSale(sale) {
     const sh = sale.shipment;
     let itemsHtml = '';
@@ -408,6 +493,7 @@
       '<span class="sale-total">' + escapeHtml(formatAmount(sale.totalAmount)) + '</span></div>' +
       itemsHtml +
       renderShipActions(sale) +
+      renderSlots(sale) +
       shippedHtml +
       moneyBox +
       renderMoneyDetail(sale) +
@@ -453,6 +539,77 @@
       errorEl.style.display = 'block';
       button.disabled = false;
       button.textContent = 'J\'ai expédié le colis';
+    }
+  });
+
+  // Le vendeur tape le code de retrait : le serveur compte les essais et libère l'argent 24 h après le bon code
+  async function submitPickup(button) {
+    const box = button.closest('.pickup-action');
+    const errorEl = box.querySelector('.pickup-error');
+    const input = box.querySelector('.pickup-code');
+    errorEl.style.display = 'none';
+
+    const code = input.value.replace(/\D/g, '');
+    if (code.length !== 4) {
+      errorEl.textContent = 'Tapez les 4 chiffres du code.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      errorEl.textContent = 'Session expirée, reconnectez-vous.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Vérification...';
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({ action: 'confirm_pickup', payoutId: box.getAttribute('data-payout'), code }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) {
+        // Retrait bloqué ou déjà validé : la liste est relue pour afficher le bon état
+        if (data.locked || response.status === 409) {
+          errorEl.textContent = data.error || 'Une erreur est survenue. Réessayez.';
+          errorEl.style.display = 'block';
+          await init();
+          return;
+        }
+        throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
+      }
+      await init();
+    } catch (err) {
+      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.style.display = 'block';
+      button.disabled = false;
+      button.textContent = 'Valider';
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  salesContainer.addEventListener('click', (event) => {
+    const button = event.target.closest('.pickup-btn');
+    if (button) submitPickup(button);
+  });
+
+  salesContainer.addEventListener('input', (event) => {
+    if (event.target.classList && event.target.classList.contains('pickup-code')) {
+      event.target.value = event.target.value.replace(/\D/g, '').slice(0, 4);
+    }
+  });
+
+  salesContainer.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && event.target.classList && event.target.classList.contains('pickup-code')) {
+      event.preventDefault();
+      const button = event.target.closest('.pickup-action').querySelector('.pickup-btn');
+      if (button && !button.disabled) submitPickup(button);
     }
   });
 
@@ -545,6 +702,17 @@
   .ship-action p { font-size:0.8rem; color:#6B5842; margin:8px 0 0; line-height:1.45; }
   .ship-action p.ship-error { color:#C8352F; font-weight:700; }
   .ship-done { margin-top:10px; background:#f6f9f5; border:1px solid #cfe3cf; border-radius:10px; padding:10px; font-size:0.85rem; line-height:1.5; color:#4C7A50; }
+  .pickup-slot { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px 12px; margin-top:10px; }
+  .pickup-slot.pickup-now { border:2px solid #8C1B3C; }
+  .pickup-when { font-weight:700; font-size:0.9rem; color:#8C1B3C; }
+  .pickup-prod { font-size:0.85rem; line-height:1.5; margin:4px 0 8px; }
+  .pickup-wait { background:#f6f2ea; border-radius:8px; padding:8px; font-size:0.8rem; color:#6B5842; line-height:1.45; }
+  .pickup-row { display:flex; gap:8px; align-items:center; }
+  .pickup-row .pickup-code { width:110px; box-sizing:border-box; font:inherit; font-size:1.3rem; letter-spacing:0.35em; text-align:center; padding:6px; border:1px solid #ccc; border-radius:8px; }
+  .pickup-row .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .pickup-slot p.pickup-hint { font-size:0.78rem; color:#6B5842; margin:6px 0 0; line-height:1.45; }
+  .pickup-slot p.pickup-error { font-size:0.8rem; color:#C8352F; font-weight:700; margin:6px 0 0; line-height:1.45; }
+  .pickup-done { background:#f6f9f5; border:1px solid #cfe3cf; border-radius:8px; padding:8px; font-size:0.85rem; line-height:1.5; color:#3E6B42; font-weight:600; }
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
   .money-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }

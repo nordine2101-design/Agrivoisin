@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('id, order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, pickup_end_at, pickup_code, refunded_cents, shipping_cents, shipped_at, tracking_number')
+      .select('id, order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, pickup_end_at, pickup_code, picked_up_at, refunded_cents, shipping_cents, shipped_at, tracking_number')
       .in('order_id', orderIds);
 
     if (payoutsError) {
@@ -153,9 +153,11 @@ export default async function handler(req, res) {
             releasedAt: p.released_at,
             pickupStartAt: p.pickup_start_at,
             pickupEndAt: p.pickup_end_at,
+            // Le moment où le vendeur a tapé le bon code : la commande est alors « retirée »
+            pickedUpAt: p.picked_up_at || null,
             refundedAmount: p.status === 'rembourse' && p.refunded_cents != null ? (Number(p.refunded_cents) || 0) / 100 : null,
-            // Le code n'est jamais envoyé avant le début du créneau (ni quand le versement n'est plus en attente)
-            code: started && p.status === 'en_attente' ? (p.pickup_code || null) : null,
+            // Le code n'est jamais envoyé avant le début du créneau, ni une fois la commande retirée (ni quand le versement n'est plus en attente)
+            code: started && p.status === 'en_attente' && !p.picked_up_at ? (p.pickup_code || null) : null,
             items: Object.values(byListing),
           };
         });
@@ -184,7 +186,7 @@ export default async function handler(req, res) {
           ...s,
           items: s.items.map(({ amountCents, ...item }) => ({ ...item, amount: amountCents / 100 })),
           // L'adresse du vendeur ne sert que s'il reste au moins un article à retirer chez lui
-          sellerAddress: hasPickupItem && (slotPayouts.length > 0 ? slotPayouts.some((p) => p.status === 'en_attente') : addressStillVisible) ? (addressesById[s.sellerId] || null) : null,
+          sellerAddress: hasPickupItem && (slotPayouts.length > 0 ? slotPayouts.some((p) => p.status === 'en_attente' && !p.picked_up_at) : addressStillVisible) ? (addressesById[s.sellerId] || null) : null,
           slots,
           delivery,
           review: existingReview || null,

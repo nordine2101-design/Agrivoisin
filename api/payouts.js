@@ -603,7 +603,7 @@ async function handleBuyerAction(req, res) {
     // la page peut donc préciser lequel (payoutId). Sans précision, on ne répond que s'il n'y en a qu'un.
     const { data: payoutRows, error: payoutError } = await supabase
       .from('payouts')
-      .select('id, status, pickup_start_at')
+      .select('id, status, pickup_start_at, pickup_end_at')
       .eq('order_id', orderId)
       .eq('seller_id', sellerId);
 
@@ -635,6 +635,13 @@ async function handleBuyerAction(req, res) {
       }
       if (payout.status === 'en_cours') {
         return res.status(409).json({ error: 'Le versement est en cours de traitement. Réessayez dans un instant.' });
+      }
+
+      // Retrait avec créneau et code : c'est le vendeur qui valide le code, l'acheteur ne peut pas libérer l'argent lui-même
+      if (payout.pickup_end_at) {
+        return res.status(409).json({
+          error: 'Pour un retrait, c\'est le code donné au vendeur qui confirme la remise : votre paiement lui est versé 24 h après. Vous pouvez signaler un problème d\'ici là.',
+        });
       }
 
       const result = await releasePayout(payout.id, ['en_attente']);

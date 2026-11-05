@@ -371,7 +371,9 @@ async function adminList() {
 
 // « Rembourser l'acheteur » : seuls les articles de ce vendeur et ses frais d'expédition sont remboursés (jamais les 0,25 € de frais de service).
 // Le remboursement part chez Stripe avec une clé anti-doublon : cliquer deux fois ne rembourse jamais deux fois.
-async function adminRefund(res, payout, note) {
+// extra (facultatif) : { extraCents } = des centimes en plus des articles (les frais de service de l'acheteur quand toute la commande est remboursée),
+// { cancelReason } = la raison de l'annulation notée sur le versement (par exemple « vendeur_absent »).
+async function adminRefund(res, payout, note, extra = {}) {
   if (payout.status === 'rembourse') {
     return res.status(200).json({ status: 'rembourse', alreadyDone: true });
   }
@@ -382,7 +384,8 @@ async function adminRefund(res, payout, note) {
     return res.status(409).json({ error: "Ce versement n'est pas dans l'état « problème signalé »." });
   }
 
-  const amount = Number(payout.amount_cents) + (Number(payout.shipping_cents) || 0);
+  const extraCents = Number(extra.extraCents) > 0 ? Math.floor(Number(extra.extraCents)) : 0;
+  const amount = Number(payout.amount_cents) + (Number(payout.shipping_cents) || 0) + extraCents;
   if (!Number.isInteger(amount) || amount <= 0) {
     return res.status(400).json({ error: 'Montant à rembourser invalide.' });
   }
@@ -416,7 +419,8 @@ async function adminRefund(res, payout, note) {
         amount,
         metadata: { payout_id: payout.id, order_id: payout.order_id, seller_id: payout.seller_id, raison: 'probleme_signale' },
       },
-      { idempotencyKey: 'problem-refund-' + payout.id }
+      // Avec des frais de service en plus, le montant fait partie de la clé : une clé ne sert jamais pour deux montants différents
+      { idempotencyKey: extraCents > 0 ? 'absence-refund-' + payout.id + '-' + amount : 'problem-refund-' + payout.id }
     );
   } catch (err) {
     console.error(`Remboursement du versement ${payout.id} refusé :`, err.message);
@@ -437,6 +441,7 @@ async function adminRefund(res, payout, note) {
       refunded_cents: amount,
       stripe_refund_id: refund.id,
       resolution_note: note || null,
+      ...(extra.cancelReason ? { cancel_reason: extra.cancelReason } : {}),
       last_error: null,
     })
     .eq('id', payout.id)
@@ -548,11 +553,71 @@ async function handleAdminAction(req, res) {
 }
 
 // ---------------------------------------------------------------------------
+// « Le vendeur n'était pas là » : possible seulement à partir de la FIN du créneau de retrait, tant que
+// le code n'a pas été validé. L'acheteur est remboursé tout de suite des produits de ce retrait ; ses frais de service
+// ne lui sont rendus que si toute la commande finit remboursée. La déclaration est gardée (absence_reported_at).
+// Le versement passe d'abord en « problème » : si le remboursement échoue chez Stripe, il reste visible pour l'administrateur.
+// ---------------------------------------------------------------------------
+async function reportSellerAbsent(res, payout) {
+  if (!payout.pickup_end_at) {
+    return res.status(400).json({ error: "Cette commande n'a pas de créneau de retrait." });
+  }
+  if (payout.status === 'rembourse') {
+    return res.status(200).json({ status: 'rembourse', alreadyDone: true });
+  }
+  if (payout.status !== 'en_attente') {
+    return res.status(409).json({ error: 'Cette commande ne peut plus être modifiée. Actualisez la page.' });
+  }
+  if (payout.picked_up_at) {
+    return res.status(409).json({ error: "Le vendeur a validé votre code : la commande est retirée. Choisissez « Autre problème » si elle n'est pas conforme." });
+  }
+  if (new Date(payout.pickup_end_at).getTime() > Date.now()) {
+    return res.status(409).json({ error: "Vous pourrez déclarer l'absence du vendeur à partir du " + formatParisMoment(payout.pickup_end_at) + '.' });
+  }
+
+  // Une seule déclaration peut réussir (deux clics ne remboursent jamais deux fois)
+  const nowIso = new Date().toISOString();
+  const { data: claimed, error: claimError } = await supabase
+    .from('payouts')
+    .update({
+      status: 'probleme',
+      problem_reported_at: nowIso,
+      problem_reason: "Vendeur absent (déclaré par l'acheteur après la fin du créneau)",
+      absence_reported_at: nowIso,
+    })
+    .eq('id', payout.id)
+    .eq('status', 'en_attente')
+    .is('picked_up_at', null)
+    .select()
+    .maybeSingle();
+  if (claimError) {
+    console.error('Erreur Supabase (vendeur absent) :', claimError);
+    return res.status(500).json({ error: "Impossible d'enregistrer votre déclaration pour le moment. Réessayez." });
+  }
+  if (!claimed) {
+    return res.status(409).json({ error: 'Cette commande vient de changer d\'état. Actualisez la page.' });
+  }
+
+  // Les frais de service (payés une seule fois par commande) : rendus seulement si tous les AUTRES versements de la commande sont déjà remboursés
+  let serviceFeeCents = 0;
+  const { data: siblings, error: siblingsError } = await supabase
+    .from('payouts')
+    .select('id, status')
+    .eq('order_id', payout.order_id);
+  if (!siblingsError && siblings && siblings.every((p) => String(p.id) === String(payout.id) || p.status === 'rembourse')) {
+    const { data: orderRow } = await supabase.from('orders').select('service_fee_cents').eq('id', payout.order_id).maybeSingle();
+    serviceFeeCents = Math.max(0, Number(orderRow && orderRow.service_fee_cents) || 0);
+  }
+
+  return adminRefund(res, claimed, 'Vendeur absent : remboursement automatique', { extraCents: serviceFeeCents, cancelReason: 'vendeur_absent' });
+}
+
+// ---------------------------------------------------------------------------
 // Actions de l'acheteur : "J'ai bien reçu ma commande" / "Signaler un problème"
 // ---------------------------------------------------------------------------
 async function handleBuyerAction(req, res) {
   try {
-    const { action, orderId, sellerId, payoutId, reason } = req.body || {};
+    const { action, orderId, sellerId, payoutId, reason, kind } = req.body || {};
 
     const token = (req.headers.authorization || '').replace('Bearer ', '');
     if (!token) {
@@ -573,8 +638,10 @@ async function handleBuyerAction(req, res) {
 
     // Signaler un problème demande une explication écrite : 10 caractères au moins, 1000 au plus
     // (la page le vérifie aussi, mais le serveur ne se fie jamais à la page)
+    // « Le vendeur n'était pas là » : aucune explication écrite demandée
+    const isAbsence = action === 'report' && kind === 'absent';
     let reasonText = '';
-    if (action === 'report') {
+    if (action === 'report' && !isAbsence) {
       reasonText = typeof reason === 'string' ? reason.trim() : '';
       if (reasonText.length < 10) {
         return res.status(400).json({ error: "Merci d'expliquer le problème (au moins 10 caractères)." });
@@ -603,7 +670,7 @@ async function handleBuyerAction(req, res) {
     // la page peut donc préciser lequel (payoutId). Sans précision, on ne répond que s'il n'y en a qu'un.
     const { data: payoutRows, error: payoutError } = await supabase
       .from('payouts')
-      .select('id, status, pickup_start_at, pickup_end_at')
+      .select('id, status, order_id, seller_id, amount_cents, shipping_cents, stripe_charge_id, pickup_start_at, pickup_end_at, picked_up_at')
       .eq('order_id', orderId)
       .eq('seller_id', sellerId);
 
@@ -663,6 +730,11 @@ async function handleBuyerAction(req, res) {
       return res.status(502).json({
         error: "Merci, votre confirmation est bien enregistrée. Le versement n'a pas pu partir tout de suite, il sera retenté automatiquement.",
       });
+    }
+
+    // ---- Le vendeur n'était pas là ----
+    if (isAbsence) {
+      return await reportSellerAbsent(res, payout);
     }
 
     // ---- Signaler un problème ----

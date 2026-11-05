@@ -90,6 +90,7 @@ async function markShipped(req, res, seller) {
     .select('id, status, shipping_cents, shipped_at')
     .eq('seller_id', seller.id)
     .eq('order_id', orderId)
+    .gt('shipping_cents', 0)
     .maybeSingle();
   if (payoutError) {
     console.error('Erreur Supabase (colis parti) :', payoutError.message);
@@ -410,7 +411,9 @@ export default async function handler(req, res) {
         totalCents += cents;
       });
 
-      const payoutRow = payouts.find((p) => p.order_id === order.id);
+      // Plusieurs versements possibles sur une commande (un par créneau) : celui de l'expédition passe en premier
+      const orderPayouts = payouts.filter((p) => p.order_id === order.id);
+      const payoutRow = orderPayouts.find((p) => Number(p.shipping_cents) > 0) || orderPayouts[0];
 
       // Ce que le vendeur voit de son argent (ses propres chiffres, jamais rien sur l'acheteur) :
       // - argent versé : la commission, les frais retirés et le montant reçu

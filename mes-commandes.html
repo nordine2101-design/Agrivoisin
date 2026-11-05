@@ -371,6 +371,17 @@
       intro = 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + when + ', ou dès que vous confirmez la réception.';
     }
 
+    // Retrait avec créneau, pas encore retiré : l'acheteur choisit « Le vendeur n'était pas là » (possible après la fin du créneau) ou « Autre problème »
+    const endsAt = isSlot ? new Date(payoutOverride.pickupEndAt) : null;
+    const slotEnded = !!(endsAt && !Number.isNaN(endsAt.getTime()) && endsAt.getTime() <= Date.now());
+    const radioName = 'kind-' + escapeHtml(String((payoutOverride && payoutOverride.payoutId) || orderId));
+    const absentChoiceHtml = isSlot && !pickedUp
+      ? '<label class="payout-report-label">Quel est le problème ?</label>' +
+        '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="absent"' + (slotEnded ? ' checked' : ' disabled') + '> Le vendeur n\'était pas là</label>' +
+        (slotEnded ? '' : '<p class="payout-report-hint payout-kind-hint">Disponible à partir de ' + escapeHtml(formatParisMoment(payoutOverride.pickupEndAt)) + '.</p>') +
+        '<label class="payout-kind"><input type="radio" name="' + radioName + '" value="other"' + (slotEnded ? '' : ' checked') + '> Autre problème</label>'
+      : '';
+
     return `
       <div class="payout-box" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(seller.sellerId)}"${payoutOverride && payoutOverride.payoutId ? ' data-payout-id="' + escapeHtml(payoutOverride.payoutId) + '"' : ''}>
         <p>${intro}</p>
@@ -381,10 +392,13 @@
         ${reportLocked ? `<p class="payout-report-hint">Vous pourrez signaler un problème à partir du ${escapeHtml(formatParisMoment(payout.pickupStartAt))}.</p>` : ''}
         ${pickedUp ? '<p class="payout-report-hint">Vous pouvez signaler un problème jusqu\'à cette date.</p>' : ''}
         <div class="payout-report-form" style="display:none;">
-          <label class="payout-report-label">Expliquez le problème (obligatoire)</label>
-          <textarea class="payout-report-reason" maxlength="1000" placeholder="Par exemple : le vendeur n'était pas là, ou les légumes étaient abîmés"></textarea>
+          ${absentChoiceHtml}
+          <div class="payout-other"${absentChoiceHtml && slotEnded ? ' style="display:none;"' : ''}>
+            <label class="payout-report-label">Expliquez le problème (obligatoire)</label>
+            <textarea class="payout-report-reason" maxlength="1000" placeholder="Par exemple : les légumes étaient abîmés"></textarea>
+          </div>
           <div class="payout-report-buttons">
-            <button type="button" class="btn btn-primary payout-report-send">Envoyer le signalement</button>
+            <button type="button" class="btn btn-primary payout-report-send">${absentChoiceHtml && slotEnded ? 'Confirmer : vendeur absent' : 'Envoyer le signalement'}</button>
             <button type="button" class="btn btn-ghost payout-report-cancel">Annuler</button>
           </div>
         </div>
@@ -436,7 +450,7 @@
     }).join('');
   }
 
-  async function sendPayoutAction(box, action, reason) {
+  async function sendPayoutAction(box, action, reason, kind) {
     const orderId = box.dataset.orderId;
     const sellerId = box.dataset.sellerId;
     const payoutId = box.dataset.payoutId || null;
@@ -458,7 +472,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ action, orderId, sellerId, ...(payoutId ? { payoutId } : {}), ...(action === 'report' ? { reason } : {}) }),
+        body: JSON.stringify({ action, orderId, sellerId, ...(payoutId ? { payoutId } : {}), ...(action === 'report' ? (kind === 'absent' ? { kind: 'absent' } : { reason }) : {}) }),
       });
 
       const data = await response.json();
@@ -468,7 +482,7 @@
       }
 
       const sellerBlock = box.closest('.order-seller-block');
-      box.outerHTML = data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml();
+      box.outerHTML = data.status === 'rembourse' ? payoutRefundedHtml({ refundedAmount: data.refundedAmount }) : (data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml());
 
       // Plus rien à retirer chez ce vendeur : son adresse disparaît de l'écran (et le serveur ne la renverra plus)
       const stillOpen = sellerBlock ? sellerBlock.querySelectorAll('.payout-box[data-order-id]').length : 0;
@@ -523,7 +537,30 @@
         actionsEl.style.display = '';
       });
 
-      box.querySelector('.payout-report-send').addEventListener('click', () => {
+      const otherEl = box.querySelector('.payout-other');
+      const sendBtn = box.querySelector('.payout-report-send');
+      const kindRadios = box.querySelectorAll('.payout-kind input[type="radio"]');
+      const selectedKind = () => {
+        const checked = box.querySelector('.payout-kind input[type="radio"]:checked');
+        return checked ? checked.value : null;
+      };
+      // Le choix change le formulaire : « vendeur absent » = pas d'explication à écrire
+      kindRadios.forEach((radio) => {
+        radio.addEventListener('change', () => {
+          errorEl.style.display = 'none';
+          const absent = selectedKind() === 'absent';
+          otherEl.style.display = absent ? 'none' : '';
+          sendBtn.textContent = absent ? 'Confirmer : vendeur absent' : 'Envoyer le signalement';
+        });
+      });
+
+      sendBtn.addEventListener('click', () => {
+        if (selectedKind() === 'absent') {
+          if (window.confirm("Confirmez-vous que le vendeur n'était pas là pendant le créneau ? Vous serez remboursé tout de suite, et cette action ne peut pas être annulée.")) {
+            sendPayoutAction(box, 'report', '', 'absent');
+          }
+          return;
+        }
         const reason = reasonEl.value.trim();
         if (reason.length < 10) {
           errorEl.textContent = "Merci d'expliquer le problème (au moins 10 caractères).";
@@ -878,6 +915,10 @@
   .payout-box p.payout-report-hint { font-size:0.8rem; color:#888; margin:0 0 8px; }
   .payout-box .payout-report-label { display:block; font-size:0.8rem; font-weight:700; color:#6B5842; margin-bottom:6px; }
   .payout-box .payout-report-reason { width:100%; min-height:80px; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; font-size:0.85rem; box-sizing:border-box; resize:vertical; }
+  .payout-box .payout-kind { display:flex; align-items:center; gap:8px; font-size:0.85rem; color:#3b2f22; margin:0 0 6px; cursor:pointer; }
+  .payout-box .payout-kind-off { color:#999; cursor:not-allowed; }
+  .payout-box p.payout-kind-hint { margin:-2px 0 8px 24px; }
+  .payout-box .payout-other { margin-top:6px; }
   .payout-report-buttons { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
   .payout-report-buttons .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
   .payout-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }

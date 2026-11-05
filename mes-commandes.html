@@ -482,6 +482,11 @@
       }
 
       const sellerBlock = box.closest('.order-seller-block');
+      // Commande remboursée : le code de ce retrait n'a plus de raison d'être affiché
+      if (data.status === 'rembourse') {
+        const slotBox = box.closest('.slot-box');
+        if (slotBox) slotBox.querySelectorAll('.slot-code, .slot-wait').forEach((el) => el.remove());
+      }
       box.outerHTML = data.status === 'rembourse' ? payoutRefundedHtml({ refundedAmount: data.refundedAmount }) : (data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml());
 
       // Plus rien à retirer chez ce vendeur : son adresse disparaît de l'écran (et le serveur ne la renverra plus)
@@ -923,7 +928,7 @@
   .payout-report-buttons .btn { font-size:0.8rem; padding:8px 12px; width:100%; }
   .payout-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .payout-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
-  .payout-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
+  .payout-refunded { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
   .seller-address { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:8px 10px; margin:8px 0; font-size:0.9rem; line-height:1.5; }
   .seller-address-title { font-size:0.7rem; font-weight:700; color:#E56500; text-transform:uppercase; letter-spacing:0.05em; }
   .ship-badge { display:inline-block; font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px; vertical-align:middle; font-family:var(--font-body); }

@@ -355,18 +355,31 @@
 
     // Colis pas encore parti : pas de date, et pas de bouton « J'ai bien reçu » (rien n'a pu être reçu)
     const notShippedYet = !payoutOverride && !!(seller.delivery && !seller.delivery.shippedAt);
-    const intro = notShippedYet
-      ? 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + SHIPPED_RELEASE_DAYS + ' jours après l\'envoi du colis, ou dès que vous confirmez la réception.'
-      : 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + when + ', ou dès que vous confirmez la réception.';
+    // Retrait avec code : pas de bouton « J'ai bien reçu » (c'est le code donné au vendeur qui fait foi)
+    const isSlot = !!(payoutOverride && payoutOverride.pickupEndAt);
+    const pickedUp = !!(isSlot && payoutOverride.pickedUpAt);
+    let intro;
+    if (pickedUp) {
+      intro = '<span class="slot-done">✓ Retiré. Votre paiement ' +
+        (releaseDate && releaseDate.getTime() > Date.now() ? 'sera versé au vendeur le ' + escapeHtml(formatParisMoment(payout.autoReleaseAt)) : 'va être versé au vendeur très prochainement') + '.</span>';
+    } else if (isSlot) {
+      intro = 'Votre paiement est gardé par Agrivoisin. Il est versé au vendeur 24 h après la remise de votre commande' +
+        (releaseDate && releaseDate.getTime() > Date.now() ? ' (au plus tard le ' + escapeHtml(formatDate(payout.autoReleaseAt)) + ')' : '') + '.';
+    } else if (notShippedYet) {
+      intro = 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + SHIPPED_RELEASE_DAYS + ' jours après l\'envoi du colis, ou dès que vous confirmez la réception.';
+    } else {
+      intro = 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + when + ', ou dès que vous confirmez la réception.';
+    }
 
     return `
       <div class="payout-box" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(seller.sellerId)}"${payoutOverride && payoutOverride.payoutId ? ' data-payout-id="' + escapeHtml(payoutOverride.payoutId) + '"' : ''}>
         <p>${intro}</p>
         <div class="payout-actions">
-          ${notShippedYet ? '' : '<button type="button" class="btn btn-primary payout-confirm-btn">J\'ai bien reçu ma commande</button>'}
+          ${notShippedYet || isSlot ? '' : '<button type="button" class="btn btn-primary payout-confirm-btn">J\'ai bien reçu ma commande</button>'}
           <button type="button" class="btn btn-ghost payout-report-btn"${reportLocked ? ' disabled data-locked="1"' : ''}>Signaler un problème</button>
         </div>
         ${reportLocked ? `<p class="payout-report-hint">Vous pourrez signaler un problème à partir du ${escapeHtml(formatParisMoment(payout.pickupStartAt))}.</p>` : ''}
+        ${pickedUp ? '<p class="payout-report-hint">Vous pouvez signaler un problème jusqu\'à cette date.</p>' : ''}
         <div class="payout-report-form" style="display:none;">
           <label class="payout-report-label">Expliquez le problème (obligatoire)</label>
           <textarea class="payout-report-reason" maxlength="1000" placeholder="Par exemple : le vendeur n'était pas là, ou les légumes étaient abîmés"></textarea>
@@ -853,6 +866,7 @@
   .slot-code { background:#FFF1E0; border:1px dashed #E56500; border-radius:8px; padding:8px; text-align:center; margin:6px 0 8px; }
   .slot-code b { font-size:1.6rem; letter-spacing:0.3em; color:#7A3500; }
   .slot-code small { display:block; color:#6B5842; font-size:0.75rem; }
+  .slot-done { display:block; background:#e8efe0; border-radius:8px; padding:8px; font-size:0.85rem; font-weight:600; color:#2f5a33; line-height:1.45; }
   .slot-wait { background:#f6f2ea; border-radius:8px; padding:8px; font-size:0.8rem; color:#6B5842; margin:6px 0 8px; }
   .slot-box .payout-box { border:0; padding:0; margin:0; background:transparent; }
   .payout-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin:8px 0; }

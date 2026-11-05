@@ -298,7 +298,8 @@
   // Un avis n'est possible qu'une fois la réception confirmée (paiement versé).
   // Les anciennes commandes, sans versement enregistré, ne sont pas concernées.
   function reviewAllowed(seller) {
-    return !seller.payout || seller.payout.status === 'verse';
+    const slotsDone = (seller.slots || []).every((slot) => slot.status === 'verse');
+    return slotsDone && (!seller.payout || seller.payout.status === 'verse');
   }
 
   // « lundi 12 octobre à 18 h » ou « lundi 12 octobre à 18 h 30 » (heure de Paris)
@@ -328,8 +329,9 @@
   // Une commande expédiée : l'argent est versé 14 jours après l'envoi du colis
   const SHIPPED_RELEASE_DAYS = 14;
 
-  function renderPayoutSection(orderId, seller) {
-    const payout = seller.payout;
+  // payoutOverride : le versement d'un créneau de retrait (sinon : celui de l'expédition ou de l'ancienne commande)
+  function renderPayoutSection(orderId, seller, payoutOverride) {
+    const payout = payoutOverride || seller.payout;
     // Anciennes commandes (avant l'argent retenu) : rien à afficher
     if (!payout) return '';
 
@@ -352,13 +354,13 @@
     const reportLocked = !!(startsAt && !Number.isNaN(startsAt.getTime()) && startsAt.getTime() > Date.now());
 
     // Colis pas encore parti : pas de date, et pas de bouton « J'ai bien reçu » (rien n'a pu être reçu)
-    const notShippedYet = !!(seller.delivery && !seller.delivery.shippedAt);
+    const notShippedYet = !payoutOverride && !!(seller.delivery && !seller.delivery.shippedAt);
     const intro = notShippedYet
       ? 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + SHIPPED_RELEASE_DAYS + ' jours après l\'envoi du colis, ou dès que vous confirmez la réception.'
       : 'Votre paiement est gardé par Agrivoisin. Il sera versé au vendeur ' + when + ', ou dès que vous confirmez la réception.';
 
     return `
-      <div class="payout-box" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(seller.sellerId)}">
+      <div class="payout-box" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(seller.sellerId)}"${payoutOverride && payoutOverride.payoutId ? ' data-payout-id="' + escapeHtml(payoutOverride.payoutId) + '"' : ''}>
         <p>${intro}</p>
         <div class="payout-actions">
           ${notShippedYet ? '' : '<button type="button" class="btn btn-primary payout-confirm-btn">J\'ai bien reçu ma commande</button>'}
@@ -378,9 +380,53 @@
     `;
   }
 
+  // « Samedi 7 novembre, de 18 h à 20 h » (heure de Paris)
+  function formatSlotRange(startIso, endIso) {
+    const hour = (iso) => {
+      const parts = {};
+      new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+      return parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
+    };
+    const day = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(startIso));
+    return day.charAt(0).toUpperCase() + day.slice(1) + ', de ' + hour(startIso) + ' à ' + hour(endIso);
+  }
+
+  // Un encadré par créneau de retrait : les produits à retirer, le code (dès le début du créneau) et les boutons du créneau
+  function renderSlotsSection(orderId, seller) {
+    const slots = seller.slots || [];
+    return slots.map((slot, index) => {
+      const products = (slot.items || []).map((item) => {
+        const qty = Number(item.quantity) || 1;
+        return escapeHtml(item.title) + ' — ' + qty + ' ' + escapeHtml(unitLabel(item.unit, qty));
+      }).join('<br>');
+
+      let codeHtml = '';
+      if (slot.status === 'en_attente') {
+        if (slot.code) {
+          codeHtml = '<div class="slot-code"><b>' + escapeHtml(String(slot.code).split('').join(' ')) + '</b><small>Donnez ce code au vendeur quand vous récupérez votre commande</small></div>';
+        } else {
+          const startsAt = new Date(slot.pickupStartAt);
+          if (startsAt.getTime() > Date.now()) {
+            codeHtml = '<div class="slot-wait">Votre code apparaîtra le ' + escapeHtml(formatParisMoment(slot.pickupStartAt)) + '.</div>';
+          }
+        }
+      }
+
+      return '<div class="slot-box">' +
+        '<div class="slot-label">' + (slots.length > 1 ? 'Retrait ' + (index + 1) : 'Retrait') + '</div>' +
+        '<div class="slot-when">' + escapeHtml(formatSlotRange(slot.pickupStartAt, slot.pickupEndAt)) + '</div>' +
+        '<div class="slot-prod">' + products + '</div>' +
+        codeHtml +
+        renderPayoutSection(orderId, seller, slot) +
+        '</div>';
+    }).join('');
+  }
+
   async function sendPayoutAction(box, action, reason) {
     const orderId = box.dataset.orderId;
     const sellerId = box.dataset.sellerId;
+    const payoutId = box.dataset.payoutId || null;
     const errorEl = box.querySelector('.payout-error');
     const buttons = box.querySelectorAll('button');
 
@@ -399,7 +445,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify(action === 'report' ? { action, orderId, sellerId, reason } : { action, orderId, sellerId }),
+        body: JSON.stringify({ action, orderId, sellerId, ...(payoutId ? { payoutId } : {}), ...(action === 'report' ? { reason } : {}) }),
       });
 
       const data = await response.json();
@@ -408,16 +454,17 @@
         throw new Error(data.error || 'Une erreur est survenue');
       }
 
-      // L'adresse du vendeur disparaît tout de suite de l'écran (et le serveur ne la renverra plus)
       const sellerBlock = box.closest('.order-seller-block');
-      if (sellerBlock) {
+      box.outerHTML = data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml();
+
+      // Plus rien à retirer chez ce vendeur : son adresse disparaît de l'écran (et le serveur ne la renverra plus)
+      const stillOpen = sellerBlock ? sellerBlock.querySelectorAll('.payout-box[data-order-id]').length : 0;
+      if (sellerBlock && stillOpen === 0) {
         sellerBlock.querySelectorAll('.seller-address, .deliver-addr, .ship-wait').forEach((el) => el.remove());
       }
 
-      box.outerHTML = data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml();
-
-      // Réception confirmée : l'acheteur peut maintenant laisser son avis
-      if (data.status !== 'probleme' && sellerBlock) {
+      // Toutes les réceptions confirmées (et aucun problème) : l'acheteur peut maintenant laisser son avis
+      if (sellerBlock && stillOpen === 0 && !sellerBlock.querySelector('.payout-problem, .payout-refunded')) {
         const reviewSlot = sellerBlock.querySelector('.review-slot');
         if (reviewSlot && reviewSlot.innerHTML.trim() === '') {
           reviewSlot.innerHTML = renderStrawberryPicker(orderId, sellerId);
@@ -730,7 +777,7 @@
               ${renderTicketLines(seller)}
               ${renderDeliverySection(seller)}
               ${renderAddressSection(seller)}
-              ${renderPickupSection((seller.items || []).filter((item) => !item.shipped))}
+              ${(seller.slots && seller.slots.length) ? renderSlotsSection(order.orderId, seller) : renderPickupSection((seller.items || []).filter((item) => !item.shipped))}
               ${renderPayoutSection(order.orderId, seller)}
               <div class="review-slot">${seller.review ? renderExistingReview(seller.review, false) : (reviewAllowed(seller) ? renderStrawberryPicker(order.orderId, seller.sellerId) : '')}</div>
             </div>
@@ -799,6 +846,15 @@
   .strawberry-icon { width:100%; height:100%; object-fit:contain; display:block; mix-blend-mode:multiply; }
   .review-comment { width:100%; min-height:60px; margin:10px 0; padding:8px; border-radius:8px; border:1px solid #ddd; font-family:inherit; }
   .existing-review { background:#f6f9f5; border-radius:8px; padding:10px; margin-top:8px; }
+  .slot-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin:8px 0; }
+  .slot-label { font-size:0.7rem; font-weight:700; color:#E56500; text-transform:uppercase; letter-spacing:0.05em; }
+  .slot-when { font-weight:700; font-size:0.9rem; margin-top:2px; }
+  .slot-prod { font-size:0.85rem; margin:4px 0 8px; line-height:1.5; }
+  .slot-code { background:#FFF1E0; border:1px dashed #E56500; border-radius:8px; padding:8px; text-align:center; margin:6px 0 8px; }
+  .slot-code b { font-size:1.6rem; letter-spacing:0.3em; color:#7A3500; }
+  .slot-code small { display:block; color:#6B5842; font-size:0.75rem; }
+  .slot-wait { background:#f6f2ea; border-radius:8px; padding:8px; font-size:0.8rem; color:#6B5842; margin:6px 0 8px; }
+  .slot-box .payout-box { border:0; padding:0; margin:0; background:transparent; }
   .payout-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin:8px 0; }
   .payout-box p { margin:0 0 8px; font-size:0.85rem; }
   .payout-box p:last-child { margin-bottom:0; }

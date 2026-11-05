@@ -468,7 +468,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents')
+      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, cancel_reason, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents')
       .eq('seller_id', seller.id)
       .in('order_id', shownOrderIds);
 
@@ -602,6 +602,7 @@ export default async function handler(req, res) {
           pickedUpAt: p.picked_up_at || null,
           autoReleaseAt: p.auto_release_at || null,
           releasedAt: p.released_at || null,
+          cancelReason: p.cancel_reason || null,
           locked: attempts >= MAX_CODE_ATTEMPTS,
           attemptsLeft: Math.max(0, MAX_CODE_ATTEMPTS - attempts),
           items: Object.values(slotItems),

@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { randomInt } from 'crypto';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
@@ -23,7 +24,7 @@ function commissionCents(amountCents, sellerType) {
 const SHIPPING_FLAT_FEE_CENTS = 50;
 const SHIPPED_RELEASE_DAYS = 30; // délai de sécurité avant le versement d'une commande expédiée (le colis doit partir avant)
 const AUTO_RELEASE_DAYS = 3;  // délai avant le versement automatique au vendeur (annonces sans horaires de retrait)
-const PICKUP_RELEASE_DELAY_MS = 48 * 60 * 60 * 1000; // avec horaires : libération 48 h après la fin du créneau de retrait
+const PICKUP_RELEASE_DELAY_MS = 7 * 24 * 60 * 60 * 1000; // avec horaires : si le code de retrait n'est jamais saisi, libération 7 jours après la fin du créneau
 
 // ---------------------------------------------------------------------------
 // Les créneaux de retrait : heure de Paris (avec l'heure d'été), jours 1 = lundi … 7 = dimanche
@@ -84,19 +85,9 @@ function firstSlotAfter(slots, afterMs) {
   return null;
 }
 
-// Pour un vendeur : le début du premier créneau (pour signaler un problème) et la date de libération
-// automatique (48 h après la fin du créneau le plus tardif). null si aucun article n'a d'horaires.
-function computePickupWindow(listingIds, slotsByListing, purchaseMs) {
-  let startMs = null;
-  let endMs = null;
-  listingIds.forEach((id) => {
-    const first = firstSlotAfter(slotsByListing[id] || [], purchaseMs);
-    if (!first) return;
-    startMs = startMs === null ? first.startMs : Math.min(startMs, first.startMs);
-    endMs = endMs === null ? first.endMs : Math.max(endMs, first.endMs);
-  });
-  if (startMs === null) return null;
-  return { start: new Date(startMs), release: new Date(endMs + PICKUP_RELEASE_DELAY_MS) };
+// Le code de retrait : 4 chiffres tirés au hasard (un par versement, donc un par créneau)
+function newPickupCode() {
+  return String(randomInt(0, 10000)).padStart(4, '0');
 }
 
 export const config = {
@@ -438,45 +429,68 @@ export default async function handler(req, res) {
         (sellerRows || []).forEach((r) => { sellerTypes[r.id] = r.seller_type; });
       }
 
-      const payouts = Object.entries(amountBySeller).map(([sellerId, amount]) => {
-        const sellerListingIds = [...new Set(servedLines.filter((l) => l.seller_id === sellerId).map((l) => l.listing_id))];
-        const pickupListingIds = sellerListingIds.filter((id) => !(String(id) in shippingFees));
-        const shippedListingIds = sellerListingIds.filter((id) => String(id) in shippingFees);
-        const pickupWindow = computePickupWindow(pickupListingIds, slotsByListing, purchaseMs);
+      // Un versement par vendeur ET par créneau de retrait (un code par créneau) ; les articles expédiés
+      // d'un vendeur forment un versement à part. Les articles sans horaires gardent la règle de 3 jours.
+      const groups = [];
+      const groupIndex = {};
+      const lineGroups = [];
+      servedLines.forEach((l, i) => {
+        const shipped = String(l.listing_id) in shippingFees;
+        const slot = shipped ? null : firstSlotAfter(slotsByListing[l.listing_id] || [], purchaseMs);
+        const key = l.seller_id + '|' + (shipped ? 'ship' : slot ? 'slot-' + slot.startMs + '-' + slot.endMs : 'none');
+        if (groupIndex[key] === undefined) {
+          groupIndex[key] = groups.length;
+          groups.push({ sellerId: l.seller_id, shipped, slot, lines: [] });
+        }
+        groups[groupIndex[key]].lines.push(l);
+        lineGroups[i] = groupIndex[key];
+      });
+
+      const payouts = groups.map((g) => {
+        const amount = g.lines.reduce((sum, l) => sum + l.cents, 0);
+        const listingIds = [...new Set(g.lines.map((l) => l.listing_id))];
         // Les frais d'expédition de ce vendeur : ils lui sont reversés, moins le forfait de 0,50 € par commande
-        const sellerShippingCents = shippedListingIds.reduce((sum, id) => sum + (servedShippingFees[id] || 0), 0);
-        // Une commande expédiée n'est pas libérée à la date d'un retrait : on laisse 30 jours, le temps que le vendeur envoie le colis
-        let releaseAt = pickupWindow ? pickupWindow.release.toISOString() : legacyReleaseAt;
-        if (shippedListingIds.length > 0) {
-          const shippedRelease = new Date(Date.now() + SHIPPED_RELEASE_DAYS * 24 * 60 * 60 * 1000).toISOString();
-          releaseAt = releaseAt > shippedRelease ? releaseAt : shippedRelease;
+        const sellerShippingCents = g.shipped ? listingIds.reduce((sum, id) => sum + (servedShippingFees[id] || 0), 0) : 0;
+        let releaseAt = legacyReleaseAt;
+        if (g.shipped) {
+          // Une commande expédiée n'est pas libérée à la date d'un retrait : on laisse 30 jours, le temps que le vendeur envoie le colis
+          releaseAt = new Date(Date.now() + SHIPPED_RELEASE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        } else if (g.slot) {
+          releaseAt = new Date(g.slot.endMs + PICKUP_RELEASE_DELAY_MS).toISOString();
         }
         return {
           order_id: order.id,
-          seller_id: sellerId,
+          seller_id: g.sellerId,
           amount_cents: amount,
           shipping_cents: sellerShippingCents,
           // La commission sur les produits, plus le forfait de 0,50 € si le vendeur expédie (plafonné aux frais d'expédition)
-          commission_cents: commissionCents(amount, sellerTypes[sellerId]) + (sellerShippingCents > 0 ? Math.min(SHIPPING_FLAT_FEE_CENTS, sellerShippingCents) : 0),
+          commission_cents: commissionCents(amount, sellerTypes[g.sellerId]) + (sellerShippingCents > 0 ? Math.min(SHIPPING_FLAT_FEE_CENTS, sellerShippingCents) : 0),
           stripe_fee_cents: totalCardFee !== null && chargedTotalCents > 0 ? Math.floor((totalCardFee * (amount + sellerShippingCents)) / chargedTotalCents) : null,
           stripe_charge_id: chargeId,
           status: 'en_attente',
-          // Avec horaires de retrait : libération 48 h après la fin du créneau, signalement possible dès son début.
+          // Avec horaires : signalement possible dès le début du créneau, libération 7 jours après sa fin si le code n'est pas saisi.
           // Sans horaires : la règle de 3 jours, et aucune attente avant de signaler.
           auto_release_at: releaseAt,
-          pickup_start_at: pickupWindow ? pickupWindow.start.toISOString() : null,
+          pickup_start_at: g.slot ? new Date(g.slot.startMs).toISOString() : null,
+          pickup_end_at: g.slot ? new Date(g.slot.endMs).toISOString() : null,
+          // Le code de retrait : seulement pour un retrait avec créneau
+          pickup_code: g.slot ? newPickupCode() : null,
         };
       });
 
       if (servedLines.length > 0) {
-        const { error: payoutsError } = await supabase.from('payouts').insert(payouts);
+        const { data: insertedPayouts, error: payoutsError } = await supabase.from('payouts').insert(payouts).select('id');
         if (payoutsError) {
           throw new Error('versements : ' + payoutsError.message);
         }
+        if (!insertedPayouts || insertedPayouts.length !== payouts.length) {
+          throw new Error('versements : identifiants non renvoyés');
+        }
 
         // 6. Détail des articles de la commande
-        const items = servedLines.map((l) => ({
+        const items = servedLines.map((l, i) => ({
           order_id: order.id,
+          payout_id: insertedPayouts[lineGroups[i]].id,
           listing_id: l.listing_id,
           seller_id: l.seller_id,
           price_at_purchase: l.cents / 100,

@@ -257,8 +257,7 @@
   // Le détail de l'argent d'une vente, avec les chiffres du vendeur lui-même :
   // - versé : commission, frais de carte, frais de service du mois (s'il y en a eu) et « Vous recevez »
   // - en attente : commission, vrais frais de carte, montant exact de la vente (et les 2 € du mois à part)
-  // Pour un retrait (un créneau), on passe ce retrait en second paramètre ;
-  // hideFeeNote = true : la phrase sur les 2 € du mois est déjà affichée ailleurs dans la vente
+  // Pour un retrait (un créneau), on passe ce retrait en second paramètre
   function renderMoneyDetail(sale, slot, hideFeeNote) {
     const payout = slot || sale.payout;
     const m = payout && payout.money;
@@ -406,7 +405,9 @@
           ? '<div class="pickup-done">✓ Retirée. L\'argent a été libéré' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>'
           : '<div class="pickup-done">Argent versé' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>';
       } else if (slot.status === 'rembourse') {
-        body = '<div class="money-box money-refunded">Commande remboursée à l\'acheteur après un problème signalé : cette vente ne vous sera pas versée.</div>';
+        body = slot.cancelReason === 'vendeur_absent'
+          ? '<div class="money-box money-refunded">Annulée : absence de votre part. L\'acheteur a été remboursé. Vous pouvez contester via la page Contact.</div>'
+          : '<div class="money-box money-refunded">Commande remboursée à l\'acheteur après un problème signalé : cette vente ne vous sera pas versée.</div>';
       } else if (slot.status === 'probleme') {
         body = '<div class="money-box money-problem">Problème signalé par l\'acheteur : le versement est suspendu le temps qu\'Agrivoisin examine la situation.</div>';
       } else if (slot.status === 'en_cours') {

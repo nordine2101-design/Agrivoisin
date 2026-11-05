@@ -257,8 +257,9 @@
   // Le détail de l'argent d'une vente, avec les chiffres du vendeur lui-même :
   // - versé : commission, frais de carte, frais de service du mois (s'il y en a eu) et « Vous recevez »
   // - en attente : commission, vrais frais de carte, montant exact de la vente (et les 2 € du mois à part)
-  // Pour un retrait (un créneau), on passe ce retrait en second paramètre
-  function renderMoneyDetail(sale, slot) {
+  // Pour un retrait (un créneau), on passe ce retrait en second paramètre ;
+  // hideFeeNote = true : la phrase sur les 2 € du mois est déjà affichée ailleurs dans la vente
+  function renderMoneyDetail(sale, slot, hideFeeNote) {
     const payout = slot || sale.payout;
     const m = payout && payout.money;
     if (!m) return '';
@@ -311,7 +312,7 @@
       }
 
       // Les frais de service du mois, en ligne séparée : retirés une seule fois, du premier versement du mois
-      if (m.monthlyFeeDue != null && Number(m.monthlyFeeDue) > 0) {
+      if (!hideFeeNote && m.monthlyFeeDue != null && Number(m.monthlyFeeDue) > 0) {
         const due = Number(m.monthlyFeeDue);
         const text = due >= MONTHLY_FEE_EUROS
           ? shortAmount(due) + ' de frais de service du mois sont retirés une seule fois, du premier versement du mois.'
@@ -390,6 +391,8 @@
   function renderSlots(sale) {
     const slots = Array.isArray(sale.slots) ? sale.slots : [];
     if (slots.length === 0) return '';
+    // La phrase sur les 2 € du mois n'apparaît qu'une seule fois par vente (sous le premier retrait concerné)
+    let feeNoteShown = false;
     return slots.map((slot, index) => {
       const title = (slots.length > 1 ? 'Retrait ' + (index + 1) + ' · ' : 'Retrait · ') + formatSlotRange(slot.startAt, slot.endAt);
       const products = (slot.items || []).map((it) => {
@@ -430,7 +433,8 @@
       }
 
       const nowClass = slot.status === 'en_attente' && !slot.pickedUpAt && slot.started && !slot.locked ? ' pickup-now' : '';
-      const detail = (slot.status === 'en_attente' || slot.status === 'verse') ? renderMoneyDetail(sale, slot) : '';
+      const detail = (slot.status === 'en_attente' || slot.status === 'verse') ? renderMoneyDetail(sale, slot, feeNoteShown) : '';
+      if (slot.status === 'en_attente' && slot.money && Number(slot.money.monthlyFeeDue) > 0) feeNoteShown = true;
       return '<div class="pickup-slot' + nowClass + '">' +
         '<div class="pickup-when">' + escapeHtml(title) + '</div>' +
         '<div class="pickup-prod">' + products + '</div>' +
@@ -496,7 +500,7 @@
       renderSlots(sale) +
       shippedHtml +
       moneyBox +
-      renderMoneyDetail(sale) +
+      renderMoneyDetail(sale, null, (sale.slots || []).some((sl) => sl.status === 'en_attente' && sl.money && Number(sl.money.monthlyFeeDue) > 0)) +
       '</div>'
     );
   }

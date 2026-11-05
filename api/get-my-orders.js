@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('id, order_id, seller_id, listing_id, price_at_purchase, delivery_mode, listings(title, unit, image_url, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
+      .select('id, order_id, seller_id, listing_id, payout_id, price_at_purchase, delivery_mode, listings(title, unit, image_url, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
       .in('order_id', orderIds);
 
     if (itemsError) throw itemsError;
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, refunded_cents, shipping_cents, shipped_at, tracking_number')
+      .select('id, order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, pickup_end_at, pickup_code, refunded_cents, shipping_cents, shipped_at, tracking_number')
       .in('order_id', orderIds);
 
     if (payoutsError) {
@@ -123,7 +123,42 @@ export default async function handler(req, res) {
         const existingReview = reviews.find((r) => r.order_id === order.id && r.seller_id === s.sellerId);
         // Plusieurs versements possibles pour un même vendeur (un par créneau) : celui de l'expédition passe en premier
         const sellerPayouts = payouts.filter((p) => p.order_id === order.id && p.seller_id === s.sellerId);
-        const payoutRow = sellerPayouts.find((p) => Number(p.shipping_cents) > 0) || sellerPayouts[0];
+        // Les retraits avec créneau (un versement par créneau) d'un côté ; l'expédition et les anciennes commandes de l'autre
+        const slotPayouts = sellerPayouts
+          .filter((p) => p.pickup_end_at)
+          .sort((x, y) => new Date(x.pickup_start_at) - new Date(y.pickup_start_at));
+        const otherPayouts = sellerPayouts.filter((p) => !p.pickup_end_at);
+        const payoutRow = otherPayouts.find((p) => Number(p.shipping_cents) > 0) || otherPayouts[0];
+
+        // Un encadré par créneau : les produits à retirer, et le code (donné seulement à partir du début du créneau)
+        const nowMs = Date.now();
+        const slots = slotPayouts.map((p) => {
+          const started = new Date(p.pickup_start_at).getTime() <= nowMs;
+          const byListing = {};
+          orderItems.filter((it) => it.payout_id === p.id).forEach((it) => {
+            const key = it.listing_id || 'supprimee';
+            if (!byListing[key]) {
+              byListing[key] = {
+                title: it.listings ? it.listings.title : 'Produit',
+                unit: it.listings ? (String(it.listings.unit == null ? '' : it.listings.unit).trim() || 'kg') : 'unité',
+                quantity: 0,
+              };
+            }
+            byListing[key].quantity += 1;
+          });
+          return {
+            payoutId: p.id,
+            status: p.status,
+            autoReleaseAt: p.auto_release_at,
+            releasedAt: p.released_at,
+            pickupStartAt: p.pickup_start_at,
+            pickupEndAt: p.pickup_end_at,
+            refundedAmount: p.status === 'rembourse' && p.refunded_cents != null ? (Number(p.refunded_cents) || 0) / 100 : null,
+            // Le code n'est jamais envoyé avant le début du créneau (ni quand le versement n'est plus en attente)
+            code: started && p.status === 'en_attente' ? (p.pickup_code || null) : null,
+            items: Object.values(byListing),
+          };
+        });
 
         // L'adresse du vendeur n'est donnée que tant que l'acheteur n'a pas confirmé la réception :
         // dès que le paiement est versé (ou suspendu), elle disparaît et n'est plus jamais renvoyée
@@ -149,7 +184,8 @@ export default async function handler(req, res) {
           ...s,
           items: s.items.map(({ amountCents, ...item }) => ({ ...item, amount: amountCents / 100 })),
           // L'adresse du vendeur ne sert que s'il reste au moins un article à retirer chez lui
-          sellerAddress: addressStillVisible && hasPickupItem ? (addressesById[s.sellerId] || null) : null,
+          sellerAddress: hasPickupItem && (slotPayouts.length > 0 ? slotPayouts.some((p) => p.status === 'en_attente') : addressStillVisible) ? (addressesById[s.sellerId] || null) : null,
+          slots,
           delivery,
           review: existingReview || null,
           // null pour les anciennes commandes (payées avant l'argent retenu)

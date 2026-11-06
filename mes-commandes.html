@@ -351,6 +351,11 @@
       return rescheduleWaitHtml(payoutOverride.rescheduleDeadlineAt);
     }
 
+    // Le vendeur a proposé un autre créneau : l'acheteur accepte ou refuse (refus = remboursement)
+    if (payoutOverride && payoutOverride.rescheduleStatus === 'proposee') {
+      return rescheduleProposalHtml(orderId, seller, payoutOverride);
+    }
+
     // En attente : l'argent est gardé par Agrivoisin
     const releaseDate = payout.autoReleaseAt ? new Date(payout.autoReleaseAt) : null;
     const when = releaseDate && releaseDate.getTime() > Date.now()
@@ -385,12 +390,14 @@
     const slotEnded = !!(endsAt && !Number.isNaN(endsAt.getTime()) && endsAt.getTime() <= Date.now());
     // Un autre créneau ne se demande que dans les 24 h qui suivent la fin du premier : après, il ne reste que le remboursement
     const rescheduleLate = !!(slotEnded && endsAt.getTime() + 24 * 60 * 60 * 1000 < Date.now());
+    // Un seul autre créneau par retrait : une fois accepté, il ne reste que le remboursement
+    const rescheduleDone = !!(payoutOverride && payoutOverride.rescheduleStatus === 'acceptee');
     const radioName = 'kind-' + escapeHtml(String((payoutOverride && payoutOverride.payoutId) || orderId));
     const absentChoiceHtml = isSlot && !pickedUp
       ? '<label class="payout-report-label">Quel est le problème ?</label>' +
         '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="absent"' + (slotEnded ? ' checked' : ' disabled') + '> Le vendeur n\'était pas là : je veux être remboursé</label>' +
-        (rescheduleLate ? '' : '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="reschedule"' + (slotEnded ? '' : ' disabled') + '> Le vendeur n\'était pas là : je veux un autre créneau</label>') +
-        (rescheduleLate ? '<p class="payout-report-hint payout-kind-hint">Plus de 24 h se sont écoulées depuis la fin du créneau : un autre créneau n\'est plus possible.</p>' : '') +
+        (rescheduleLate || rescheduleDone ? '' : '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="reschedule"' + (slotEnded ? '' : ' disabled') + '> Le vendeur n\'était pas là : je veux un autre créneau</label>') +
+        (rescheduleLate && !rescheduleDone ? '<p class="payout-report-hint payout-kind-hint">Plus de 24 h se sont écoulées depuis la fin du créneau : un autre créneau n\'est plus possible.</p>' : '') +
         (slotEnded ? '' : '<p class="payout-report-hint payout-kind-hint">Disponible à partir de ' + escapeHtml(formatParisMoment(payoutOverride.pickupEndAt)) + '.</p>') +
         '<label class="payout-kind"><input type="radio" name="' + radioName + '" value="other"' + (slotEnded ? '' : ' checked') + '> Autre problème</label>'
       : '';
@@ -442,13 +449,13 @@
       }).join('<br>');
 
       let codeHtml = '';
-      if (slot.status === 'en_attente' && !slot.rescheduleStatus) {
+      if (slot.status === 'en_attente' && (!slot.rescheduleStatus || slot.rescheduleStatus === 'acceptee')) {
         if (slot.code) {
           codeHtml = '<div class="slot-code"><b>' + escapeHtml(String(slot.code).split('').join(' ')) + '</b><small>Donnez ce code au vendeur quand vous récupérez votre commande</small></div>';
         } else {
           const startsAt = new Date(slot.pickupStartAt);
           if (startsAt.getTime() > Date.now()) {
-            codeHtml = '<div class="slot-wait">Votre code apparaîtra le ' + escapeHtml(formatParisMoment(slot.pickupStartAt)) + '.</div>';
+            codeHtml = '<div class="slot-wait">' + (slot.rescheduleStatus === 'acceptee' ? 'Nouveau créneau accepté. ' : '') + 'Votre code apparaîtra le ' + escapeHtml(formatParisMoment(slot.pickupStartAt)) + '.</div>';
           }
         }
       }
@@ -462,6 +469,83 @@
         '</div>';
     }).join('');
   }
+
+  // Le vendeur propose un autre créneau : deux boutons seulement. Une fois le créneau commencé, plus de choix : remboursement automatique.
+  function rescheduleProposalHtml(orderId, seller, slot) {
+    const startIso = slot.rescheduleProposedStartAt;
+    const endIso = slot.rescheduleProposedEndAt;
+    if (!startIso || !endIso) return '';
+    if (new Date(startIso).getTime() <= Date.now()) {
+      return '<div class="slot-wait">Le créneau proposé a commencé : vous serez remboursé automatiquement.</div>';
+    }
+    return '<div class="payout-box resch-proposal" data-resch-order="' + escapeHtml(orderId) + '" data-resch-seller="' + escapeHtml(seller.sellerId) + '" data-resch-payout="' + escapeHtml(slot.payoutId) + '">' +
+      '<p>Le vendeur vous propose un autre créneau :</p>' +
+      '<p class="resch-proposal-when">' + escapeHtml(formatSlotRange(startIso, endIso)) + '</p>' +
+      '<div class="payout-actions">' +
+      '<button type="button" class="btn btn-primary resch-accept-btn">Accepter ce créneau</button>' +
+      '<button type="button" class="btn btn-ghost resch-refuse-btn">Refuser : je veux être remboursé</button>' +
+      '</div>' +
+      '<p class="payout-report-hint">Sans réponse de votre part avant ' + escapeHtml(formatParisMoment(startIso)) + ', vous serez remboursé automatiquement (au plus tard le lendemain matin).</p>' +
+      '<p class="payout-error" style="color:#C8352F;display:none;"></p>' +
+      '</div>';
+  }
+
+  // L'acheteur répond au créneau proposé : accepter (la page est relue) ou refuser (remboursement)
+  async function sendRescheduleAnswer(box, answer) {
+    const errorEl = box.querySelector('.payout-error');
+    const buttons = box.querySelectorAll('button');
+    errorEl.style.display = 'none';
+    buttons.forEach((b) => { b.disabled = true; });
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) throw new Error('Session expirée, reconnectez-vous.');
+      const response = await fetch('/api/payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({
+          action: 'reschedule_answer',
+          answer,
+          orderId: box.dataset.reschOrder,
+          sellerId: box.dataset.reschSeller,
+          payoutId: box.dataset.reschPayout,
+        }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) {
+        if (response.status === 409) {
+          errorEl.textContent = (data.error || 'Une erreur est survenue.') + ' La page va se recharger.';
+          errorEl.style.display = 'block';
+          setTimeout(() => { window.location.reload(); }, 2500);
+          return;
+        }
+        throw new Error(data.error || 'Une erreur est survenue');
+      }
+      if (data.status === 'rembourse') {
+        const slotBox = box.closest('.slot-box');
+        if (slotBox) slotBox.querySelectorAll('.slot-code, .slot-wait').forEach((el) => el.remove());
+        box.outerHTML = payoutRefundedHtml({ refundedAmount: data.refundedAmount });
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.style.display = 'block';
+      buttons.forEach((b) => { b.disabled = false; });
+    }
+  }
+
+  document.addEventListener('click', (event) => {
+    const acceptBtn = event.target.closest('.resch-accept-btn');
+    const refuseBtn = event.target.closest('.resch-refuse-btn');
+    if (acceptBtn) {
+      sendRescheduleAnswer(acceptBtn.closest('.resch-proposal'), 'accept');
+    } else if (refuseBtn) {
+      if (window.confirm('Refuser ce créneau ? Vous serez remboursé tout de suite, et cette action ne peut pas être annulée.')) {
+        sendRescheduleAnswer(refuseBtn.closest('.resch-proposal'), 'refuse');
+      }
+    }
+  });
 
   // Message gris : l'acheteur a demandé un autre créneau, le vendeur a jusqu'à la date indiquée pour en proposer un
   function rescheduleWaitHtml(deadlineIso) {
@@ -508,8 +592,6 @@
         if (slotBox) slotBox.querySelectorAll('.slot-code, .slot-wait').forEach((el) => el.remove());
       }
       if (data.status === 'reschedule_requested') {
-        const slotBox = box.closest('.slot-box');
-        if (slotBox) slotBox.querySelectorAll('.slot-code, .slot-wait').forEach((el) => el.remove());
         box.outerHTML = rescheduleWaitHtml(data.deadlineAt);
         return;
       }
@@ -942,6 +1024,14 @@
   .slot-code b { font-size:1.6rem; letter-spacing:0.3em; color:#7A3500; }
   .slot-code small { display:block; color:#6B5842; font-size:0.75rem; }
   .slot-done { display:block; background:#e8efe0; border-radius:8px; padding:8px; font-size:0.85rem; font-weight:600; color:#2f5a33; line-height:1.45; }
+  .slot-box .payout-box.resch-proposal { background:#fff; border:2px solid #8C1B3C; border-radius:10px; padding:10px; margin:8px 0; }
+  .payout-box p.resch-proposal-when { font-weight:700; font-size:0.95rem; color:#8C1B3C; }
+  .resch-proposal .payout-actions { flex-direction:column; flex-wrap:nowrap; }
+  .resch-proposal .payout-actions .btn { width:100%; }
+  .my-panel .resch-proposal .resch-accept-btn { background:#8C1B3C; color:#fff; box-shadow:0 4px 14px rgba(140,27,60,0.4); }
+  .my-panel .resch-proposal .resch-accept-btn:hover { background:#6E1230; }
+  .my-panel .resch-proposal .resch-refuse-btn { background:#fff; color:#8C1B3C; border:1.5px solid #8C1B3C; }
+  .my-panel .resch-proposal .resch-refuse-btn:hover { background:#FAF0F3; color:#6E1230; border-color:#6E1230; }
   .slot-wait { background:#f6f2ea; border-radius:8px; padding:8px; font-size:0.8rem; color:#6B5842; margin:6px 0 8px; }
   .slot-box .payout-box { border:0; padding:0; margin:0; background:transparent; }
   .payout-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin:8px 0; }

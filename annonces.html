@@ -1015,17 +1015,18 @@
 
 <style>
   .page-header { background:url('fond-provence.jpg.jpg') center 35%/cover no-repeat; height:600px; padding:0; position:relative; }
-  .page-header .titre-cal { position:absolute; left:62%; top:51%; transform:translate(-50%,-50%); width:min(720px,60%); margin:0; line-height:0; mix-blend-mode:multiply; }
+  .page-header .titre-cal { position:absolute; left:76%; top:17%; transform:translate(-50%,-50%); width:min(620px,52%); margin:0; line-height:0; mix-blend-mode:multiply; }
   .page-header .titre-cal img { width:100%; height:auto; display:block; }
-  .page-header .phrase-cal { position:absolute; left:62%; top:63%; transform:translateX(-50%); width:min(560px,56%); text-wrap:balance; text-align:center; font-family:var(--font-body); font-weight:400; font-size:1.15rem; line-height:1.5; letter-spacing:0.03em; color:#3b3a30; margin:0; text-shadow:0 0 8px rgba(255,248,230,.95), 0 0 3px rgba(255,248,230,.9); }
+  .page-header .phrase-cal { position:absolute; left:76%; top:31%; transform:translateX(-50%); width:min(480px,40%); text-wrap:balance; text-align:center; font-family:var(--font-body); font-weight:400; font-size:1.15rem; line-height:1.5; letter-spacing:0.03em; color:#3b3a30; margin:0; text-shadow:0 0 8px rgba(255,248,230,.95), 0 0 3px rgba(255,248,230,.9); }
   @media (max-width: 1100px) {
-    .page-header .titre-cal { top:52%; }
-    .page-header .phrase-cal { top:66%; }
+    .page-header .titre-cal { left:70%; }
+    .page-header .phrase-cal { left:70%; width:min(480px,46%); }
   }
   @media (max-width: 700px) {
     .page-header { height:430px; background-position:38% center; }
     .page-header .titre-cal { left:50%; top:40%; width:88%; }
     .page-header .phrase-cal { left:50%; top:54%; width:84%; font-size:1rem; }
+    .filters-card { margin-top:-40px; }
   }
   .page-header .container { max-width:none; padding-top:14px; }
   .produce-card-body img.ship-sticker { display:block; width:130px; height:auto; margin:4px 0 4px -6px; }
@@ -1085,7 +1086,7 @@
 
   /* Carte des filtres posée sur le bas de la bannière ; annonces sur fond vert très clair */
   body { background: linear-gradient(180deg, #EAF5E6 0%, #F7FBF5 100%); }
-  .filters-card { position:relative; z-index:5; width:calc(100% - 48px); max-width:1100px; margin:-130px auto 30px; background:#fff; border-radius:28px; box-shadow:0 4px 0 #A9DBB0, 0 14px 22px rgba(60,100,60,.20); padding:22px 28px 18px; box-sizing:border-box; }
+  .filters-card { position:relative; z-index:5; width:calc(100% - 48px); max-width:1100px; margin:-290px auto 30px; background:#fff; border-radius:28px; box-shadow:0 4px 0 #A9DBB0, 0 14px 22px rgba(60,100,60,.20); padding:22px 28px 18px; box-sizing:border-box; }
   .filters-card .filters-bar { padding:6px 0; border:none; }
   .filters-card .container { padding:0; }
   .filters-card .seller-type-filter { margin-left:0; }

@@ -569,7 +569,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, delivery_mode, shipping_tiers, multi_parcel, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, availability_status, sale_opened_at, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
+      .select('id, title, price, unit, quantity_available, delivery_mode, shipping_tiers, multi_parcel, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, availability_status, sale_opened_at, withdrawn_at, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
       .in('id', listingIds);
 
     if (listingsError) {
@@ -600,7 +600,8 @@ export default async function handler(req, res) {
         seller.latitude != null &&
         seller.longitude != null;
 
-      if (!listing || !sellerIsValid) {
+      // Une annonce retirée de la vente par son vendeur (commande en cours chez d'autres acheteurs) ne s'achète plus
+      if (!listing || listing.withdrawn_at || !sellerIsValid) {
         return res.status(400).json({
           error: `L'annonce « ${label} » n'est plus disponible. Retirez-la de votre panier.`,
         });

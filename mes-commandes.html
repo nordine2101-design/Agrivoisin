@@ -342,6 +342,11 @@
       return '<div class="payout-box"><p>Versement au vendeur en cours de traitement...</p></div>';
     }
 
+    // Un autre créneau a été demandé : le vendeur a 24 h pour répondre
+    if (payoutOverride && payoutOverride.rescheduleStatus === 'demandee') {
+      return rescheduleWaitHtml(payoutOverride.rescheduleDeadlineAt);
+    }
+
     // En attente : l'argent est gardé par Agrivoisin
     const releaseDate = payout.autoReleaseAt ? new Date(payout.autoReleaseAt) : null;
     const when = releaseDate && releaseDate.getTime() > Date.now()
@@ -377,7 +382,8 @@
     const radioName = 'kind-' + escapeHtml(String((payoutOverride && payoutOverride.payoutId) || orderId));
     const absentChoiceHtml = isSlot && !pickedUp
       ? '<label class="payout-report-label">Quel est le problème ?</label>' +
-        '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="absent"' + (slotEnded ? ' checked' : ' disabled') + '> Le vendeur n\'était pas là</label>' +
+        '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="absent"' + (slotEnded ? ' checked' : ' disabled') + '> Le vendeur n\'était pas là : je veux être remboursé</label>' +
+        '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="reschedule"' + (slotEnded ? '' : ' disabled') + '> Le vendeur n\'était pas là : je veux un autre créneau</label>' +
         (slotEnded ? '' : '<p class="payout-report-hint payout-kind-hint">Disponible à partir de ' + escapeHtml(formatParisMoment(payoutOverride.pickupEndAt)) + '.</p>') +
         '<label class="payout-kind"><input type="radio" name="' + radioName + '" value="other"' + (slotEnded ? '' : ' checked') + '> Autre problème</label>'
       : '';
@@ -398,7 +404,7 @@
             <textarea class="payout-report-reason" maxlength="1000" placeholder="Par exemple : les légumes étaient abîmés"></textarea>
           </div>
           <div class="payout-report-buttons">
-            <button type="button" class="btn btn-primary payout-report-send">${absentChoiceHtml && slotEnded ? 'Confirmer : vendeur absent' : 'Envoyer le signalement'}</button>
+            <button type="button" class="btn btn-primary payout-report-send">${absentChoiceHtml && slotEnded ? 'Confirmer : remboursement' : 'Envoyer le signalement'}</button>
             <button type="button" class="btn btn-ghost payout-report-cancel">Annuler</button>
           </div>
         </div>
@@ -429,7 +435,7 @@
       }).join('<br>');
 
       let codeHtml = '';
-      if (slot.status === 'en_attente') {
+      if (slot.status === 'en_attente' && !slot.rescheduleStatus) {
         if (slot.code) {
           codeHtml = '<div class="slot-code"><b>' + escapeHtml(String(slot.code).split('').join(' ')) + '</b><small>Donnez ce code au vendeur quand vous récupérez votre commande</small></div>';
         } else {
@@ -448,6 +454,13 @@
         renderPayoutSection(orderId, seller, slot) +
         '</div>';
     }).join('');
+  }
+
+  // Message gris : l'acheteur a demandé un autre créneau, le vendeur a jusqu'à la date indiquée pour en proposer un
+  function rescheduleWaitHtml(deadlineIso) {
+    return '<div class="slot-wait">Vous avez demandé un autre créneau. Le vendeur a jusqu\'au ' +
+      (deadlineIso ? escapeHtml(formatParisMoment(deadlineIso)) : 'lendemain') +
+      ' pour vous en proposer un. Sans réponse de sa part, vous serez remboursé.</div>';
   }
 
   async function sendPayoutAction(box, action, reason, kind) {
@@ -472,7 +485,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ action, orderId, sellerId, ...(payoutId ? { payoutId } : {}), ...(action === 'report' ? (kind === 'absent' ? { kind: 'absent' } : { reason }) : {}) }),
+        body: JSON.stringify({ action, orderId, sellerId, ...(payoutId ? { payoutId } : {}), ...(action === 'report' ? (kind === 'absent' || kind === 'reschedule' ? { kind } : { reason }) : {}) }),
       });
 
       const data = await response.json();
@@ -486,6 +499,12 @@
       if (data.status === 'rembourse') {
         const slotBox = box.closest('.slot-box');
         if (slotBox) slotBox.querySelectorAll('.slot-code, .slot-wait').forEach((el) => el.remove());
+      }
+      if (data.status === 'reschedule_requested') {
+        const slotBox = box.closest('.slot-box');
+        if (slotBox) slotBox.querySelectorAll('.slot-code, .slot-wait').forEach((el) => el.remove());
+        box.outerHTML = rescheduleWaitHtml(data.deadlineAt);
+        return;
       }
       box.outerHTML = data.status === 'rembourse' ? payoutRefundedHtml({ refundedAmount: data.refundedAmount }) : (data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml());
 
@@ -553,9 +572,10 @@
       kindRadios.forEach((radio) => {
         radio.addEventListener('change', () => {
           errorEl.style.display = 'none';
-          const absent = selectedKind() === 'absent';
-          otherEl.style.display = absent ? 'none' : '';
-          sendBtn.textContent = absent ? 'Confirmer : vendeur absent' : 'Envoyer le signalement';
+          const kind = selectedKind();
+          const noText = kind === 'absent' || kind === 'reschedule';
+          otherEl.style.display = noText ? 'none' : '';
+          sendBtn.textContent = kind === 'absent' ? 'Confirmer : remboursement' : (kind === 'reschedule' ? 'Demander un autre créneau' : 'Envoyer le signalement');
         });
       });
 
@@ -563,6 +583,12 @@
         if (selectedKind() === 'absent') {
           if (window.confirm("Confirmez-vous que le vendeur n'était pas là pendant le créneau ? Vous serez remboursé tout de suite, et cette action ne peut pas être annulée.")) {
             sendPayoutAction(box, 'report', '', 'absent');
+          }
+          return;
+        }
+        if (selectedKind() === 'reschedule') {
+          if (window.confirm("Demander un autre créneau ? Le vendeur aura 24 h pour vous en proposer un. Sans réponse de sa part, vous serez remboursé.")) {
+            sendPayoutAction(box, 'report', '', 'reschedule');
           }
           return;
         }

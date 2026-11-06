@@ -171,7 +171,29 @@
   .promo-buttons .btn { font-size:0.85rem; padding:8px 16px; }
   .promo-buttons .btn:disabled { opacity:0.5; cursor:not-allowed; }
   .my-empty { text-align:center; color:#6B5842; padding:24px 0; }
+  .del-overlay { position:fixed; inset:0; z-index:1000; background:rgba(30,40,30,0.55); display:none; align-items:center; justify-content:center; padding:16px; overflow-y:auto; }
+  .del-box { background:#fff; border-radius:24px; box-shadow:0 20px 50px rgba(0,0,0,0.25); padding:24px; width:100%; max-width:440px; box-sizing:border-box; max-height:calc(100vh - 32px); overflow-y:auto; }
+  .del-title { font-family:var(--font-display); color:var(--leaf-deep); font-size:1.25rem; margin:0 0 10px; }
+  .del-warn { background:#FFF4E0; border:2px solid #E8935C; border-radius:14px; padding:12px 14px; color:#7a3e12; font-weight:700; line-height:1.5; font-size:0.95rem; }
+  .del-warn .del-red { color:#C8352F; }
+  .del-warn .del-lines { font-weight:600; display:block; }
+  .del-actions { display:flex; gap:10px; justify-content:flex-end; align-items:center; margin-top:18px; }
+  #delOk { background:#4C7A50; box-shadow:0 4px 12px rgba(76,122,80,0.35); }
+  #delOk:hover { background:#2F5A33; }
+  .del-cancel { background:none; border:0; cursor:pointer; color:var(--leaf-deep); font-weight:700; font-size:0.95rem; font-family:inherit; padding:10px 8px; }
 </style>
+
+<!-- Avertissement avant de supprimer une annonce qui a encore des commandes à honorer -->
+<div id="delOverlay" class="del-overlay" role="dialog" aria-modal="true" aria-labelledby="delTitle">
+  <div class="del-box">
+    <h2 id="delTitle" class="del-title"></h2>
+    <div class="del-warn" id="delWarn"></div>
+    <div class="del-actions">
+      <button type="button" id="delCancel" class="del-cancel">Annuler</button>
+      <button type="button" id="delOk" class="btn btn-primary">Supprimer quand même</button>
+    </div>
+  </div>
+</div>
 
 <script src="script.js"></script>
 <script>
@@ -613,13 +635,44 @@
 
   let deleting = false;
 
+  // La boîte d'avertissement : une ligne par créneau de retrait, « à expédier » pour les colis. Rend true (supprimer) ou false (annuler).
+  function askDeleteWithOrders(honor) {
+    return new Promise(function (resolve) {
+      const overlay = document.getElementById('delOverlay');
+      const many = Number(honor.orders) > 1;
+      document.getElementById('delTitle').textContent = 'Supprimer « ' + (honor.title || 'cette annonce') + ' » ?';
+      document.getElementById('delWarn').innerHTML =
+        'Votre annonce va être cachée, mais <span class="del-red">' +
+        (many ? 'vous avez des commandes à honorer' : 'vous avez une commande à honorer') +
+        '</span> :<span class="del-lines">' +
+        honor.lines.map(function (line) { return '• ' + escapeHtml(line); }).join('<br>') +
+        '</span>';
+      overlay.style.display = 'flex';
+
+      function done(answer) {
+        overlay.style.display = 'none';
+        document.getElementById('delOk').removeEventListener('click', onOk);
+        document.getElementById('delCancel').removeEventListener('click', onCancel);
+        overlay.removeEventListener('click', onOverlay);
+        document.removeEventListener('keydown', onKey);
+        resolve(answer);
+      }
+      function onOk() { done(true); }
+      function onCancel() { done(false); }
+      function onOverlay(e) { if (e.target === overlay) done(false); }
+      function onKey(e) { if (e.key === 'Escape') done(false); }
+      document.getElementById('delOk').addEventListener('click', onOk);
+      document.getElementById('delCancel').addEventListener('click', onCancel);
+      overlay.addEventListener('click', onOverlay);
+      document.addEventListener('keydown', onKey);
+    });
+  }
+
   container.addEventListener('click', async function (e) {
     const deleteBtn = e.target.closest('.delete-btn');
     if (!deleteBtn || deleting) return;
     const card = deleteBtn.closest('.listing-card');
     if (!card) return;
-
-    if (!confirm('Supprimer définitivement cette annonce ?')) return;
 
     const listingId = card.getAttribute('data-id');
     deleting = true;
@@ -628,6 +681,31 @@
     try {
       const { data: { session } } = await supabaseClient.auth.getSession();
       if (!session) throw new Error('Session expirée, reconnectez-vous.');
+
+      // Y a-t-il des commandes à honorer ? Si oui, on avertit le vendeur avec la boîte ci-dessous ; sinon, la confirmation habituelle
+      let honor = null;
+      try {
+        const check = await fetch('/api/update-listing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+          body: JSON.stringify({ action: 'delete_check', listingId: listingId }),
+        });
+        if (check.ok) honor = await check.json();
+      } catch (checkError) {
+        honor = null;
+      }
+
+      let agreed;
+      if (honor && Array.isArray(honor.lines) && honor.lines.length > 0) {
+        agreed = await askDeleteWithOrders(honor);
+      } else {
+        agreed = confirm('Supprimer définitivement cette annonce ?');
+      }
+      if (!agreed) {
+        deleteBtn.disabled = false;
+        deleting = false;
+        return;
+      }
 
       const r = await fetch('/api/update-listing', {
         method: 'POST',

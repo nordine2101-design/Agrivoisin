@@ -285,6 +285,9 @@
       if (Number(m.monthlyFee) > 0) {
         html += line('Frais de service du mois', '− ' + formatAmount(m.monthlyFee));
       }
+      if (Number(m.refundFees) > 0) {
+        html += line('Frais de carte d\'un retrait annulé', '− ' + formatAmount(m.refundFees));
+      }
       html += line('Vous recevez', formatAmount(m.received), 'money-total');
       return '<div class="money-detail">' + html + '</div>';
     }
@@ -406,7 +409,10 @@
           : '<div class="pickup-done">Argent versé' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>';
       } else if (slot.status === 'rembourse') {
         body = slot.cancelReason === 'vendeur_absent'
-          ? '<div class="money-box money-refunded">Annulée : absence de votre part. L\'acheteur a été remboursé. Vous pouvez contester via la page Contact.</div>'
+          ? '<div class="money-box money-refunded">Annulée : absence de votre part. L\'acheteur a été remboursé. Vous pouvez contester via la page Contact.' + (slot.refundFee
+              ? '<div class="money-detail" style="color:#3b4a7a"><div class="money-line"><span>Frais de carte du remboursement</span><span class="money-amount">− ' + escapeHtml(formatAmount(slot.refundFee.amount)) + '</span></div>' +
+                '<p class="money-note" style="margin-top:4px">' + (slot.refundFee.collected ? 'Stripe ne rend pas ces frais. Ils ont été retirés d\'un de vos versements.' : 'Stripe ne rend pas ces frais. Ils seront retirés de votre prochain versement.') + '</p></div>'
+              : '') + '</div>'
           : '<div class="money-box money-refunded">Commande remboursée à l\'acheteur après un problème signalé : cette vente ne vous sera pas versée.</div>';
       } else if (slot.status === 'probleme') {
         body = '<div class="money-box money-problem">Problème signalé par l\'acheteur : le versement est suspendu le temps qu\'Agrivoisin examine la situation.</div>';

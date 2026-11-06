@@ -468,7 +468,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, cancel_reason, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents')
+      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, cancel_reason, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents, refund_fee_cents, refund_fee_collected_at')
       .eq('seller_id', seller.id)
       .in('order_id', shownOrderIds);
 
@@ -477,6 +477,23 @@ export default async function handler(req, res) {
       console.error('Erreur Supabase (versements) :', payoutsError);
     } else {
       payouts = payoutsData || [];
+    }
+
+    // Les frais de carte des remboursements « vendeur absent », retirés de chacun de ces versements (pas bloquant)
+    const refundFeesByPayout = {};
+    if (payouts.length > 0) {
+      const { data: collectedRows, error: collectedError } = await supabase
+        .from('payouts')
+        .select('refund_fee_cents, refund_fee_collected_by')
+        .eq('seller_id', seller.id)
+        .in('refund_fee_collected_by', payouts.map((p) => String(p.id)));
+      if (collectedError) {
+        console.error('Erreur Supabase (frais de remboursement) :', collectedError);
+      } else {
+        (collectedRows || []).forEach((r) => {
+          refundFeesByPayout[r.refund_fee_collected_by] = (refundFeesByPayout[r.refund_fee_collected_by] || 0) + (Number(r.refund_fee_cents) || 0);
+        });
+      }
     }
 
     // Les frais de service mensuel de CE vendeur déjà payés, mois par mois (pour dire ce qu'il reste à payer).
@@ -547,6 +564,7 @@ export default async function handler(req, res) {
             flatFee: toEuros(flatFeeCents),
             cardFee: toEuros(row.stripe_fee_cents),
             monthlyFee: toEuros(row.monthly_fee_cents),
+            refundFees: toEuros(refundFeesByPayout[String(row.id)] || 0),
             received: row.seller_cents == null ? null : toEuros(row.seller_cents),
           };
         }
@@ -603,6 +621,10 @@ export default async function handler(req, res) {
           autoReleaseAt: p.auto_release_at || null,
           releasedAt: p.released_at || null,
           cancelReason: p.cancel_reason || null,
+          // Frais de carte du remboursement à la charge du vendeur (absence) : montant, et déjà retiré ou non
+          refundFee: p.status === 'rembourse' && p.cancel_reason === 'vendeur_absent' && Number(p.refund_fee_cents) > 0
+            ? { amount: toEuros(p.refund_fee_cents), collected: !!p.refund_fee_collected_at }
+            : null,
           locked: attempts >= MAX_CODE_ATTEMPTS,
           attemptsLeft: Math.max(0, MAX_CODE_ATTEMPTS - attempts),
           items: Object.values(slotItems),

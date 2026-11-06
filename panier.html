@@ -859,7 +859,7 @@
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + session.access_token,
         },
-        body: JSON.stringify({ cart, delivery }),
+        body: JSON.stringify({ cart, delivery, pickupRulesAccepted: needsPickupRules && pickupBox.checked }),
       });
 
       // Session expirée : retour par la connexion

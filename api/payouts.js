@@ -652,12 +652,14 @@ async function reportSellerAbsent(res, payout) {
 }
 
 // ---------------------------------------------------------------------------
-// « Le vendeur n'était pas là, je veux un autre créneau » : mêmes conditions que l'absence (à partir de la FIN du créneau,
-// code pas encore validé). Rien n'est remboursé : le vendeur a 24 h pour proposer un nouveau créneau. Une seule demande
-// par retrait. L'absence est gardée (absence_reported_at) comme pour un remboursement. L'argent reste bloqué :
+// « Le vendeur n'était pas là, je veux un autre créneau » : possible à partir de la FIN du créneau et jusqu'à 24 h après
+// (code pas encore validé). Passé ce délai, il ne reste que le remboursement. Rien n'est remboursé tout de suite :
+// le vendeur a jusqu'à la fin de ces 24 h pour proposer un nouveau créneau. Une seule demande par retrait.
+// L'absence est gardée (absence_reported_at) comme pour un remboursement. L'argent reste bloqué :
 // le versement automatique est repoussé de 14 jours le temps que la demande soit réglée.
 // ---------------------------------------------------------------------------
-const RESCHEDULE_SELLER_HOURS = 24;
+// Un autre créneau ne se demande que dans les 24 h qui suivent la FIN du premier créneau ; le vendeur a jusque-là pour répondre.
+const RESCHEDULE_WINDOW_HOURS = 24;
 const RESCHEDULE_BRAKE_DAYS = 14;
 
 async function requestReschedule(res, payout) {
@@ -675,6 +677,10 @@ async function requestReschedule(res, payout) {
   }
   if (new Date(payout.pickup_end_at).getTime() > Date.now()) {
     return res.status(409).json({ error: "Vous pourrez le demander à partir du " + formatParisMoment(payout.pickup_end_at) + '.' });
+  }
+  const limitMs = new Date(payout.pickup_end_at).getTime() + RESCHEDULE_WINDOW_HOURS * 60 * 60 * 1000;
+  if (Date.now() > limitMs) {
+    return res.status(409).json({ error: 'Trop tard : plus de 24 h se sont écoulées depuis la fin du créneau. Un autre créneau n\'est plus possible, vous pouvez seulement être remboursé. Actualisez la page.' });
   }
 
   const now = new Date();
@@ -702,7 +708,7 @@ async function requestReschedule(res, payout) {
     return res.status(409).json({ error: 'Cette commande vient de changer d\'état. Actualisez la page.' });
   }
 
-  const deadline = new Date(now.getTime() + RESCHEDULE_SELLER_HOURS * 60 * 60 * 1000).toISOString();
+  const deadline = new Date(limitMs).toISOString();
   return res.status(200).json({ status: 'reschedule_requested', requestedAt: nowIso, deadlineAt: deadline });
 }
 

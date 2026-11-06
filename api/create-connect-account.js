@@ -339,6 +339,8 @@ async function handleShop(action, body, res, userId) {
       .from('listings')
       .select('id')
       .eq('seller_id', seller.id)
+      // Une annonce cachée (commande en cours) ne peut pas servir d'entrée vers la vitrine
+      .is('withdrawn_at', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

@@ -12,6 +12,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 //   GET  /api/update-listing?id=...  -> renvoie l'annonce (et ses horaires de retrait) pour remplir le formulaire
 //   POST /api/update-listing         -> enregistre les modifications
 //   POST /api/update-listing avec { action: 'delete', listingId } -> supprime l'annonce (ou, s'il y a une commande en cours, la RETIRE de la vente : elle est cachée aux acheteurs et gardée jusqu'à la fin de la commande)
+//   POST /api/update-listing avec { action: 'delete_check', listingId } -> ce qu'il reste à honorer avant de supprimer (ne change rien)
 //   (une récolte « Bientôt mûr » ne peut plus être supprimée ni modifiée après 3 h)
 //   POST /api/update-listing avec { action: 'open_sale', listingId } -> ouvre la vente d'une récolte « Bientôt mûr »
 //   POST /api/update-listing avec { action: 'cancel_info' | 'cancel_harvest', listingId } -> annule une récolte « Bientôt mûr » (après 3 h)
@@ -90,6 +91,90 @@ async function hasOpenOrders(listingId) {
     }
   }
   return false;
+}
+
+// Les commandes que le vendeur doit encore honorer pour cette annonce (retraits pas encore validés par le code, colis pas encore expédiés).
+// Une ligne par créneau de retrait, plus une ligne « à expédier ». Jamais le nom d'un acheteur.
+const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+function pluralWord(word) {
+  if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+  if (/[sxz]$/i.test(word)) return word;
+  if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+  return word + 's';
+}
+
+function unitLabel(unit, count) {
+  const u = String(unit == null ? '' : unit).trim() || 'kg';
+  if (count <= 1) return u;
+  const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+  if (withDe) return pluralWord(withDe[1]) + withDe[2];
+  if (/[\s\d]/.test(u)) return u;
+  return pluralWord(u);
+}
+
+function parisParts(iso) {
+  const parts = {};
+  new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+  return parts;
+}
+
+function hourText(parts) {
+  return parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
+}
+
+async function ordersToHonor(listingId, unit) {
+  const { data: items, error: itemsError } = await supabase
+    .from('order_items')
+    .select('id, order_id, seller_id, payout_id, delivery_mode')
+    .eq('listing_id', listingId);
+  if (itemsError) throw itemsError;
+  const withPayout = (items || []).filter((it) => it.payout_id);
+  if (withPayout.length === 0) return { lines: [], orders: 0 };
+
+  const payoutIds = [...new Set(withPayout.map((it) => it.payout_id))];
+  const { data: payouts, error: payoutsError } = await supabase
+    .from('payouts')
+    .select('id, status, pickup_start_at, pickup_end_at, picked_up_at, shipped_at')
+    .in('id', payoutIds)
+    .in('status', OPEN_PAYOUT_STATUSES);
+  if (payoutsError) throw payoutsError;
+  const byId = {};
+  (payouts || []).forEach((p) => { byId[p.id] = p; });
+
+  const slots = {};
+  let toShip = 0;
+  const honored = new Set();
+  withPayout.forEach((it) => {
+    const p = byId[it.payout_id];
+    if (!p) return;
+    if (it.delivery_mode === 'expedition') {
+      if (p.shipped_at) return;
+      toShip += 1;
+      honored.add(p.id);
+      return;
+    }
+    if (p.picked_up_at) return;
+    const key = p.pickup_start_at ? p.pickup_start_at + '|' + (p.pickup_end_at || '') : 'sans-creneau';
+    if (!slots[key]) slots[key] = { start: p.pickup_start_at, end: p.pickup_end_at, count: 0 };
+    slots[key].count += 1;
+    honored.add(p.id);
+  });
+
+  const lines = Object.values(slots)
+    .sort((a, b) => String(a.start || '').localeCompare(String(b.start || '')))
+    .map((slot) => {
+      const qty = slot.count + ' ' + unitLabel(unit, slot.count);
+      if (!slot.start) return 'retrait : ' + qty;
+      const a = parisParts(slot.start);
+      const when = 'le ' + a.weekday + ' ' + a.day + ' ' + a.month;
+      if (!slot.end) return when + ', à partir de ' + hourText(a) + ' : ' + qty;
+      return when + ', de ' + hourText(a) + ' à ' + hourText(parisParts(slot.end)) + ' : ' + qty;
+    });
+  if (toShip > 0) lines.push('à expédier : ' + toShip + ' ' + unitLabel(unit, toShip));
+  return { lines, orders: honored.size };
 }
 
 // Catégories que les particuliers peuvent vendre (produits frais, non transformés).
@@ -282,7 +367,7 @@ export default async function handler(req, res) {
     if (existing.availability_status === 'bientot_mur' && existing.created_at && postAction !== 'open_sale' && postAction !== 'cancel_info' && postAction !== 'cancel_harvest'
         && Date.now() >= new Date(existing.created_at).getTime() + 3 * 60 * 60 * 1000) {
       return res.status(400).json({
-        error: postAction === 'delete'
+        error: (postAction === 'delete' || postAction === 'delete_check')
           ? "Cette récolte est visible des acheteurs depuis plus de 3 h : vous ne pouvez plus la supprimer. Utilisez « Annuler cette récolte »."
           : "Cette récolte est visible des acheteurs depuis plus de 3 h : vous ne pouvez plus la modifier. Utilisez « Annuler cette récolte » si vous ne pouvez pas la tenir.",
       });
@@ -334,6 +419,13 @@ export default async function handler(req, res) {
 
       const total = await countRecentCancellations(seller.id);
       return res.status(200).json({ success: true, cancellations: total, blocked: total > CANCEL_TOLERATED, blockDays: CANCEL_BLOCK_DAYS });
+    }
+
+    // ---------- POST « delete_check » : avant de supprimer, que reste-t-il à honorer ? (ne change rien) ----------
+    if ((req.body || {}).action === 'delete_check') {
+      const { data: unitRow } = await supabase.from('listings').select('unit').eq('id', existing.id).maybeSingle();
+      const honor = await ordersToHonor(existing.id, unitRow ? unitRow.unit : null);
+      return res.status(200).json({ lines: honor.lines, orders: honor.orders, title: existing.title });
     }
 
     // ---------- POST « delete » : supprimer l'annonce (remplace l'ancienne fonction delete-listing) ----------

@@ -154,7 +154,21 @@ async function releasePayout(payoutId, fromStatuses, restoreStatus = 'en_attente
       throw new Error('Frais de service mensuels : ' + monthlyFeeError.message);
     }
     const monthlyFeeCents = Math.max(0, Math.min(Number(collectedFee) || 0, available));
-    const sellerCents = beforeMonthlyFee - monthlyFeeCents;
+
+    // Les frais de carte des remboursements « vendeur absent » de CE vendeur, jamais rendus par Stripe :
+    // retirés ici, sans dépasser ce que rapporte ce versement (le reste attend le suivant).
+    // Un versement retenté ne paie jamais deux fois (la fonction rend le même montant).
+    const availableForRefundFees = Math.max(beforeMonthlyFee - monthlyFeeCents, 0);
+    const { data: collectedRefundFees, error: refundFeesError } = await supabase.rpc('collect_refund_fees', {
+      p_seller_id: String(payout.seller_id),
+      p_payout_id: String(payout.id),
+      p_available_cents: availableForRefundFees,
+    });
+    if (refundFeesError) {
+      throw new Error('Frais de remboursement : ' + refundFeesError.message);
+    }
+    const refundFeesCents = Math.max(0, Math.min(Number(collectedRefundFees) || 0, availableForRefundFees));
+    const sellerCents = beforeMonthlyFee - monthlyFeeCents - refundFeesCents;
 
     // 5. Montant nul après commission et frais : rien à envoyer
     if (sellerCents <= 0) {
@@ -432,6 +446,27 @@ async function adminRefund(res, payout, note, extra = {}) {
     return res.status(502).json({ error: 'Stripe a refusé le remboursement : ' + err.message });
   }
 
+  // Remboursement pour absence du vendeur : Stripe ne rend pas ses frais de carte, c'est le vendeur qui les paie
+  // (retirés de son prochain versement). Part des frais correspondant aux produits remboursés, calculée comme pour un versement.
+  // Jamais bloquant : si le calcul échoue, le remboursement est enregistré quand même (Agrivoisin absorbe).
+  let refundFeeCents = null;
+  if (extra.cancelReason === 'vendeur_absent') {
+    try {
+      const charge = await stripe.charges.retrieve(chargeId, { expand: ['balance_transaction'] });
+      const bt = charge.balance_transaction;
+      const totalFee = bt && typeof bt === 'object' ? bt.fee : null;
+      const { data: siblingRows } = await supabase.from('payouts').select('amount_cents, shipping_cents').eq('order_id', payout.order_id);
+      if (totalFee !== null && totalFee !== undefined && siblingRows && siblingRows.length > 0) {
+        const orderTotal = siblingRows.reduce((sum, row) => sum + (Number(row.amount_cents) || 0) + (Number(row.shipping_cents) || 0), 0);
+        const chargedTotal = Math.max(Number(charge.amount) || 0, orderTotal);
+        const sellerPart = (Number(payout.amount_cents) || 0) + (Number(payout.shipping_cents) || 0);
+        refundFeeCents = chargedTotal > 0 ? Math.floor((totalFee * sellerPart) / chargedTotal) : 0;
+      }
+    } catch (feeError) {
+      console.error(`Frais de carte du remboursement ${payout.id} non calculés (Agrivoisin les absorbe) :`, feeError.message);
+    }
+  }
+
   const { data: updated, error: updateError } = await supabase
     .from('payouts')
     .update({
@@ -442,6 +477,7 @@ async function adminRefund(res, payout, note, extra = {}) {
       stripe_refund_id: refund.id,
       resolution_note: note || null,
       ...(extra.cancelReason ? { cancel_reason: extra.cancelReason } : {}),
+      ...(refundFeeCents !== null ? { refund_fee_cents: refundFeeCents } : {}),
       last_error: null,
     })
     .eq('id', payout.id)

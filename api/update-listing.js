@@ -11,7 +11,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 // Cette fonction sert à modifier une annonce depuis « Mes annonces » :
 //   GET  /api/update-listing?id=...  -> renvoie l'annonce (et ses horaires de retrait) pour remplir le formulaire
 //   POST /api/update-listing         -> enregistre les modifications
-//   POST /api/update-listing avec { action: 'delete', listingId } -> supprime l'annonce
+//   POST /api/update-listing avec { action: 'delete', listingId } -> supprime l'annonce (ou, s'il y a une commande en cours, la RETIRE de la vente : elle est cachée aux acheteurs et gardée jusqu'à la fin de la commande)
 //   (une récolte « Bientôt mûr » ne peut plus être supprimée ni modifiée après 3 h)
 //   POST /api/update-listing avec { action: 'open_sale', listingId } -> ouvre la vente d'une récolte « Bientôt mûr »
 //   POST /api/update-listing avec { action: 'cancel_info' | 'cancel_harvest', listingId } -> annule une récolte « Bientôt mûr » (après 3 h)
@@ -45,6 +45,51 @@ async function countRecentCancellations(sellerId) {
     .gte('cancelled_at', since);
   if (error) throw error;
   return (data || []).length;
+}
+
+// Une commande est « en cours » tant que l'argent de son retrait n'est ni versé ni remboursé
+const OPEN_PAYOUT_STATUSES = ['en_attente', 'en_cours', 'probleme'];
+
+// Cette annonce a-t-elle une commande en cours ? (on garde alors l'annonce, cachée, jusqu'à la fin de la commande)
+async function hasOpenOrders(listingId) {
+  const { data: items, error: itemsError } = await supabase
+    .from('order_items')
+    .select('order_id, seller_id, payout_id')
+    .eq('listing_id', listingId);
+  if (itemsError) throw itemsError;
+  if (!items || items.length === 0) return false;
+
+  // Les commandes récentes : chaque article est rattaché à son versement
+  const payoutIds = [...new Set(items.map((it) => it.payout_id).filter(Boolean))];
+  if (payoutIds.length > 0) {
+    const { data: rows, error: rowsError } = await supabase
+      .from('payouts')
+      .select('id')
+      .in('id', payoutIds)
+      .in('status', OPEN_PAYOUT_STATUSES)
+      .limit(1);
+    if (rowsError) throw rowsError;
+    if (rows && rows.length > 0) return true;
+  }
+
+  // Les anciennes commandes (article sans versement noté) : on regarde les versements du vendeur sur cette commande
+  const legacy = items.filter((it) => !it.payout_id);
+  if (legacy.length > 0) {
+    const orderIds = [...new Set(legacy.map((it) => it.order_id).filter(Boolean))];
+    const sellerIds = [...new Set(legacy.map((it) => it.seller_id).filter(Boolean))];
+    if (orderIds.length > 0 && sellerIds.length > 0) {
+      const { data: rows, error: rowsError } = await supabase
+        .from('payouts')
+        .select('id')
+        .in('order_id', orderIds)
+        .in('seller_id', sellerIds)
+        .in('status', OPEN_PAYOUT_STATUSES)
+        .limit(1);
+      if (rowsError) throw rowsError;
+      if (rows && rows.length > 0) return true;
+    }
+  }
+  return false;
 }
 
 // Catégories que les particuliers peuvent vendre (produits frais, non transformés).
@@ -189,7 +234,7 @@ export default async function handler(req, res) {
     // L'annonce doit exister et appartenir à ce vendeur
     const { data: existing, error: existingError } = await supabase
       .from('listings')
-      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, quantity_available, pro_attested_at, is_bio, delivery_mode, shipping_tiers, availability_status, created_at, planned_date')
+      .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, quantity_available, pro_attested_at, is_bio, delivery_mode, shipping_tiers, availability_status, created_at, planned_date, withdrawn_at')
       .eq('id', listingId)
       .single();
 
@@ -198,6 +243,14 @@ export default async function handler(req, res) {
     }
     if (existing.seller_id !== seller.id) {
       return res.status(403).json({ error: "Vous n'êtes pas autorisé à modifier cette annonce." });
+    }
+
+    // Annonce déjà retirée de la vente (commande en cours) : le vendeur ne la voit plus, rien ne peut s'y faire
+    if (existing.withdrawn_at) {
+      if ((req.body || {}).action === 'delete') {
+        return res.status(200).json({ success: true, withdrawn: true });
+      }
+      return res.status(404).json({ error: 'Annonce introuvable.' });
     }
 
     // ---------- GET : les informations actuelles, pour remplir le formulaire ----------
@@ -285,6 +338,20 @@ export default async function handler(req, res) {
 
     // ---------- POST « delete » : supprimer l'annonce (remplace l'ancienne fonction delete-listing) ----------
     if ((req.body || {}).action === 'delete') {
+      // Avec une commande en cours, l'annonce n'est PAS effacée : elle est retirée de la vente (cachée aux acheteurs)
+      // et gardée jusqu'à la fin de la commande, pour que l'acheteur retrouve son produit et ses horaires.
+      if (await hasOpenOrders(existing.id)) {
+        const { error: withdrawError } = await supabase
+          .from('listings')
+          .update({ withdrawn_at: new Date().toISOString() })
+          .eq('id', existing.id)
+          .eq('seller_id', seller.id)
+          .is('withdrawn_at', null);
+        if (withdrawError) throw withdrawError;
+
+        return res.status(200).json({ success: true, withdrawn: true });
+      }
+
       const { error: deleteError } = await supabase
         .from('listings')
         .delete()

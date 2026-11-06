@@ -77,6 +77,11 @@
           <span>J'ai lu et j'accepte les <a href="cgv.html" target="_blank" rel="noopener" style="text-decoration:underline;">conditions générales</a>.</span>
         </label>
         <p id="cartTermsError" style="display:none;color:#C8352F;font-size:0.9rem;margin:0 0 10px;">Cochez la case ci-dessus pour pouvoir payer.</p>
+        <label class="cart-terms" id="pickupRulesLabel" style="display:none;align-items:flex-start;gap:10px;margin:0 0 10px;font-size:0.9rem;line-height:1.5;cursor:pointer;text-align:left;">
+          <input type="checkbox" id="acceptPickupRules" style="width:auto;margin:4px 0 0;flex-shrink:0;">
+          <span>Je retirerai ma commande pendant le créneau indiqué. Si je ne viens pas, le prix reste dû au vendeur.</span>
+        </label>
+        <p id="pickupRulesError" style="display:none;color:#C8352F;font-size:0.9rem;margin:0 0 10px;">Cochez la case ci-dessus pour pouvoir payer.</p>
         <button class="btn btn-primary cart-checkout-btn" id="checkoutBtn">Payer ma commande</button>
 
         <p class="product-trust-note" id="cartTrustNote" style="margin-top:20px;">
@@ -226,6 +231,9 @@
     return pluralWord(u);
   }
 
+  // Les catégories de produits frais (les autres sont des produits qui se conservent, vendus par des professionnels)
+  const FRESH_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin'];
+
   // Le choix « retrait » ou « expédition » de l'acheteur pour chaque annonce, gardé dans le navigateur
   function getDelivery() {
     try {
@@ -343,6 +351,8 @@
           multi: true, // plusieurs colis toujours possibles : l'acheteur paie les frais de chaque colis
           // L'annonce n'apparaît plus sur le site (épuisée, supprimée, vendeur incomplet) : elle n'est plus achetable
           unavailable: !!(listingInfoLoaded && item.listingId && !info),
+          // Produit frais (fruits, légumes, aromates, fleurs du jardin) : sans information sur l'annonce, on le considère frais par prudence
+          fresh: !info || !info.category || FRESH_CATEGORIES.includes(info.category),
         };
         groups.push(byKey[key]);
       }
@@ -371,6 +381,7 @@
   let cartHasProblem = false;
   let belowMinimum = false;
   let anyShipping = false;
+  let needsPickupRules = false;
 
   function updateCheckoutButton() {
     const btn = document.getElementById('checkoutBtn');
@@ -431,6 +442,7 @@
     let problem = false;
     let anyShip = false;
     let anyPickup = false;
+    let anyFreshPickup = false;
     const shipParts = [];
 
     groupCart(cart).forEach((g) => {
@@ -565,6 +577,7 @@
         }
       } else {
         anyPickup = true;
+        if (g.fresh) anyFreshPickup = true;
       }
 
       if (g.deliveryMode !== 'retrait') {
@@ -667,6 +680,11 @@
     // Les adresses des vendeurs ne sont communiquées que pour les retraits
     document.getElementById('cartTrustNote').style.display = anyPickup ? '' : 'none';
 
+    // La règle du retrait n'est demandée que s'il y a un produit frais à retirer chez le vendeur
+    needsPickupRules = anyFreshPickup;
+    document.getElementById('pickupRulesLabel').style.display = anyFreshPickup ? 'flex' : 'none';
+    if (!anyFreshPickup) document.getElementById('pickupRulesError').style.display = 'none';
+
     // Ligne des frais d'expédition dans le récapitulatif
     const shipRow = document.getElementById('cartShipRow');
     if (anyShip) {
@@ -703,7 +721,7 @@
         throw new Error('liste des annonces indisponible');
       }
       data.listings.forEach((l) => {
-        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price, lot_quantity: l.lot_quantity, lot_price: l.lot_price, delivery_mode: l.delivery_mode, shipping_tiers: l.shipping_tiers, multi_parcel: l.multi_parcel };
+        listingInfo[String(l.id)] = { unit: l.unit, quantity_available: l.quantity_available, price: l.price, lot_quantity: l.lot_quantity, lot_price: l.lot_price, delivery_mode: l.delivery_mode, shipping_tiers: l.shipping_tiers, multi_parcel: l.multi_parcel, category: l.category };
       });
       listingInfoLoaded = true;
       renderCart();
@@ -796,6 +814,16 @@
     }
     termsError.style.display = 'none';
 
+    // Produit frais à retirer : la règle du retrait doit aussi être acceptée
+    const pickupBox = document.getElementById('acceptPickupRules');
+    const pickupError = document.getElementById('pickupRulesError');
+    if (needsPickupRules && !pickupBox.checked) {
+      pickupError.style.display = 'block';
+      pickupBox.focus();
+      return;
+    }
+    pickupError.style.display = 'none';
+
     const cart = getCart();
 
     // Expédition : l'adresse de livraison doit être complète (le serveur la vérifie aussi)
@@ -852,6 +880,10 @@
       alert('Erreur : ' + err.message);
       updateCheckoutButton();
     }
+  });
+
+  document.getElementById('acceptPickupRules').addEventListener('change', function () {
+    if (this.checked) document.getElementById('pickupRulesError').style.display = 'none';
   });
 
   document.getElementById('acceptCartTerms').addEventListener('change', function () {

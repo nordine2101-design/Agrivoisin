@@ -319,6 +319,10 @@
   // Commande remboursée par Agrivoisin après un problème : plus aucun bouton, le vendeur n'est pas payé
   function payoutRefundedHtml(payout) {
     const amount = payout && payout.refundedAmount != null ? ' : ' + formatAmount(payout.refundedAmount) : '';
+    // Remboursé juste après avoir cliqué trop tard pour demander un autre créneau
+    if (payout && payout.late) {
+      return '<div class="payout-box payout-refunded"><p>Trop tard : plus de 24 h se sont écoulées depuis la fin du créneau. Vous avez été automatiquement remboursé' + escapeHtml(amount) + '. Le remboursement est fait sur la carte utilisée pour le paiement.</p></div>';
+    }
     return '<div class="payout-box payout-refunded"><p>Commande remboursée' + escapeHtml(amount) + '. Le remboursement est fait sur la carte utilisée pour le paiement.</p></div>';
   }
 
@@ -379,17 +383,20 @@
     // Retrait avec créneau, pas encore retiré : l'acheteur choisit « Le vendeur n'était pas là » (possible après la fin du créneau) ou « Autre problème »
     const endsAt = isSlot ? new Date(payoutOverride.pickupEndAt) : null;
     const slotEnded = !!(endsAt && !Number.isNaN(endsAt.getTime()) && endsAt.getTime() <= Date.now());
+    // Un autre créneau ne se demande que dans les 24 h qui suivent la fin du premier : après, il ne reste que le remboursement
+    const rescheduleLate = !!(slotEnded && endsAt.getTime() + 24 * 60 * 60 * 1000 < Date.now());
     const radioName = 'kind-' + escapeHtml(String((payoutOverride && payoutOverride.payoutId) || orderId));
     const absentChoiceHtml = isSlot && !pickedUp
       ? '<label class="payout-report-label">Quel est le problème ?</label>' +
         '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="absent"' + (slotEnded ? ' checked' : ' disabled') + '> Le vendeur n\'était pas là : je veux être remboursé</label>' +
-        '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="reschedule"' + (slotEnded ? '' : ' disabled') + '> Le vendeur n\'était pas là : je veux un autre créneau</label>' +
+        (rescheduleLate ? '' : '<label class="payout-kind' + (slotEnded ? '' : ' payout-kind-off') + '"><input type="radio" name="' + radioName + '" value="reschedule"' + (slotEnded ? '' : ' disabled') + '> Le vendeur n\'était pas là : je veux un autre créneau</label>') +
+        (rescheduleLate ? '<p class="payout-report-hint payout-kind-hint">Plus de 24 h se sont écoulées depuis la fin du créneau : un autre créneau n\'est plus possible.</p>' : '') +
         (slotEnded ? '' : '<p class="payout-report-hint payout-kind-hint">Disponible à partir de ' + escapeHtml(formatParisMoment(payoutOverride.pickupEndAt)) + '.</p>') +
         '<label class="payout-kind"><input type="radio" name="' + radioName + '" value="other"' + (slotEnded ? '' : ' checked') + '> Autre problème</label>'
       : '';
 
     return `
-      <div class="payout-box" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(seller.sellerId)}"${payoutOverride && payoutOverride.payoutId ? ' data-payout-id="' + escapeHtml(payoutOverride.payoutId) + '"' : ''}>
+      <div class="payout-box" data-order-id="${escapeHtml(orderId)}" data-seller-id="${escapeHtml(seller.sellerId)}"${rescheduleLate ? ' data-late="1"' : ''}${payoutOverride && payoutOverride.payoutId ? ' data-payout-id="' + escapeHtml(payoutOverride.payoutId) + '"' : ''}>
         <p>${intro}</p>
         <div class="payout-actions">
           ${notShippedYet || isSlot ? '' : '<button type="button" class="btn btn-primary payout-confirm-btn">J\'ai bien reçu ma commande</button>'}
@@ -506,7 +513,7 @@
         box.outerHTML = rescheduleWaitHtml(data.deadlineAt);
         return;
       }
-      box.outerHTML = data.status === 'rembourse' ? payoutRefundedHtml({ refundedAmount: data.refundedAmount }) : (data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml());
+      box.outerHTML = data.status === 'rembourse' ? payoutRefundedHtml({ refundedAmount: data.refundedAmount, late: box.dataset.late === '1' && kind === 'absent' }) : (data.status === 'probleme' ? payoutProblemHtml() : payoutDoneHtml());
 
       // Plus rien à retirer chez ce vendeur : son adresse disparaît de l'écran (et le serveur ne la renverra plus)
       const stillOpen = sellerBlock ? sellerBlock.querySelectorAll('.payout-box[data-order-id]').length : 0;

@@ -389,6 +389,70 @@
     return parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
   }
 
+  // ---------- Autre créneau demandé par l'acheteur ----------
+
+  // Les créneaux que le vendeur peut proposer, par pas de 30 min : au moins 1 h après maintenant, jamais après la limite
+  // (fin du premier créneau + 24 h). Chaque choix garde le vrai moment : aucun calcul d'heure d'été à faire.
+  const reschChoices = {};
+
+  function parisDayKey(iso) {
+    return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(iso));
+  }
+
+  function buildReschChoices(deadlineIso) {
+    const STEP = 30 * 60 * 1000;
+    const limit = new Date(deadlineIso).getTime();
+    const first = Math.ceil((Date.now() + 60 * 60 * 1000 + 2 * 60 * 1000) / STEP) * STEP;
+    const list = [];
+    for (let t = first; t <= limit; t += STEP) list.push(new Date(t).toISOString());
+    if (list.length === 0 || new Date(list[list.length - 1]).getTime() < limit) {
+      if (limit >= first) list.push(new Date(limit).toISOString());
+    }
+    return list;
+  }
+
+  function reschOptionsHtml(items, selected) {
+    return items.map((it) => '<option value="' + escapeHtml(it.iso) + '"' + (it.iso === selected ? ' selected' : '') + '>' + escapeHtml(it.label) + '</option>').join('');
+  }
+
+  // Remplit les heures de début (du jour choisi) et de fin (au moins 1 h après le début) à partir de la liste du créneau
+  function fillReschSelects(box) {
+    const list = reschChoices[box.getAttribute('data-resch')] || [];
+    const daySel = box.querySelector('.resch-day');
+    const fromSel = box.querySelector('.resch-from');
+    const toSel = box.querySelector('.resch-to');
+    const day = daySel.value;
+    const limit = list.length ? list[list.length - 1] : null;
+    const starts = list.filter((iso) => parisDayKey(iso) === day && limit && new Date(iso).getTime() + 60 * 60 * 1000 <= new Date(limit).getTime());
+    const keepFrom = starts.includes(fromSel.value) ? fromSel.value : (starts[0] || '');
+    fromSel.innerHTML = reschOptionsHtml(starts.map((iso) => ({ iso, label: formatHourOnly(iso) })), keepFrom);
+    const fromMs = keepFrom ? new Date(keepFrom).getTime() : 0;
+    const ends = list.filter((iso) => new Date(iso).getTime() >= fromMs + 60 * 60 * 1000);
+    const keepTo = ends.includes(toSel.value) ? toSel.value : (ends[0] || '');
+    toSel.innerHTML = reschOptionsHtml(ends.map((iso) => ({ iso, label: parisDayKey(iso) === day ? formatHourOnly(iso) : formatMoment(iso) })), keepTo);
+  }
+
+  function reschFormHtml(slot) {
+    const list = buildReschChoices(slot.rescheduleDeadlineAt);
+    const limitText = escapeHtml(formatMoment(slot.rescheduleDeadlineAt));
+    const starts = list.filter((iso) => new Date(iso).getTime() + 60 * 60 * 1000 <= new Date(slot.rescheduleDeadlineAt).getTime());
+    if (starts.length === 0) {
+      return '<div class="pickup-wait">Il n\'est plus possible de proposer un créneau : l\'acheteur va être remboursé.</div>';
+    }
+    reschChoices[slot.payoutId] = list;
+    const days = [];
+    starts.forEach((iso) => { const d = parisDayKey(iso); if (!days.includes(d)) days.push(d); });
+    return '<div class="pickup-action resch-box" data-resch="' + escapeHtml(slot.payoutId) + '">' +
+      '<p class="pickup-alert">L\'acheteur dit que vous n\'étiez pas là. Proposez-lui un autre créneau avant ' + limitText + ', sinon il sera remboursé.</p>' +
+      '<div class="resch-row">' +
+      '<div><label>Jour</label><select class="resch-day">' + days.map((d) => '<option value="' + escapeHtml(d) + '">' + escapeHtml(d.charAt(0).toUpperCase() + d.slice(1)) + '</option>').join('') + '</select></div>' +
+      '<div><label>De</label><select class="resch-from"></select></div>' +
+      '<div><label>À</label><select class="resch-to"></select></div></div>' +
+      '<button type="button" class="btn btn-primary resch-btn">Envoyer la proposition</button>' +
+      '<p class="pickup-hint">Le créneau doit finir au plus tard ' + limitText + ', durer au moins 1 h et commencer dans au moins 1 h.</p>' +
+      '<p class="pickup-error" style="display:none;"></p></div>';
+  }
+
   // Un bloc par retrait : les produits du créneau, puis la saisie du code donné par l'acheteur
   function renderSlots(sale) {
     const slots = Array.isArray(sale.slots) ? sale.slots : [];
@@ -423,6 +487,12 @@
         body = '<div class="pickup-done">✓ Retirée. L\'argent sera libéré ' +
           (release && release.getTime() > Date.now() ? 'le ' + escapeHtml(formatMoment(slot.autoReleaseAt)) : 'très prochainement') +
           '.</div>';
+      } else if (slot.rescheduleStatus === 'proposee') {
+        body = '<div class="pickup-wait">Vous avez proposé un autre créneau : ' + escapeHtml(formatSlotRange(slot.rescheduleProposedStartAt, slot.rescheduleProposedEndAt)) + '. En attente de la réponse de l\'acheteur.</div>';
+      } else if (slot.rescheduleStatus === 'demandee') {
+        body = new Date(slot.rescheduleDeadlineAt).getTime() > Date.now()
+          ? reschFormHtml(slot)
+          : '<div class="pickup-wait">Le délai est dépassé : l\'acheteur va être remboursé.</div>';
       } else if (!slot.started) {
         body = '<div class="pickup-wait">Le code se tape ici à partir de ' + escapeHtml(formatHourOnly(slot.startAt)) +
           ', quand l\'acheteur vient chercher sa commande.</div>';
@@ -440,7 +510,7 @@
           '<p class="pickup-error" style="display:none;"></p></div>';
       }
 
-      const nowClass = slot.status === 'en_attente' && !slot.pickedUpAt && slot.started && !slot.locked ? ' pickup-now' : '';
+      const nowClass = slot.status === 'en_attente' && !slot.pickedUpAt && slot.started && !slot.locked && slot.rescheduleStatus !== 'proposee' ? ' pickup-now' : '';
       const detail = (slot.status === 'en_attente' || slot.status === 'verse') ? renderMoneyDetail(sale, slot, feeNoteShown) : '';
       if (slot.status === 'en_attente' && slot.money && Number(slot.money.monthlyFeeDue) > 0) feeNoteShown = true;
       return '<div class="pickup-slot' + nowClass + '">' +
@@ -606,9 +676,64 @@
     }
   }
 
+  // Le vendeur envoie son nouveau créneau : le serveur vérifie les limites (24 h, 1 h minimum, 1 h d'avance)
+  async function submitReschedule(button) {
+    const box = button.closest('.resch-box');
+    const errorEl = box.querySelector('.pickup-error');
+    errorEl.style.display = 'none';
+    const startAt = box.querySelector('.resch-from').value;
+    const endAt = box.querySelector('.resch-to').value;
+    if (!startAt || !endAt) {
+      errorEl.textContent = 'Choisissez un jour, une heure de début et une heure de fin.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      errorEl.textContent = 'Session expirée, reconnectez-vous.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Envoi...';
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({ action: 'propose_reschedule', payoutId: box.getAttribute('data-resch'), startAt, endAt }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) {
+        if (response.status === 409) {
+          errorEl.textContent = data.error || 'Une erreur est survenue. Réessayez.';
+          errorEl.style.display = 'block';
+          await init();
+          return;
+        }
+        throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
+      }
+      await init();
+    } catch (err) {
+      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.style.display = 'block';
+      button.disabled = false;
+      button.textContent = 'Envoyer la proposition';
+    }
+  }
+
   salesContainer.addEventListener('click', (event) => {
     const button = event.target.closest('.pickup-btn');
     if (button) submitPickup(button);
+    const reschButton = event.target.closest('.resch-btn');
+    if (reschButton) submitReschedule(reschButton);
+  });
+
+  salesContainer.addEventListener('change', (event) => {
+    const cl = event.target.classList;
+    if (!cl) return;
+    const box = event.target.closest('.resch-box');
+    if (box && (cl.contains('resch-day') || cl.contains('resch-from'))) fillReschSelects(box);
   });
 
   salesContainer.addEventListener('input', (event) => {
@@ -664,6 +789,7 @@
       salesContainer.innerHTML =
         '<p class="payout-note">Votre argent est viré à votre banque une fois par mois, à partir du 05.</p>' +
         sales.map(renderSale).join('');
+      salesContainer.querySelectorAll('.resch-box').forEach(fillReschSelects);
 
     } catch (err) {
       console.error(err);
@@ -725,6 +851,9 @@
   .pickup-slot p.pickup-hint { font-size:0.78rem; color:#6B5842; margin:6px 0 0; line-height:1.45; }
   .pickup-slot p.pickup-alert { font-size:0.85rem; color:#C8352F; font-weight:700; margin:0 0 8px; line-height:1.45; }
   .pickup-slot p.pickup-error { font-size:0.8rem; color:#C8352F; font-weight:700; margin:6px 0 0; line-height:1.45; }
+  .resch-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .resch-row label { display:block; font-size:0.75rem; font-weight:700; color:#8C1B3C; margin-bottom:3px; }
+  .resch-row select { font:inherit; font-size:0.9rem; padding:7px; border:1px solid #ccc; border-radius:8px; background:#fff; max-width:100%; }
   .pickup-done { background:#f6f9f5; border:1px solid #cfe3cf; border-radius:8px; padding:8px; font-size:0.85rem; line-height:1.5; color:#3E6B42; font-weight:600; }
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }

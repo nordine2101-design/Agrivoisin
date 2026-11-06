@@ -607,6 +607,9 @@ async function reportSellerAbsent(res, payout) {
   if (payout.picked_up_at) {
     return res.status(409).json({ error: "Le vendeur a validé votre code : la commande est retirée. Choisissez « Autre problème » si elle n'est pas conforme." });
   }
+  if (payout.reschedule_status === 'demandee' || payout.reschedule_status === 'proposee') {
+    return res.status(409).json({ error: 'Vous avez demandé un autre créneau : cette demande doit d\'abord être réglée. Actualisez la page.' });
+  }
   if (new Date(payout.pickup_end_at).getTime() > Date.now()) {
     return res.status(409).json({ error: "Vous pourrez déclarer l'absence du vendeur à partir du " + formatParisMoment(payout.pickup_end_at) + '.' });
   }
@@ -649,6 +652,61 @@ async function reportSellerAbsent(res, payout) {
 }
 
 // ---------------------------------------------------------------------------
+// « Le vendeur n'était pas là, je veux un autre créneau » : mêmes conditions que l'absence (à partir de la FIN du créneau,
+// code pas encore validé). Rien n'est remboursé : le vendeur a 24 h pour proposer un nouveau créneau. Une seule demande
+// par retrait. L'absence est gardée (absence_reported_at) comme pour un remboursement. L'argent reste bloqué :
+// le versement automatique est repoussé de 14 jours le temps que la demande soit réglée.
+// ---------------------------------------------------------------------------
+const RESCHEDULE_SELLER_HOURS = 24;
+const RESCHEDULE_BRAKE_DAYS = 14;
+
+async function requestReschedule(res, payout) {
+  if (!payout.pickup_end_at) {
+    return res.status(400).json({ error: "Cette commande n'a pas de créneau de retrait." });
+  }
+  if (payout.status !== 'en_attente') {
+    return res.status(409).json({ error: 'Cette commande ne peut plus être modifiée. Actualisez la page.' });
+  }
+  if (payout.picked_up_at) {
+    return res.status(409).json({ error: "Le vendeur a validé votre code : la commande est retirée. Choisissez « Autre problème » si elle n'est pas conforme." });
+  }
+  if (payout.reschedule_status) {
+    return res.status(409).json({ error: 'Vous avez déjà demandé un autre créneau pour ce retrait. Actualisez la page.' });
+  }
+  if (new Date(payout.pickup_end_at).getTime() > Date.now()) {
+    return res.status(409).json({ error: "Vous pourrez le demander à partir du " + formatParisMoment(payout.pickup_end_at) + '.' });
+  }
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const brakeIso = new Date(now.getTime() + RESCHEDULE_BRAKE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { data: claimed, error: claimError } = await supabase
+    .from('payouts')
+    .update({
+      reschedule_status: 'demandee',
+      reschedule_requested_at: nowIso,
+      absence_reported_at: nowIso,
+      auto_release_at: brakeIso,
+    })
+    .eq('id', payout.id)
+    .eq('status', 'en_attente')
+    .is('picked_up_at', null)
+    .is('reschedule_status', null)
+    .select('id, reschedule_requested_at')
+    .maybeSingle();
+  if (claimError) {
+    console.error('Erreur Supabase (demande d\'un autre créneau) :', claimError);
+    return res.status(500).json({ error: "Impossible d'enregistrer votre demande pour le moment. Réessayez." });
+  }
+  if (!claimed) {
+    return res.status(409).json({ error: 'Cette commande vient de changer d\'état. Actualisez la page.' });
+  }
+
+  const deadline = new Date(now.getTime() + RESCHEDULE_SELLER_HOURS * 60 * 60 * 1000).toISOString();
+  return res.status(200).json({ status: 'reschedule_requested', requestedAt: nowIso, deadlineAt: deadline });
+}
+
+// ---------------------------------------------------------------------------
 // Actions de l'acheteur : "J'ai bien reçu ma commande" / "Signaler un problème"
 // ---------------------------------------------------------------------------
 async function handleBuyerAction(req, res) {
@@ -676,8 +734,9 @@ async function handleBuyerAction(req, res) {
     // (la page le vérifie aussi, mais le serveur ne se fie jamais à la page)
     // « Le vendeur n'était pas là » : aucune explication écrite demandée
     const isAbsence = action === 'report' && kind === 'absent';
+    const isReschedule = action === 'report' && kind === 'reschedule';
     let reasonText = '';
-    if (action === 'report' && !isAbsence) {
+    if (action === 'report' && !isAbsence && !isReschedule) {
       reasonText = typeof reason === 'string' ? reason.trim() : '';
       if (reasonText.length < 10) {
         return res.status(400).json({ error: "Merci d'expliquer le problème (au moins 10 caractères)." });
@@ -706,7 +765,7 @@ async function handleBuyerAction(req, res) {
     // la page peut donc préciser lequel (payoutId). Sans précision, on ne répond que s'il n'y en a qu'un.
     const { data: payoutRows, error: payoutError } = await supabase
       .from('payouts')
-      .select('id, status, order_id, seller_id, amount_cents, shipping_cents, stripe_charge_id, pickup_start_at, pickup_end_at, picked_up_at')
+      .select('id, status, order_id, seller_id, amount_cents, shipping_cents, stripe_charge_id, pickup_start_at, pickup_end_at, picked_up_at, reschedule_status')
       .eq('order_id', orderId)
       .eq('seller_id', sellerId);
 
@@ -766,6 +825,11 @@ async function handleBuyerAction(req, res) {
       return res.status(502).json({
         error: "Merci, votre confirmation est bien enregistrée. Le versement n'a pas pu partir tout de suite, il sera retenté automatiquement.",
       });
+    }
+
+    // ---- Le vendeur n'était pas là, je veux un autre créneau ----
+    if (isReschedule) {
+      return await requestReschedule(res, payout);
     }
 
     // ---- Le vendeur n'était pas là ----

@@ -23,6 +23,30 @@ export default async function handler(req, res) {
 
     const buyerId = userData.user.id;
 
+    // Page d'une annonce : l'acheteur qui l'a commandée peut savoir qu'elle a été retirée par le vendeur
+    const askedListing = req.query && req.query.withdrawn ? String(req.query.withdrawn).slice(0, 64) : '';
+    if (askedListing) {
+      const { data: gone } = await supabase
+        .from('listings')
+        .select('id, title, image_url, withdrawn_at')
+        .eq('id', askedListing)
+        .maybeSingle();
+      if (!gone || !gone.withdrawn_at) {
+        return res.status(200).json({ withdrawn: null });
+      }
+      const { data: mine } = await supabase.from('orders').select('id').eq('buyer_id', buyerId);
+      const mineIds = (mine || []).map((o) => o.id);
+      if (mineIds.length === 0) return res.status(200).json({ withdrawn: null });
+      const { data: bought } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('listing_id', gone.id)
+        .in('order_id', mineIds)
+        .limit(1);
+      if (!bought || bought.length === 0) return res.status(200).json({ withdrawn: null });
+      return res.status(200).json({ withdrawn: { id: gone.id, title: gone.title, image_url: gone.image_url } });
+    }
+
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id, total_amount, created_at, service_fee_cents, shipping_address')

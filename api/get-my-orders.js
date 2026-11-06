@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('id, order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, pickup_end_at, pickup_code, picked_up_at, refunded_cents, shipping_cents, shipped_at, tracking_number')
+      .select('id, order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, pickup_end_at, pickup_code, picked_up_at, refunded_cents, shipping_cents, shipped_at, tracking_number, reschedule_status, reschedule_requested_at, reschedule_proposed_start_at, reschedule_proposed_end_at')
       .in('order_id', orderIds);
 
     if (payoutsError) {
@@ -179,6 +179,11 @@ export default async function handler(req, res) {
             pickupEndAt: p.pickup_end_at,
             // Le moment où le vendeur a tapé le bon code : la commande est alors « retirée »
             pickedUpAt: p.picked_up_at || null,
+            // Demande d'un autre créneau (vendeur absent) : où elle en est, et jusqu'à quand le vendeur peut répondre (24 h)
+            rescheduleStatus: p.reschedule_status || null,
+            rescheduleDeadlineAt: p.reschedule_requested_at ? new Date(new Date(p.reschedule_requested_at).getTime() + 24 * 60 * 60 * 1000).toISOString() : null,
+            rescheduleProposedStartAt: p.reschedule_proposed_start_at || null,
+            rescheduleProposedEndAt: p.reschedule_proposed_end_at || null,
             refundedAmount: p.status === 'rembourse' && p.refunded_cents != null ? (Number(p.refunded_cents) || 0) / 100 : null,
             // Le code n'est jamais envoyé avant le début du créneau, ni une fois la commande retirée (ni quand le versement n'est plus en attente)
             code: started && p.status === 'en_attente' && !p.picked_up_at ? (p.pickup_code || null) : null,

@@ -179,9 +179,10 @@ export default async function handler(req, res) {
             pickupEndAt: p.pickup_end_at,
             // Le moment où le vendeur a tapé le bon code : la commande est alors « retirée »
             pickedUpAt: p.picked_up_at || null,
-            // Demande d'un autre créneau (vendeur absent) : où elle en est, et jusqu'à quand le vendeur peut répondre (24 h)
+            // Demande d'un autre créneau (vendeur absent) : où elle en est, et jusqu'à quand le vendeur peut répondre
+            // (24 h après la FIN du premier créneau ; c'est aussi la limite pour que l'acheteur le demande)
             rescheduleStatus: p.reschedule_status || null,
-            rescheduleDeadlineAt: p.reschedule_requested_at ? new Date(new Date(p.reschedule_requested_at).getTime() + 24 * 60 * 60 * 1000).toISOString() : null,
+            rescheduleDeadlineAt: p.pickup_end_at ? new Date(new Date(p.pickup_end_at).getTime() + 24 * 60 * 60 * 1000).toISOString() : null,
             rescheduleProposedStartAt: p.reschedule_proposed_start_at || null,
             rescheduleProposedEndAt: p.reschedule_proposed_end_at || null,
             refundedAmount: p.status === 'rembourse' && p.refunded_cents != null ? (Number(p.refunded_cents) || 0) / 100 : null,

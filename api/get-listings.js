@@ -874,6 +874,8 @@ export default async function handler(req, res) {
     const { data: rawListings, error } = await supabase
       .from('listings')
       .select('id, seller_id, title, description, price, unit, category, subcategory, harvest_date, harvest_at, image_url, created_at, quantity_available, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, delivery_mode, shipping_tiers, multi_parcel, is_bio, availability_status, planned_date, price_locked, sale_opened_at, listing_pickup_hours(day_of_week, slot, start_time, end_time), sellers(city, latitude, longitude, stripe_account_id, seller_type, pseudo)')
+      // Une annonce retirée par son vendeur (commande en cours) n'est plus montrée aux acheteurs
+      .is('withdrawn_at', null)
       .order('created_at', { ascending: false });
 
     if (error) {

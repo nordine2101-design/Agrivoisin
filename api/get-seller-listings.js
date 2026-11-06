@@ -49,11 +49,11 @@ async function setPromotion(req, res, seller) {
 
   const { data: listing, error: listingError } = await supabase
     .from('listings')
-    .select('id, seller_id, price, quantity_available')
+    .select('id, seller_id, price, quantity_available, withdrawn_at')
     .eq('id', listingId)
     .single();
 
-  if (listingError || !listing) {
+  if (listingError || !listing || listing.withdrawn_at) {
     return res.status(404).json({ error: 'Annonce introuvable' });
   }
 
@@ -191,6 +191,8 @@ export default async function handler(req, res) {
       .from('listings')
       .select('id, title, description, price, unit, quantity_available, category, subcategory, harvest_date, image_url, created_at, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, availability_status, planned_date, price_locked')
       .eq('seller_id', seller.id)
+      // Une annonce retirée de la vente (commande en cours) disparaît de la liste du vendeur
+      .is('withdrawn_at', null)
       .order('created_at', { ascending: false });
 
     if (listingsError) throw listingsError;

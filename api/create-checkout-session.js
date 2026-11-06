@@ -6,6 +6,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 
 const MAX_ITEMS = 50; // nombre maximum d'articles par paiement
 const SERVICE_FEE_CENTS = 25;   // frais de service payés par l'acheteur : 0,25 €, une seule fois par commande
+const FRESH_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin']; // produits frais : le prix reste dû si l'acheteur ne vient pas retirer
 const MIN_ORDER_CENTS = 500;    // commande minimum : 5 € d'articles (sans compter les frais de service)
 
 function formatEuros(cents) {
@@ -529,7 +530,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { cart, delivery } = req.body;
+    const { cart, delivery, pickupRulesAccepted } = req.body;
 
     // Le paiement est réservé aux personnes connectées
     const authHeader = req.headers.authorization || '';
@@ -569,7 +570,7 @@ export default async function handler(req, res) {
 
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, title, price, unit, quantity_available, delivery_mode, shipping_tiers, multi_parcel, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, availability_status, sale_opened_at, withdrawn_at, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
+      .select('id, title, category, price, unit, quantity_available, delivery_mode, shipping_tiers, multi_parcel, promo_percent, promo_price, promo_starts_at, promo_ends_at, promo_clearance, lot_quantity, lot_price, availability_status, sale_opened_at, withdrawn_at, sellers(id, city, latitude, longitude, stripe_account_id, seller_type)')
       .in('id', listingIds);
 
     if (listingsError) {
@@ -700,6 +701,21 @@ export default async function handler(req, res) {
     // L'expédition : pour chaque annonce, le mode de remise est celui du vendeur (retrait, expédition, ou les deux au choix de
     // l'acheteur). Les frais viennent des paliers de l'annonce, selon la quantité commandée (relue plus haut, jamais crue sur parole).
     const choices = delivery && typeof delivery === 'object' && delivery.choices && typeof delivery.choices === 'object' ? delivery.choices : {};
+    // Produit frais à retirer chez le vendeur : l'acheteur doit avoir coché la règle du retrait (preuve gardée dans le paiement)
+    let hasFreshPickup = false;
+    for (const key of Object.keys(requested)) {
+      const listing = listingsById[key];
+      const mode = listing.delivery_mode === 'expedition' || listing.delivery_mode === 'les_deux' ? listing.delivery_mode : 'retrait';
+      const shipped = mode === 'expedition' || (mode === 'les_deux' && choices[key] === 'expedition');
+      if (!shipped && (!listing.category || FRESH_CATEGORIES.includes(listing.category))) hasFreshPickup = true;
+    }
+    if (hasFreshPickup && pickupRulesAccepted !== true) {
+      return res.status(400).json({
+        error: 'Cochez la case « Je retirerai ma commande pendant le créneau indiqué » pour pouvoir payer.',
+      });
+    }
+    const pickupRulesAcceptedAt = hasFreshPickup ? new Date().toISOString() : null;
+
     const shippingFees = {};
     const shippingParcels = {};
     const shippingLines = [];
@@ -892,6 +908,8 @@ export default async function handler(req, res) {
           cart_id: savedCart.id,
           buyer_id: buyerId,
           service_fee_cents: String(SERVICE_FEE_CENTS),
+          // Preuve en cas de litige bancaire : l'acheteur a accepté de retirer sa commande pendant le créneau (date et heure exactes)
+          ...(pickupRulesAcceptedAt ? { pickup_rules_accepted_at: pickupRulesAcceptedAt } : {}),
         },
         success_url: `${req.headers.origin}/paiement-succes.html?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.headers.origin}/panier.html`,

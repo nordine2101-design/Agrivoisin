@@ -431,9 +431,10 @@
       } else {
         const ended = new Date(slot.endAt).getTime() < Date.now();
         body = '<div class="pickup-action" data-payout="' + escapeHtml(slot.payoutId) + '">' +
+          '<p class="pickup-alert">Demandez le code à l\'acheteur et tapez-le ici pour que l\'argent soit libéré rapidement.</p>' +
           '<div class="pickup-row"><input type="text" class="pickup-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="Code de retrait à 4 chiffres">' +
           '<button type="button" class="btn btn-primary pickup-btn">Valider</button></div>' +
-          '<p class="pickup-hint">Demandez à l\'acheteur les 4 chiffres affichés sur sa page « Mes commandes », puis remettez-lui sa commande.' +
+          '<p class="pickup-hint">Les 4 chiffres sont affichés sur sa page « Mes commandes ». Remettez-lui sa commande.' +
           (slot.attemptsLeft < 5 ? ' Il vous reste ' + slot.attemptsLeft + (slot.attemptsLeft > 1 ? ' essais.' : ' essai.') : '') + '</p>' +
           (ended && slot.autoReleaseAt ? '<p class="pickup-hint">Le créneau est terminé. Sans code, l\'argent vous est libéré le ' + escapeHtml(formatMoment(slot.autoReleaseAt)) + '.</p>' : '') +
           '<p class="pickup-error" style="display:none;"></p></div>';
@@ -722,6 +723,7 @@
   .pickup-row .pickup-code { width:110px; box-sizing:border-box; font:inherit; font-size:1.3rem; letter-spacing:0.35em; text-align:center; padding:6px; border:1px solid #ccc; border-radius:8px; }
   .pickup-row .btn:disabled { opacity:0.5; cursor:not-allowed; }
   .pickup-slot p.pickup-hint { font-size:0.78rem; color:#6B5842; margin:6px 0 0; line-height:1.45; }
+  .pickup-slot p.pickup-alert { font-size:0.85rem; color:#C8352F; font-weight:700; margin:0 0 8px; line-height:1.45; }
   .pickup-slot p.pickup-error { font-size:0.8rem; color:#C8352F; font-weight:700; margin:6px 0 0; line-height:1.45; }
   .pickup-done { background:#f6f9f5; border:1px solid #cfe3cf; border-radius:8px; padding:8px; font-size:0.85rem; line-height:1.5; color:#3E6B42; font-weight:600; }
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }

@@ -152,7 +152,7 @@ async function confirmPickup(req, res, seller) {
     return res.status(400).json({ error: 'Le code comporte 4 chiffres.' });
   }
 
-  const columns = 'id, status, pickup_code, pickup_start_at, picked_up_at, code_attempts';
+  const columns = 'id, status, pickup_code, pickup_start_at, picked_up_at, code_attempts, reschedule_status';
   const { data: first, error: readError } = await supabase
     .from('payouts')
     .select(columns)
@@ -171,6 +171,9 @@ async function confirmPickup(req, res, seller) {
   }
   if (first.status !== 'en_attente') {
     return res.status(409).json({ error: 'Cette vente ne peut plus être modifiée.' });
+  }
+  if (first.reschedule_status === 'demandee' || first.reschedule_status === 'proposee') {
+    return res.status(409).json({ error: "L'acheteur a demandé un autre créneau : ce retrait doit d'abord être réglé. Actualisez la page." });
   }
   if (first.pickup_start_at && new Date(first.pickup_start_at).getTime() > Date.now()) {
     return res.status(409).json({ error: 'Le code pourra être saisi à partir du ' + formatParisMoment(first.pickup_start_at) + '.' });
@@ -232,6 +235,90 @@ async function confirmPickup(req, res, seller) {
   }
 
   return res.status(200).json({ pickup: { payoutId, pickedUpAt: pickedUpAt.toISOString(), autoReleaseAt: releaseAt.toISOString() } });
+}
+
+// ---------------------------------------------------------------------------
+// « Autre créneau » : l'acheteur a dit que le vendeur n'était pas là et demande un nouveau retrait.
+// Le vendeur propose alors un créneau, au plus tard 24 h après la FIN du premier créneau.
+// Le nouveau créneau doit durer au moins 1 h et commencer au moins 1 h après l'envoi de la proposition.
+// ---------------------------------------------------------------------------
+const RESCHEDULE_WINDOW_HOURS = 24;
+const RESCHEDULE_MIN_NOTICE_MS = 60 * 60 * 1000;
+const RESCHEDULE_MIN_LENGTH_MS = 60 * 60 * 1000;
+
+async function proposeReschedule(req, res, seller) {
+  const body = req.body || {};
+  const payoutId = String(body.payoutId == null ? '' : body.payoutId).trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(payoutId)) {
+    return res.status(400).json({ error: 'Retrait inconnu.' });
+  }
+  const startMs = Date.parse(String(body.startAt == null ? '' : body.startAt));
+  const endMs = Date.parse(String(body.endAt == null ? '' : body.endAt));
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return res.status(400).json({ error: 'Choisissez un jour, une heure de début et une heure de fin.' });
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from('payouts')
+    .select('id, status, picked_up_at, pickup_end_at, reschedule_status')
+    .eq('id', payoutId)
+    .eq('seller_id', seller.id)
+    .maybeSingle();
+  if (readError) {
+    console.error('Erreur Supabase (proposition de créneau) :', readError.message);
+    return res.status(500).json({ error: 'Impossible d\'enregistrer votre proposition pour le moment. Réessayez.' });
+  }
+  if (!row || !row.pickup_end_at) {
+    return res.status(404).json({ error: 'Ce retrait est introuvable.' });
+  }
+  if (row.status !== 'en_attente' || row.picked_up_at) {
+    return res.status(409).json({ error: 'Cette vente ne peut plus être modifiée. Actualisez la page.' });
+  }
+  if (row.reschedule_status === 'proposee') {
+    return res.status(409).json({ error: 'Vous avez déjà fait une proposition pour ce retrait. Actualisez la page.' });
+  }
+  if (row.reschedule_status !== 'demandee') {
+    return res.status(409).json({ error: "L'acheteur n'a pas demandé d'autre créneau pour ce retrait. Actualisez la page." });
+  }
+
+  const limitMs = new Date(row.pickup_end_at).getTime() + RESCHEDULE_WINDOW_HOURS * 60 * 60 * 1000;
+  const nowMs = Date.now();
+  if (nowMs > limitMs) {
+    return res.status(409).json({ error: "Le délai est dépassé : l'acheteur va être remboursé." });
+  }
+  // Une minute de marge : le temps que la page envoie la proposition
+  if (startMs < nowMs + RESCHEDULE_MIN_NOTICE_MS - 60 * 1000) {
+    return res.status(400).json({ error: 'Le créneau doit commencer au moins 1 h après l\'envoi de votre proposition.' });
+  }
+  if (endMs - startMs < RESCHEDULE_MIN_LENGTH_MS) {
+    return res.status(400).json({ error: 'Le créneau doit durer au moins 1 h.' });
+  }
+  if (endMs > limitMs) {
+    return res.status(400).json({ error: 'Le créneau doit finir au plus tard le ' + formatParisMoment(new Date(limitMs).toISOString()) + '.' });
+  }
+
+  // Conditions « demandé » et « en attente » dans la requête : deux clics ne comptent qu'une fois
+  const { data: updated, error: updateError } = await supabase
+    .from('payouts')
+    .update({
+      reschedule_status: 'proposee',
+      reschedule_proposed_start_at: new Date(startMs).toISOString(),
+      reschedule_proposed_end_at: new Date(endMs).toISOString(),
+    })
+    .eq('id', payoutId)
+    .eq('status', 'en_attente')
+    .eq('reschedule_status', 'demandee')
+    .is('picked_up_at', null)
+    .select('id');
+  if (updateError) {
+    console.error('Erreur Supabase (proposition de créneau) :', updateError.message);
+    return res.status(500).json({ error: 'Impossible d\'enregistrer votre proposition pour le moment. Réessayez.' });
+  }
+  if (!updated || updated.length === 0) {
+    return res.status(409).json({ error: 'Cette vente vient de changer d\'état. Actualisez la page.' });
+  }
+
+  return res.status(200).json({ reschedule: { payoutId, status: 'proposee', proposedStartAt: new Date(startMs).toISOString(), proposedEndAt: new Date(endMs).toISOString() } });
 }
 
 // Le mois d'une vente, à l'heure de Paris (comme dans la base) : « 2026-10 »
@@ -382,7 +469,7 @@ async function saveTaxInfo(req, res, seller) {
 }
 
 export default async function handler(req, res) {
-  // GET : les ventes du vendeur ; POST : l'envoi de ses informations fiscales, la déclaration d'un colis parti ou le code de retrait
+  // GET : les ventes du vendeur ; POST : l'envoi de ses informations fiscales, la déclaration d'un colis parti, le code de retrait ou la proposition d'un autre créneau
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
@@ -427,6 +514,9 @@ export default async function handler(req, res) {
       if (action === 'confirm_pickup') {
         return await confirmPickup(req, res, seller);
       }
+      if (action === 'propose_reschedule') {
+        return await proposeReschedule(req, res, seller);
+      }
       return res.status(400).json({ error: 'Action inconnue.' });
     }
 
@@ -468,7 +558,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, cancel_reason, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents, refund_fee_cents, refund_fee_collected_at')
+      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, cancel_reason, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents, refund_fee_cents, refund_fee_collected_at, reschedule_status, reschedule_proposed_start_at, reschedule_proposed_end_at')
       .eq('seller_id', seller.id)
       .in('order_id', shownOrderIds);
 
@@ -621,6 +711,11 @@ export default async function handler(req, res) {
           autoReleaseAt: p.auto_release_at || null,
           releasedAt: p.released_at || null,
           cancelReason: p.cancel_reason || null,
+          // Autre créneau demandé par l'acheteur : où en est la demande, la limite pour répondre (fin du créneau + 24 h) et la proposition envoyée
+          rescheduleStatus: p.reschedule_status || null,
+          rescheduleDeadlineAt: p.pickup_end_at ? new Date(new Date(p.pickup_end_at).getTime() + RESCHEDULE_WINDOW_HOURS * 60 * 60 * 1000).toISOString() : null,
+          rescheduleProposedStartAt: p.reschedule_proposed_start_at || null,
+          rescheduleProposedEndAt: p.reschedule_proposed_end_at || null,
           // Frais de carte du remboursement à la charge du vendeur (absence) : montant, et déjà retiré ou non
           refundFee: p.status === 'rembourse' && p.cancel_reason === 'vendeur_absent' && Number(p.refund_fee_cents) > 0
             ? { amount: toEuros(p.refund_fee_cents), collected: !!p.refund_fee_collected_at }

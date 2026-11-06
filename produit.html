@@ -677,6 +677,43 @@
     }
   });
 
+  function escapeHtml(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // Renvoie l'annonce retirée si la personne connectée l'a commandée, sinon null
+  async function checkWithdrawn() {
+    try {
+      const authClient = window.supabase.createClient(
+        'https://eipksfszadhratfvavvs.supabase.co',
+        'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+      );
+      const { data: { session } } = await authClient.auth.getSession();
+      if (!session || !session.access_token) return null;
+      const res = await fetch('/api/get-my-orders?withdrawn=' + encodeURIComponent(listingId), {
+        headers: { Authorization: 'Bearer ' + session.access_token },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.withdrawn || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function showWithdrawn(w) {
+    const photo = w.image_url
+      ? '<img src="' + escapeHtml(w.image_url) + '" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin:10px 0;filter:grayscale(1);opacity:.6;">'
+      : '';
+    showError(
+      '<span style="display:block;font-family:inherit;font-size:1.5rem;font-weight:800;color:var(--leaf-deep);margin:0 0 6px;">' + escapeHtml(w.title) + '</span>' +
+      photo +
+      '<span style="display:block;background:#FFF4E0;border:2px solid #E8935C;border-radius:14px;padding:14px 16px;color:#7a3e12;font-weight:700;line-height:1.4;">' +
+      'Cette annonce a été retirée par le vendeur.<br>' +
+      '<span style="font-weight:600;">Retrouvez votre commande dans <a href="mes-commandes.html" style="color:var(--leaf-deep);text-decoration:underline;">Mes commandes</a>.</span></span>'
+    );
+  }
+
   if (!listingId) {
     showError('Cette annonce est introuvable. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>');
   } else {
@@ -699,7 +736,14 @@
       .then((data) => {
         const item = (data.listings || []).find((l) => String(l.id) === String(listingId));
         if (!item) {
-          showError('Cette annonce n\'existe plus. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>');
+          // L'annonce a peut-être été retirée par son vendeur : l'acheteur qui l'a commandée le sait
+          checkWithdrawn().then((withdrawn) => {
+            if (withdrawn) {
+              showWithdrawn(withdrawn);
+            } else {
+              showError('Cette annonce n\'existe plus. <a href="annonces.html" style="color:var(--leaf-deep);font-weight:700;">Voir les annonces</a>');
+            }
+          });
           return;
         }
         renderListing(item);

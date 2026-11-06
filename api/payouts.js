@@ -818,6 +818,71 @@ async function handleBuyerAction(req, res) {
 // ---------------------------------------------------------------------------
 // Passage automatique (une fois par jour) : verse ce dont l'échéance est passée
 // ---------------------------------------------------------------------------
+// Annonces retirées de la vente par leur vendeur (commande en cours) : une fois toutes leurs commandes terminées
+// (argent versé ou remboursé), elles sont effacées pour de bon. Une erreur ici ne bloque jamais les versements.
+const OPEN_PAYOUT_STATUSES = ['en_attente', 'en_cours', 'probleme'];
+
+async function listingHasOpenOrders(listingId) {
+  const { data: items, error: itemsError } = await supabase
+    .from('order_items')
+    .select('order_id, seller_id, payout_id')
+    .eq('listing_id', listingId);
+  if (itemsError) throw itemsError;
+  if (!items || items.length === 0) return false;
+
+  const payoutIds = [...new Set(items.map((it) => it.payout_id).filter(Boolean))];
+  if (payoutIds.length > 0) {
+    const { data: rows, error: rowsError } = await supabase
+      .from('payouts')
+      .select('id')
+      .in('id', payoutIds)
+      .in('status', OPEN_PAYOUT_STATUSES)
+      .limit(1);
+    if (rowsError) throw rowsError;
+    if (rows && rows.length > 0) return true;
+  }
+
+  // Anciennes commandes (article sans versement noté) : les versements du vendeur sur cette commande
+  const legacy = items.filter((it) => !it.payout_id);
+  if (legacy.length > 0) {
+    const orderIds = [...new Set(legacy.map((it) => it.order_id).filter(Boolean))];
+    const sellerIds = [...new Set(legacy.map((it) => it.seller_id).filter(Boolean))];
+    if (orderIds.length > 0 && sellerIds.length > 0) {
+      const { data: rows, error: rowsError } = await supabase
+        .from('payouts')
+        .select('id')
+        .in('order_id', orderIds)
+        .in('seller_id', sellerIds)
+        .in('status', OPEN_PAYOUT_STATUSES)
+        .limit(1);
+      if (rowsError) throw rowsError;
+      if (rows && rows.length > 0) return true;
+    }
+  }
+  return false;
+}
+
+async function deleteFinishedWithdrawnListings() {
+  let deleted = 0;
+  try {
+    const { data: withdrawn, error } = await supabase
+      .from('listings')
+      .select('id')
+      .not('withdrawn_at', 'is', null)
+      .limit(100);
+    if (error) throw error;
+    for (const listing of withdrawn || []) {
+      if (await listingHasOpenOrders(listing.id)) continue;
+      const { error: deleteError } = await supabase.from('listings').delete().eq('id', listing.id);
+      if (deleteError) throw deleteError;
+      deleted++;
+    }
+  } catch (cleanupError) {
+    console.error('Effacement des annonces retirées impossible :', cleanupError);
+  }
+  return deleted;
+}
+
 async function runAutomaticReleases(req, res) {
   try {
     const secret = process.env.CRON_SECRET;
@@ -877,6 +942,8 @@ async function runAutomaticReleases(req, res) {
       else if (result.reason === 'not_claimable') summary.skipped++;
       else summary.failed++;
     }
+
+    summary.listingsDeleted = await deleteFinishedWithdrawnListings();
 
     console.log('Passage automatique des versements :', JSON.stringify(summary));
     return res.status(200).json(summary);

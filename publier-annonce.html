@@ -331,6 +331,7 @@
   function setListingStatus(status) {
     listingStatus = status;
     updateStatusUi();
+    updateDelivery();
   }
 
   document.querySelectorAll('.st-mode').forEach(function (card) {
@@ -480,7 +481,7 @@
   // Le sélecteur n'existe que pour un professionnel dont la catégorie est réservée aux professionnels ;
   // sinon, le champ « Unité » habituel (kg, botte, barquette…) reste en place
   function updateUnitPicker() {
-    const on = deliveryAvailable();
+    const on = unitPickerAvailable();
     if (on === unitPickerOn) return;
     unitPickerOn = on;
     unitPicker.style.display = on ? '' : 'none';
@@ -511,11 +512,21 @@
     return Number.isInteger(q) && q >= 1 && q <= 9999 ? q : null;
   }
 
-  // Le choix « retrait / expédition » n'existe que pour un professionnel dont la catégorie est réservée aux professionnels
-  function deliveryAvailable() {
+  // Le sélecteur d'unité (pots, bouteilles, au poids) : professionnel dont la catégorie est réservée aux professionnels
+  function unitPickerAvailable() {
     return currentSellerType === 'professionnel'
       && categorySelect.value !== ''
       && !PARTICULIER_CATEGORIES.includes(categorySelect.value);
+  }
+
+  // Le choix « retrait / expédition » existe pour un professionnel dont la catégorie est réservée aux professionnels,
+  // et aussi pour les aromates (sauf une récolte « Bientôt mûr », qui se retire toujours chez le vendeur)
+  function deliveryAvailable() {
+    if (unitPickerAvailable()) return true;
+    return currentSellerType === 'professionnel'
+      && categorySelect.value === 'Aromates'
+      && listingStatus !== 'bientot_mur'
+      && !editSoon;
   }
 
   function formatEuro(value) {

@@ -360,7 +360,7 @@ async function loadYearTotals(sellerId) {
   for (let page = 0; page < 20; page += 1) {
     const { data, error } = await supabase
       .from('payouts')
-      .select('amount_cents, refunded_cents, status, created_at')
+      .select('amount_cents, refunded_cents, status, created_at, buyer_cancelled_at')
       .eq('seller_id', sellerId)
       .gte('created_at', since)
       .order('created_at', { ascending: true })
@@ -370,7 +370,13 @@ async function loadYearTotals(sellerId) {
       if (row.status === 'rembourse') return;
       if (parisYearOf(row.created_at) !== year) return;
       salesCount += 1;
-      totalCents += Math.max(0, (Number(row.amount_cents) || 0) - (Number(row.refunded_cents) || 0));
+      // Retrait annulé par l'acheteur : le montant du versement est déjà réduit à la moitié restée au vendeur,
+      // le remboursement ne doit donc pas être retiré une seconde fois
+      if (row.buyer_cancelled_at) {
+        totalCents += Number(row.amount_cents) || 0;
+      } else {
+        totalCents += Math.max(0, (Number(row.amount_cents) || 0) - (Number(row.refunded_cents) || 0));
+      }
     });
     if (!data || data.length < PAGE) break;
   }
@@ -562,7 +568,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, cancel_reason, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents, refund_fee_cents, refund_fee_collected_at, reschedule_status, reschedule_proposed_start_at, reschedule_proposed_end_at')
+      .select('id, order_id, status, auto_release_at, pickup_start_at, pickup_end_at, picked_up_at, cancel_reason, code_attempts, released_at, amount_cents, shipping_cents, shipped_at, tracking_number, commission_cents, stripe_fee_cents, monthly_fee_cents, seller_cents, refund_fee_cents, refund_fee_collected_at, reschedule_status, reschedule_proposed_start_at, reschedule_proposed_end_at, buyer_cancelled_at, original_amount_cents')
       .eq('seller_id', seller.id)
       .in('order_id', shownOrderIds);
 
@@ -715,6 +721,10 @@ export default async function handler(req, res) {
           autoReleaseAt: p.auto_release_at || null,
           releasedAt: p.released_at || null,
           cancelReason: p.cancel_reason || null,
+          // Retrait annulé par l'acheteur : la moitié restée au vendeur (avant frais), ou rien si remboursé en totalité
+          buyerCancelled: !!p.buyer_cancelled_at,
+          cancelKeptAmount: p.buyer_cancelled_at ? (Number(p.original_amount_cents) > 0 ? toEuros(p.amount_cents) : 0) : null,
+          cancelOriginalAmount: p.buyer_cancelled_at ? toEuros(Number(p.original_amount_cents) > 0 ? p.original_amount_cents : p.amount_cents) : null,
           // Autre créneau demandé par l'acheteur : où en est la demande, la limite pour répondre (fin du créneau + 24 h) et la proposition envoyée
           rescheduleStatus: p.reschedule_status || null,
           rescheduleDeadlineAt: p.pickup_end_at ? new Date(new Date(p.pickup_end_at).getTime() + RESCHEDULE_WINDOW_HOURS * 60 * 60 * 1000).toISOString() : null,

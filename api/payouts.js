@@ -834,6 +834,28 @@ async function computeCancellation(payout) {
   return { refund, retained, commission, full: retained === 0 };
 }
 
+// Remet en vente les quantités d'un retrait annulé (une ligne d'article = une unité).
+// Jamais bloquant : le remboursement est déjà parti, une erreur est seulement notée dans les journaux.
+async function giveBackCancelledStock(payoutId) {
+  try {
+    const { data: items, error } = await supabase
+      .from('order_items')
+      .select('listing_id')
+      .eq('payout_id', payoutId);
+    if (error) throw new Error(error.message);
+    const byListing = {};
+    (items || []).forEach((it) => {
+      if (it.listing_id) byListing[it.listing_id] = (byListing[it.listing_id] || 0) + 1;
+    });
+    for (const [listingId, qty] of Object.entries(byListing)) {
+      const { error: giveError } = await supabase.rpc('give_back_listing_stock', { p_listing_id: listingId, p_quantity: qty });
+      if (giveError) console.error('Annulation : impossible de remettre le stock de ' + listingId + ' :', giveError.message);
+    }
+  } catch (err) {
+    console.error('Annulation ' + payoutId + ' : stock non remis en vente :', err.message);
+  }
+}
+
 async function buyerCancelVendor(res, payoutRows, previewOnly) {
   const rows = payoutRows || [];
   // Seuls les retraits (avec créneau) sont concernés : un colis a sa propre règle
@@ -962,6 +984,9 @@ async function buyerCancelVendor(res, payoutRows, previewOnly) {
 
     doneRefund += refundCents;
     doneRetained += plan.retained;
+
+    // Le remboursement est parti : les quantités annulées retournent en vente
+    await giveBackCancelledStock(row.id);
 
     // 3. On note le remboursement
     if (plan.full) {
@@ -1137,7 +1162,6 @@ async function handleBuyerAction(req, res) {
       }
       return await buyerCancelVendor(res, payoutRows, action === 'cancel_info');
     }
-
     let payout = null;
     if (typeof payoutId === 'string' && payoutId.trim()) {
       payout = (payoutRows || []).find((r) => String(r.id) === payoutId.trim()) || null;

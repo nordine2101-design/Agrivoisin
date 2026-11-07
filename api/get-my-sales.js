@@ -76,7 +76,7 @@ function planParcels(tiers, quantity, allowMulti) {
   return parcels.sort((a, b) => b - a);
 }
 
-// Le vendeur déclare que le colis est parti (avec, s'il le souhaite, un numéro de suivi)
+// Le vendeur déclare que le colis est parti, avec son numéro de suivi (obligatoire : 8 à 20 lettres ou chiffres)
 async function markShipped(req, res, seller) {
   const body = req.body || {};
   const orderId = String(body.orderId == null ? '' : body.orderId).trim();
@@ -84,9 +84,13 @@ async function markShipped(req, res, seller) {
     return res.status(400).json({ error: 'Commande inconnue.' });
   }
 
-  const tracking = String(body.trackingNumber == null ? '' : body.trackingNumber).replace(/\s+/g, ' ').trim();
-  if (tracking.length > 40 || (tracking && !/^[A-Za-z0-9][A-Za-z0-9 \-]*$/.test(tracking))) {
-    return res.status(400).json({ error: 'Le numéro de suivi ne doit contenir que des lettres, des chiffres et des tirets (40 caractères au plus).' });
+  // Espaces et tirets enlevés (par exemple « 6A 1234-5678 »), puis 8 à 20 lettres ou chiffres
+  const tracking = String(body.trackingNumber == null ? '' : body.trackingNumber).replace(/[\s-]+/g, '');
+  if (!tracking) {
+    return res.status(400).json({ error: 'Indiquez le numéro de suivi du colis pour continuer.' });
+  }
+  if (!/^[A-Za-z0-9]{8,20}$/.test(tracking)) {
+    return res.status(400).json({ error: 'Le numéro de suivi doit faire entre 8 et 20 caractères, avec seulement des lettres et des chiffres.' });
   }
 
   const { data: payout, error: payoutError } = await supabase
@@ -115,7 +119,7 @@ async function markShipped(req, res, seller) {
   // Condition « pas encore expédié » dans la requête : deux clics ne comptent qu'une fois
   const { data: updated, error: updateError } = await supabase
     .from('payouts')
-    .update({ shipped_at: shippedAt.toISOString(), tracking_number: tracking || null, auto_release_at: releaseAt.toISOString() })
+    .update({ shipped_at: shippedAt.toISOString(), tracking_number: tracking, auto_release_at: releaseAt.toISOString() })
     .eq('id', payout.id)
     .eq('status', 'en_attente')
     .is('shipped_at', null)
@@ -128,7 +132,7 @@ async function markShipped(req, res, seller) {
     return res.status(409).json({ error: 'Cet envoi est déjà enregistré.' });
   }
 
-  return res.status(200).json({ shipment: { shippedAt: shippedAt.toISOString(), trackingNumber: tracking || null, autoReleaseAt: releaseAt.toISOString() } });
+  return res.status(200).json({ shipment: { shippedAt: shippedAt.toISOString(), trackingNumber: tracking, autoReleaseAt: releaseAt.toISOString() } });
 }
 
 // Un moment à l'heure de Paris : « samedi 7 novembre à 18 h 00 »

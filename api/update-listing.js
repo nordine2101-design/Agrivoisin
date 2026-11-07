@@ -579,12 +579,14 @@ export default async function handler(req, res) {
       harvestMoment = parsed.toISOString();
     }
 
-    // Mode de remise : l'expédition est réservée aux professionnels qui vendent une catégorie réservée aux professionnels
+    // Mode de remise : l'expédition est réservée aux professionnels, pour une catégorie réservée aux professionnels
+    // ou pour des aromates (sauf une récolte « Bientôt mûr », qui se retire toujours chez le vendeur)
     const mode = deliveryMode == null ? 'retrait' : deliveryMode;
     if (!DELIVERY_MODES.includes(mode)) {
       return res.status(400).json({ error: 'Mode de remise invalide : choisissez retrait, expédition ou les deux.' });
     }
-    if (mode !== 'retrait' && !proOnlyCategory) {
+    const aromatesShippable = category === 'Aromates' && existing.availability_status !== 'bientot_mur';
+    if (mode !== 'retrait' && !(isPro && (proOnlyCategory || aromatesShippable))) {
       return res.status(403).json({ error: "L'expédition n'est pas possible pour cette catégorie de produits : seul le retrait est proposé." });
     }
 
@@ -725,6 +727,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-
-
 

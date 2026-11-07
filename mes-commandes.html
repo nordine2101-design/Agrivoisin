@@ -420,6 +420,7 @@
             <label class="payout-report-label">Expliquez le problème (obligatoire)</label>
             <textarea class="payout-report-reason" maxlength="1000" placeholder="Par exemple : les légumes étaient abîmés"></textarea>
           </div>
+          <p class="fraud-note"><strong>Attention :</strong> toute fausse déclaration faite pour obtenir un remboursement est une escroquerie (article 313-1 du Code pénal), punie de 5 ans d'emprisonnement et de 375 000 € d'amende.</p>
           <div class="payout-report-buttons">
             <button type="button" class="btn btn-primary payout-report-send">${absentChoiceHtml && slotEnded ? 'Confirmer : remboursement' : 'Envoyer le signalement'}</button>
             <button type="button" class="btn btn-ghost payout-report-cancel">Annuler</button>
@@ -1099,6 +1100,7 @@
   .slot-code b { font-size:1.6rem; letter-spacing:0.3em; color:#7A3500; }
   .slot-code small { display:block; color:#6B5842; font-size:0.75rem; }
   .verify-note { background:#E4F2DE; border:2px solid #2F6B3A; border-radius:10px; padding:9px 10px; margin:0 0 8px; font-size:0.82rem; line-height:1.45; color:#3b2f22; }
+  .payout-box p.fraud-note { background:#E4F2DE; border:2px solid #2F6B3A; border-radius:10px; padding:9px 10px; margin:10px 0 0; font-size:0.82rem; line-height:1.45; color:#3b2f22; }
   .verify-alert { display:block; color:#C8352F; font-weight:800; font-size:0.9rem; letter-spacing:0.01em; margin-bottom:4px; }
   .slot-done { display:block; background:#e8efe0; border-radius:8px; padding:8px; font-size:0.85rem; font-weight:600; color:#2f5a33; line-height:1.45; }
   .slot-box .payout-box.resch-proposal { background:#fff; border:2px solid #8C1B3C; border-radius:10px; padding:10px; margin:8px 0; }

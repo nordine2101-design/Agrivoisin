@@ -138,7 +138,10 @@ async function releasePayout(payoutId, fromStatuses, restoreStatus = 'en_attente
     const chargedTotal = Math.max(Number(charge.amount) || 0, orderTotal);
     // Arrondi vers le bas : le vendeur ne paie jamais plus que sa part
     // La part des frais de carte du vendeur porte sur ses produits ET sur ses frais d'expédition
-    const feeShare = chargedTotal > 0 ? Math.floor((totalFee * (payout.amount_cents + shippingCents)) / chargedTotal) : 0;
+    // Retrait annulé par l'acheteur : le vendeur ne garde que la moitié, mais il paie les frais de carte sur la totalité
+    // de sa part d'origine (Stripe ne rend pas ses frais lors d'un remboursement)
+    const feeBaseCents = Number(payout.original_amount_cents) > 0 ? Number(payout.original_amount_cents) : payout.amount_cents;
+    const feeShare = chargedTotal > 0 ? Math.floor((totalFee * (feeBaseCents + shippingCents)) / chargedTotal) : 0;
     // La commission ne porte que sur les produits : les frais d'expédition lui sont reversés en entier
     const beforeMonthlyFee = payout.amount_cents + shippingCents - payout.commission_cents - feeShare;
 
@@ -766,6 +769,246 @@ async function requestReschedule(res, payout) {
 }
 
 // ---------------------------------------------------------------------------
+// « Annuler » (retrait) : l'acheteur annule sa commande chez UN vendeur, entre le paiement et le début du créneau.
+// Tout ou rien par vendeur : tous les retraits de ce vendeur dans la commande sont annulés ensemble.
+// L'acheteur perd 50 % de la partie annulée (les produits de ce vendeur) : cette moitié va au vendeur, commission
+// de 15 % prélevée dessus, et le vendeur paie en entier les frais de carte. Les 0,25 € de frais de service restent à Agrivoisin.
+// Exception : un produit non périssable d'un professionnel (catégorie réservée aux professionnels) est remboursé en totalité
+// (rétractation de 14 jours), frais de service compris si toute la commande finit remboursée.
+// ---------------------------------------------------------------------------
+// Catégories de produits frais : la retenue de 50 % s'applique (les autres sont réservées aux professionnels)
+const FRESH_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin'];
+
+// Le paiement de l'acheteur chez Stripe (retrouvé si on ne l'avait pas noté)
+async function findChargeId(payout) {
+  if (payout.stripe_charge_id) return payout.stripe_charge_id;
+  const { data: order } = await supabase.from('orders').select('stripe_session_id').eq('id', payout.order_id).maybeSingle();
+  if (!order || !order.stripe_session_id) {
+    throw new Error('Paiement Stripe introuvable pour cette commande');
+  }
+  const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+  const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent);
+  const latest = paymentIntent.latest_charge;
+  const chargeId = typeof latest === 'string' ? latest : (latest && latest.id) || null;
+  if (!chargeId) {
+    throw new Error('Paiement Stripe introuvable pour cette commande');
+  }
+  return chargeId;
+}
+
+// Ce que coûte l'annulation d'un retrait : { refund, retained, commission, full } (en centimes)
+async function computeCancellation(payout) {
+  const amount = Number(payout.amount_cents) || 0;
+  let freshCents = amount;
+
+  const { data: items, error: itemsError } = await supabase
+    .from('order_items')
+    .select('listing_id, price_at_purchase')
+    .eq('payout_id', payout.id);
+  if (itemsError) throw new Error('Lecture des articles impossible : ' + itemsError.message);
+
+  if (items && items.length > 0) {
+    const listingIds = uniqueValues(items.map((it) => it.listing_id));
+    let categories = {};
+    if (listingIds.length > 0) {
+      const { data: listingRows, error: listingError } = await supabase.from('listings').select('id, category').in('id', listingIds);
+      if (listingError) throw new Error('Lecture des annonces impossible : ' + listingError.message);
+      (listingRows || []).forEach((l) => { categories[l.id] = l.category; });
+    }
+    let totalCents = 0;
+    let freshItemsCents = 0;
+    items.forEach((it) => {
+      const cents = Math.round(Number(it.price_at_purchase || 0) * 100);
+      totalCents += cents;
+      // Une annonce introuvable est traitée comme un produit frais
+      const category = categories[it.listing_id];
+      if (!category || FRESH_CATEGORIES.includes(category)) freshItemsCents += cents;
+    });
+    if (totalCents > 0) freshCents = Math.round((amount * freshItemsCents) / totalCents);
+  }
+
+  // Arrondi vers le bas : l'acheteur ne perd jamais plus de la moitié
+  const retained = Math.min(amount, Math.floor(freshCents / 2));
+  const refund = amount - retained;
+  const commission = amount > 0 ? Math.round(((Number(payout.commission_cents) || 0) * retained) / amount) : 0;
+  return { refund, retained, commission, full: retained === 0 };
+}
+
+async function buyerCancelVendor(res, payoutRows, previewOnly) {
+  const rows = payoutRows || [];
+  // Seuls les retraits (avec créneau) sont concernés : un colis a sa propre règle
+  const pickupRows = rows.filter((r) => r.pickup_end_at);
+  const todo = pickupRows.filter((r) => !r.buyer_cancelled_at);
+
+  if (todo.length === 0) {
+    if (pickupRows.length > 0) {
+      return res.status(200).json({ status: 'annule', alreadyDone: true });
+    }
+    return res.status(400).json({ error: "Cette commande n'est pas un retrait : elle ne peut pas être annulée ici." });
+  }
+
+  const nowMs = Date.now();
+  for (const r of todo) {
+    if (r.status !== 'en_attente') {
+      return res.status(409).json({ error: 'Cette commande ne peut plus être annulée. Actualisez la page.' });
+    }
+    if (r.picked_up_at) {
+      return res.status(409).json({ error: 'Le vendeur a validé votre code : la commande est retirée, elle ne peut plus être annulée.' });
+    }
+    if (r.reschedule_status) {
+      return res.status(409).json({ error: "Un autre créneau a été demandé pour ce retrait : il ne peut plus être annulé ici. Actualisez la page." });
+    }
+    if (!r.pickup_start_at || new Date(r.pickup_start_at).getTime() <= nowMs) {
+      return res.status(409).json({ error: "Le créneau de retrait a commencé : vous ne pouvez plus annuler. Retirez votre commande, ou signalez un problème après la fin du créneau si le vendeur n'était pas là." });
+    }
+  }
+
+  let totalRefund = 0;
+  let totalRetained = 0;
+  const plans = [];
+  try {
+    for (const r of todo) {
+      const plan = await computeCancellation(r);
+      plans.push({ row: r, plan });
+      totalRefund += plan.refund;
+      totalRetained += plan.retained;
+    }
+  } catch (err) {
+    console.error('Calcul de l\'annulation impossible :', err.message);
+    return res.status(500).json({ error: "Impossible de calculer l'annulation pour le moment. Réessayez." });
+  }
+
+  // Simple aperçu (pour la fenêtre de confirmation) : rien n'est changé
+  if (previewOnly) {
+    return res.status(200).json({ refundAmount: totalRefund / 100, retainedAmount: totalRetained / 100, full: totalRetained === 0 });
+  }
+
+  let doneRefund = 0;
+  let doneRetained = 0;
+  for (const { row, plan } of plans) {
+    const nowIso = new Date().toISOString();
+    const original = Number(row.amount_cents) || 0;
+
+    // 1. Réserver ce retrait : un seul clic peut réussir, et seulement avant le début du créneau
+    const claimChanges = {
+      status: 'en_cours',
+      cancel_reason: 'acheteur_annule',
+      buyer_cancelled_at: nowIso,
+      // Pas d'échéance tant que le remboursement n'est pas parti : le passage automatique ne doit pas y toucher
+      auto_release_at: null,
+    };
+    if (!plan.full) {
+      claimChanges.original_amount_cents = original;
+      claimChanges.amount_cents = plan.retained;
+      claimChanges.commission_cents = plan.commission;
+    }
+    const { data: claimed, error: claimError } = await supabase
+      .from('payouts')
+      .update(claimChanges)
+      .eq('id', row.id)
+      .eq('status', 'en_attente')
+      .is('picked_up_at', null)
+      .is('reschedule_status', null)
+      .gt('pickup_start_at', nowIso)
+      .select()
+      .maybeSingle();
+    if (claimError) {
+      console.error('Erreur Supabase (annulation) :', claimError);
+      return res.status(500).json({ error: "Impossible d'enregistrer votre annulation pour le moment. Réessayez." });
+    }
+    if (!claimed) {
+      return res.status(409).json({ error: 'Cette commande vient de changer d\'état (le créneau a peut-être commencé). Actualisez la page.' });
+    }
+
+    // Remet le retrait comme avant si le remboursement ne peut pas partir
+    const restore = async (message) => {
+      await supabase
+        .from('payouts')
+        .update({
+          status: 'en_attente',
+          cancel_reason: row.cancel_reason || null,
+          buyer_cancelled_at: null,
+          original_amount_cents: row.original_amount_cents || null,
+          amount_cents: row.amount_cents,
+          commission_cents: row.commission_cents,
+          auto_release_at: row.auto_release_at || null,
+          last_error: String(message).slice(0, 500),
+        })
+        .eq('id', row.id);
+    };
+
+    // 2. Le remboursement de l'acheteur (partiel, ou total pour un produit non périssable d'un professionnel)
+    let extraCents = 0;
+    if (plan.full) {
+      try { extraCents = await serviceFeeToRefund(claimed); } catch (err) { extraCents = 0; }
+    }
+    const refundCents = plan.refund + extraCents;
+    let refund;
+    try {
+      const chargeId = await findChargeId(claimed);
+      refund = await stripe.refunds.create(
+        {
+          charge: chargeId,
+          amount: refundCents,
+          metadata: { payout_id: row.id, order_id: row.order_id, seller_id: row.seller_id, raison: 'annulation_acheteur' },
+        },
+        { idempotencyKey: 'buyer-cancel-' + row.id + '-' + refundCents }
+      );
+    } catch (err) {
+      console.error(`Annulation du versement ${row.id} : remboursement refusé :`, err.message);
+      await restore('Annulation : remboursement refusé : ' + err.message);
+      return res.status(502).json({ error: "Le remboursement n'a pas pu partir : " + err.message + ' Réessayez dans quelques instants.' });
+    }
+
+    doneRefund += refundCents;
+    doneRetained += plan.retained;
+
+    // 3. On note le remboursement
+    if (plan.full) {
+      const { error: fullError } = await supabase
+        .from('payouts')
+        .update({
+          status: 'rembourse',
+          resolution: 'rembourse',
+          resolved_at: new Date().toISOString(),
+          refunded_cents: refundCents,
+          stripe_refund_id: refund.id,
+          resolution_note: "Annulation par l'acheteur (produit non périssable : remboursement total)",
+          last_error: null,
+        })
+        .eq('id', row.id);
+      if (fullError) {
+        console.error(`ALERTE : remboursement ${refund.id} créé mais le versement ${row.id} n'a pas pu être noté :`, fullError.message);
+      }
+      continue;
+    }
+
+    const { error: noteError } = await supabase
+      .from('payouts')
+      .update({
+        refunded_cents: refundCents,
+        stripe_refund_id: refund.id,
+        resolution_note: "Annulation par l'acheteur : 50 % retenus au profit du vendeur",
+        // Le remboursement est parti : le versement du vendeur est dû tout de suite (retenté au prochain passage s'il échoue)
+        auto_release_at: new Date().toISOString(),
+      })
+      .eq('id', row.id);
+    if (noteError) {
+      console.error(`ALERTE : remboursement ${refund.id} créé mais le versement ${row.id} n'a pas pu être noté :`, noteError.message);
+    }
+
+    // 4. La moitié retenue est versée au vendeur tout de suite (commission et frais de carte déduits).
+    // Si le versement échoue, il est remis « en attente » et sera retenté au prochain passage automatique.
+    const released = await releasePayout(row.id, ['en_cours']);
+    if (!released.ok) {
+      console.error(`Annulation ${row.id} : versement du vendeur différé :`, released.error || released.reason);
+    }
+  }
+
+  return res.status(200).json({ status: 'annule', refundedAmount: doneRefund / 100, retainedAmount: doneRetained / 100 });
+}
+
+// ---------------------------------------------------------------------------
 // Actions de l'acheteur : "J'ai bien reçu ma commande" / "Signaler un problème"
 // ---------------------------------------------------------------------------
 // L'acheteur répond à l'autre créneau proposé par le vendeur : « accept » (le nouveau créneau remplace l'ancien, le même code reste valable)
@@ -836,7 +1079,7 @@ async function handleBuyerAction(req, res) {
       return res.status(401).json({ error: 'Session invalide, reconnectez-vous.' });
     }
 
-    if (action !== 'confirm' && action !== 'report' && action !== 'reschedule_answer') {
+    if (action !== 'confirm' && action !== 'report' && action !== 'reschedule_answer' && action !== 'cancel_vendor' && action !== 'cancel_info') {
       return res.status(400).json({ error: 'Action inconnue.' });
     }
     if (!orderId || !sellerId) {
@@ -878,7 +1121,7 @@ async function handleBuyerAction(req, res) {
     // la page peut donc préciser lequel (payoutId). Sans précision, on ne répond que s'il n'y en a qu'un.
     const { data: payoutRows, error: payoutError } = await supabase
       .from('payouts')
-      .select('id, status, order_id, seller_id, amount_cents, shipping_cents, stripe_charge_id, pickup_start_at, pickup_end_at, picked_up_at, reschedule_status, reschedule_proposed_start_at, reschedule_proposed_end_at')
+      .select('id, status, order_id, seller_id, amount_cents, shipping_cents, commission_cents, stripe_charge_id, pickup_start_at, pickup_end_at, picked_up_at, reschedule_status, reschedule_proposed_start_at, reschedule_proposed_end_at, auto_release_at, cancel_reason, buyer_cancelled_at, original_amount_cents')
       .eq('order_id', orderId)
       .eq('seller_id', sellerId);
 
@@ -886,6 +1129,15 @@ async function handleBuyerAction(req, res) {
       console.error('Erreur Supabase (versement) :', payoutError);
       return res.status(500).json({ error: 'Impossible de lire le versement pour le moment. Réessayez.' });
     }
+
+    // ---- Annuler (retrait) : tous les retraits de ce vendeur dans la commande, ensemble ----
+    if (action === 'cancel_vendor' || action === 'cancel_info') {
+      if (!payoutRows || payoutRows.length === 0) {
+        return res.status(404).json({ error: 'Aucun versement trouvé pour ce vendeur.' });
+      }
+      return await buyerCancelVendor(res, payoutRows, action === 'cancel_info');
+    }
+
     let payout = null;
     if (typeof payoutId === 'string' && payoutId.trim()) {
       payout = (payoutRows || []).find((r) => String(r.id) === payoutId.trim()) || null;

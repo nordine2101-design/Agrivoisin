@@ -522,6 +522,7 @@
       if (slot.status === 'en_attente' && (!slot.rescheduleStatus || slot.rescheduleStatus === 'acceptee')) {
         if (slot.code) {
           codeHtml = '<div class="slot-code"><b>' + escapeHtml(String(slot.code).split('').join(' ')) + '</b><small>Donnez ce code au vendeur quand vous récupérez votre commande</small></div>';
+          codeHtml += '<div class="verify-note"><span class="verify-alert">VÉRIFIEZ VOTRE COMMANDE AVANT DE DONNER VOTRE CODE AU VENDEUR !</span> Une fois le code donné, la commande est considérée comme remise et conforme, et vous ne pourrez plus faire de réclamation.</div>';
         } else {
           const startsAt = new Date(slot.pickupStartAt);
           if (startsAt.getTime() > Date.now()) {
@@ -593,7 +594,7 @@
       }
       if (data.status === 'rembourse') {
         const slotBox = box.closest('.slot-box');
-        if (slotBox) slotBox.querySelectorAll('.slot-code, .slot-wait').forEach((el) => el.remove());
+        if (slotBox) slotBox.querySelectorAll('.slot-code, .verify-note, .slot-wait').forEach((el) => el.remove());
         box.outerHTML = payoutRefundedHtml({ refundedAmount: data.refundedAmount });
         return;
       }
@@ -659,7 +660,7 @@
       // Commande remboursée : le code de ce retrait n'a plus de raison d'être affiché
       if (data.status === 'rembourse') {
         const slotBox = box.closest('.slot-box');
-        if (slotBox) slotBox.querySelectorAll('.slot-code, .slot-wait').forEach((el) => el.remove());
+        if (slotBox) slotBox.querySelectorAll('.slot-code, .verify-note, .slot-wait').forEach((el) => el.remove());
       }
       if (data.status === 'reschedule_requested') {
         box.outerHTML = rescheduleWaitHtml(data.deadlineAt);
@@ -1097,6 +1098,8 @@
   .slot-code { background:#FFF1E0; border:1px dashed #E56500; border-radius:8px; padding:8px; text-align:center; margin:6px 0 8px; }
   .slot-code b { font-size:1.6rem; letter-spacing:0.3em; color:#7A3500; }
   .slot-code small { display:block; color:#6B5842; font-size:0.75rem; }
+  .verify-note { background:#E4F2DE; border:2px solid #2F6B3A; border-radius:10px; padding:9px 10px; margin:0 0 8px; font-size:0.82rem; line-height:1.45; color:#3b2f22; }
+  .verify-alert { display:block; color:#C8352F; font-weight:800; font-size:0.9rem; letter-spacing:0.01em; margin-bottom:4px; }
   .slot-done { display:block; background:#e8efe0; border-radius:8px; padding:8px; font-size:0.85rem; font-weight:600; color:#2f5a33; line-height:1.45; }
   .slot-box .payout-box.resch-proposal { background:#fff; border:2px solid #8C1B3C; border-radius:10px; padding:10px; margin:8px 0; }
   .payout-box p.resch-proposal-when { font-weight:700; font-size:0.95rem; color:#8C1B3C; }

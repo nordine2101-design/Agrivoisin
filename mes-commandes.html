@@ -298,6 +298,8 @@
   // Un avis n'est possible qu'une fois la réception confirmée (paiement versé).
   // Les anciennes commandes, sans versement enregistré, ne sont pas concernées.
   function reviewAllowed(seller) {
+    // Une commande annulée par l'acheteur n'a jamais été retirée : pas d'avis possible
+    if ((seller.slots || []).some((slot) => slot.buyerCancelled)) return false;
     const slotsDone = (seller.slots || []).every((slot) => slot.status === 'verse');
     return slotsDone && (!seller.payout || seller.payout.status === 'verse');
   }
@@ -334,7 +336,7 @@
   const SHIPPED_RELEASE_DAYS = 14;
 
   // payoutOverride : le versement d'un créneau de retrait (sinon : celui de l'expédition ou de l'ancienne commande)
-  function renderPayoutSection(orderId, seller, payoutOverride) {
+  function renderPayoutSection(orderId, seller, payoutOverride, showCancel) {
     const payout = payoutOverride || seller.payout;
     // Anciennes commandes (avant l'argent retenu) : rien à afficher
     if (!payout) return '';
@@ -408,6 +410,7 @@
         <div class="payout-actions">
           ${notShippedYet || isSlot ? '' : '<button type="button" class="btn btn-primary payout-confirm-btn">J\'ai bien reçu ma commande</button>'}
           <button type="button" class="btn btn-ghost payout-report-btn"${reportLocked ? ' disabled data-locked="1"' : ''}>Signaler un problème</button>
+          ${showCancel ? '<button type="button" class="btn payout-cancel-btn">Annuler</button><span class="cancel-note">' + (seller.cancelFree ? 'Annulation gratuite : produit non périssable' : 'Annuler vous coûtera 50 % de la partie annulée') + '</span>' : ''}
         </div>
         ${reportLocked ? `<p class="payout-report-hint">Vous pourrez signaler un problème à partir du ${escapeHtml(formatParisMoment(payout.pickupStartAt))}.</p>` : ''}
         ${pickedUp ? '<p class="payout-report-hint">Vous pouvez signaler un problème jusqu\'à cette date.</p>' : ''}
@@ -439,9 +442,76 @@
     return day.charAt(0).toUpperCase() + day.slice(1) + ', de ' + hour(startIso) + ' à ' + hour(endIso);
   }
 
+  // Retrait annulé par l'acheteur : ce qui lui a été remboursé, et la moitié restée au vendeur
+  function buyerCancelledHtml(slot) {
+    const refunded = slot.cancelRefundedAmount != null ? ' Vous avez été remboursé de ' + formatAmount(slot.cancelRefundedAmount) : ' Vous avez été remboursé';
+    const kept = Number(slot.cancelKeptAmount) > 0 ? ', et ' + formatAmount(slot.cancelKeptAmount) + ' sont restés au vendeur (50 % de la partie annulée)' : '';
+    return '<div class="payout-box payout-refunded"><p>Commande annulée.' + escapeHtml(refunded + kept) + '.</p></div>';
+  }
+
+  // « Annuler » : on demande d'abord à Agrivoisin ce que cela coûte, puis on confirme
+  async function cancelVendorOrder(box) {
+    const errorEl = box.querySelector('.payout-error');
+    const buttons = box.querySelectorAll('button');
+    errorEl.style.display = 'none';
+    buttons.forEach((b) => { b.disabled = true; });
+    const enable = () => { buttons.forEach((b) => { b.disabled = b.dataset.locked === '1'; }); };
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) throw new Error('Session expirée, reconnectez-vous.');
+      const send = async (action) => {
+        const response = await fetch('/api/payouts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+          body: JSON.stringify({ action, orderId: box.dataset.orderId, sellerId: box.dataset.sellerId }),
+        });
+        let data = {};
+        try { data = await response.json(); } catch (e) { data = {}; }
+        return { response, data };
+      };
+
+      const info = await send('cancel_info');
+      if (!info.response.ok) {
+        if (info.response.status === 409) {
+          errorEl.textContent = (info.data.error || 'Une erreur est survenue.') + ' La page va se recharger.';
+          errorEl.style.display = 'block';
+          setTimeout(() => { window.location.reload(); }, 2500);
+          return;
+        }
+        throw new Error(info.data.error || 'Une erreur est survenue');
+      }
+
+      const message = info.data.full
+        ? 'Annuler cette commande ? Vous serez remboursé de ' + formatAmount(info.data.refundAmount) + '. Cette action ne peut pas être annulée.'
+        : 'Annuler cette commande ? Vous serez remboursé de ' + formatAmount(info.data.refundAmount) + ' et vous perdrez ' + formatAmount(info.data.retainedAmount) + ' (50 % de la partie annulée). Les frais de service ne sont pas remboursés. Cette action ne peut pas être annulée.';
+      if (!window.confirm(message)) {
+        enable();
+        return;
+      }
+
+      const done = await send('cancel_vendor');
+      if (!done.response.ok) {
+        if (done.response.status === 409) {
+          errorEl.textContent = (done.data.error || 'Une erreur est survenue.') + ' La page va se recharger.';
+          errorEl.style.display = 'block';
+          setTimeout(() => { window.location.reload(); }, 2500);
+          return;
+        }
+        throw new Error(done.data.error || 'Une erreur est survenue');
+      }
+      window.location.reload();
+    } catch (err) {
+      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.style.display = 'block';
+      enable();
+    }
+  }
+
   // Un encadré par créneau de retrait : les produits à retirer, le code (dès le début du créneau) et les boutons du créneau
   function renderSlotsSection(orderId, seller) {
     const slots = seller.slots || [];
+    // « Annuler » apparaît une seule fois par vendeur (tout ou rien) : dans le premier retrait pas encore annulé
+    const firstOpen = slots.findIndex((x) => !x.buyerCancelled);
     return slots.map((slot, index) => {
       const products = (slot.items || []).map((item) => {
         const qty = Number(item.quantity) || 1;
@@ -465,7 +535,7 @@
         '<div class="slot-when">' + escapeHtml(formatSlotRange(slot.pickupStartAt, slot.pickupEndAt)) + '</div>' +
         '<div class="slot-prod">' + products + '</div>' +
         codeHtml +
-        renderPayoutSection(orderId, seller, slot) +
+        (slot.buyerCancelled ? buyerCancelledHtml(slot) : renderPayoutSection(orderId, seller, slot, !!seller.cancelAllowed && index === firstOpen)) +
         '</div>';
     }).join('');
   }
@@ -622,6 +692,10 @@
     document.querySelectorAll('.payout-box[data-order-id]').forEach((box) => {
       const confirmBtn = box.querySelector('.payout-confirm-btn');
       const reportBtn = box.querySelector('.payout-report-btn');
+      const cancelBtn = box.querySelector('.payout-cancel-btn');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => { cancelVendorOrder(box); });
+      }
 
       if (confirmBtn) {
         confirmBtn.addEventListener('click', () => {
@@ -1070,6 +1144,10 @@
   .pickup-names { font-style:italic; color:#6B5842; }
   .payout-actions, .payout-report-buttons { flex-direction:row; flex-wrap:wrap; }
   .payout-actions .btn, .payout-report-buttons .btn { width:auto; }
+  .payout-actions { align-items:center; }
+  .my-panel .payout-cancel-btn { background:#C8352F; border:0; color:#fff; font-weight:700; box-shadow:none; }
+  .my-panel .payout-cancel-btn:hover { background:#A82A25; }
+  .cancel-note { font-size:0.8rem; font-weight:600; color:#6B5842; line-height:1.3; flex:1; min-width:150px; text-decoration:underline; text-decoration-color:#C8352F; text-decoration-thickness:2px; text-underline-offset:3px; }
 </style>
 
 </body>

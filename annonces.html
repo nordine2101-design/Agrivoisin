@@ -9,6 +9,142 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400&family=Merriweather:ital,wght@1,700&display=swap" rel="stylesheet">
+<style>
+  .page-header { background:url('fond-provence.jpg.jpg') center 35%/cover no-repeat; height:600px; padding:0; position:relative; }
+  .page-header .titre-cal { position:absolute; left:72%; top:18%; transform:translate(-50%,-50%); width:min(690px,56%); margin:0; line-height:0; mix-blend-mode:multiply; background:#fff; }
+  .page-header .titre-cal img { width:100%; height:auto; display:block; }
+  .page-header .titre-cal::after { content:''; position:absolute; inset:3px; background:#1FAE72; mix-blend-mode:lighten; pointer-events:none; }
+  .page-header .phrase-cal { position:absolute; left:76%; top:31%; transform:translateX(-50%); width:min(560px,44%); text-wrap:balance; text-align:center; font-family:'Merriweather',Georgia,serif; font-style:italic; font-weight:700; font-size:1.45rem; line-height:1.5; letter-spacing:0.02em; color:#fff; margin:0; text-shadow:0 2px 3px rgba(0,30,60,1), 0 0 8px rgba(0,30,60,.95), 0 0 18px rgba(0,30,60,.85), 0 0 28px rgba(0,30,60,.6); }
+  @media (max-width: 1100px) {
+    .page-header .titre-cal { left:70%; }
+    .page-header .phrase-cal { left:70%; width:min(560px,50%); }
+  }
+  @media (max-width: 700px) {
+    .page-header { height:430px; background-position:38% center; }
+    .page-header .titre-cal { left:50%; top:40%; width:88%; }
+    .page-header .phrase-cal { left:50%; top:54%; width:84%; font-size:1rem; }
+    .filters-card { margin-top:-40px; }
+  }
+  .page-header .container { max-width:none; padding-top:14px; }
+  .produce-card-body img.ship-sticker { display:block; width:130px; height:auto; margin:4px 0 4px -6px; }
+  .seller-type-disc { display:block; background:#fff; color:#C8352F; font-size:0.8rem; font-weight:700; padding:7px 15px 6px 14px; border-radius:0 18px 0 12px; box-shadow:inset 0 0 0 2px #C8352F; position:absolute; top:0; right:0; z-index:2; }
+  .produce-card-body p.stock-badge { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
+  .produce-card-body p.stock-badge.stock-out { color:#C8352F; }
+  .produce-card-body p.freshness-badge { display:flex; flex-direction:column; align-items:flex-start; }
+  .freshness-icons { display:flex; gap:2px; }
+  .freshness-label { color:#4169E1; }
+  .freshness-icon { width:56px; height:56px; object-fit:contain; flex-shrink:0; }
+  .card-rating { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin:2px 0 8px; font-size:0.9rem; font-weight:700; color:var(--leaf-deep); }
+  .card-rating-icon { width:22px; height:22px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
+  .card-rating-count { font-size:0.8rem; font-weight:400; color:#6B5842; }
+  .card-rating-new { font-size:0.8rem; color:#6B5842; }
+  .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  /* Annonce dans le panier : bouton vert avec une coche */
+  .icon-btn.is-selected { background:#2F8F3A; }
+  .icon-btn.is-selected svg { color:#fff; }
+  .icon-btn.is-selected:hover { background:#27782F; }
+
+  /* Favoris : la banane épluchée, dans l'angle haut droit sous la photo */
+  .title-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .title-row h4 { margin:0; min-width:0; }
+  .produce-card-body { position:relative; }
+  .title-row { padding-right:44px; }
+  .fav-btn { position:absolute; top:4px; right:8px; width:44px; height:44px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
+  .fav-btn img { position:absolute; left:50%; top:50%; width:38px; height:38px; object-fit:contain; transform:translate(-50%,-50%); transition:opacity .25s ease, transform .25s ease; pointer-events:none; }
+  .fav-btn .fav-off { opacity:.6; }
+  .fav-btn .fav-on { opacity:0; transform:translate(-50%,-50%) scale(.8); }
+  .fav-btn.is-fav .fav-off { opacity:0; }
+  .fav-btn.is-fav .fav-on { opacity:1; transform:translate(-50%,-50%) scale(1.08); }
+  .fav-btn:focus-visible { outline:2px solid #D97D45; outline-offset:2px; border-radius:12px; }
+  .fav-link { display:inline-flex; align-items:center; gap:6px; padding:5px 10px 5px 10px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-size:0.95rem; font-weight:700; color:#fff; text-decoration:none; }
+  .fav-link img { width:46px; height:46px; object-fit:contain; }
+  #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
+  #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
+  #favToast a { color:#FFD21F; font-weight:700; }
+  .coming-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; box-sizing:border-box; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; text-decoration:none; cursor:pointer; }
+  .coming-pill:focus-visible { outline:2px solid #3E9B4D; outline-offset:2px; }
+  .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; margin-left:90px; }
+  @media (max-width: 900px) { .seller-type-filter { margin-left:0; } }
+  .type-check { position:relative; display:inline-flex; align-items:center; padding:9px 18px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; user-select:none; }
+  .type-check input { position:absolute; opacity:0; width:1px; height:1px; margin:0; pointer-events:none; }
+  .type-check:has(input:checked) { background:#fff; border-color:#7CCB86; box-shadow:none; color:#3E9B4D; }
+  .type-check:has(input:focus-visible) { outline:2px solid #7CCB86; outline-offset:2px; }
+
+  /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone), chaque rangée sur son fond */
+  .bio-pill { display:inline-block; margin-left:6px; background:#fff; border:2px solid #2F8F3A; color:#2F8F3A; border-radius:999px; padding:2px 10px; font-weight:800; font-size:0.72rem; letter-spacing:0.05em; vertical-align:middle; }
+  .listings-grid { display: block; }
+  .listings-grid .row-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 16px; margin: 0 -16px; border-radius: 22px; }
+  .listings-grid .row-band-rose { background: #FCEBEE; }
+  .listings-grid .row-band-vert { background: #E4F3E0; }
+  .listings-grid .row-sep { height: 2px; margin: 16px 0; background: #BCD9B8; border-radius: 2px; }
+  @media (max-width: 900px) { .listings-grid .row-band { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .listings-grid .row-band { grid-template-columns: 1fr; padding: 10px; margin: 0 -10px; } }
+  .produce-card { border: 1px solid #e3efe0; }
+
+  /* Carte des filtres posée sur le bas de la bannière ; annonces sur fond vert très clair */
+  body { background: linear-gradient(180deg, #EAF5E6 0%, #F7FBF5 100%); }
+  .filters-card { position:relative; z-index:5; width:calc(100% - 48px); max-width:1100px; margin:-320px auto 30px; background:linear-gradient(180deg,#fff 0%,#EEF7EB 100%); border:2px solid #1FAE72; border-radius:28px; box-shadow:inset 0 3px 0 #fff, inset 0 -4px 6px rgba(110,175,125,.20), 0 2px 0 #1FAE72, 0 24px 36px rgba(25,70,35,.38); padding:22px 28px 18px; box-sizing:border-box; }
+  .filters-card .filters-bar { padding:6px 0; border:none; }
+  .filters-card .container { padding:0; }
+  .filters-card .seller-type-filter { margin-left:0; }
+  @media (max-width: 560px) { .filters-card { width:calc(100% - 24px); margin-top:-40px; padding:16px 14px 12px; border-radius:22px; } }
+  /* Sur grand écran, la carte des filtres reste visible en haut quand on descend la page */
+  @media (min-width: 901px) { .filters-card { position:sticky; top:0; } }
+
+  /* Bande réduite (quand on a descendu la page) : Retour à gauche, panier à droite, tout sur une ligne */
+  .bar-back, .bar-cart { display:none; }
+  @media (min-width: 901px) {
+    .filters-card.is-compact { max-width:1240px; }
+    .filters-card.is-compact .bar-back { display:inline-flex; flex:none; }
+    .filters-card.is-compact .bar-cart { display:flex; flex:none; width:48px; height:48px; margin-left:auto; background:none; }
+    .filters-card.is-compact .filters-bar:first-child .container > div { flex-wrap:nowrap; gap:8px !important; }
+    .filters-card.is-compact #searchInput { min-width:120px !important; }
+    .filters-card.is-compact #buyerCityInput { min-width:90px !important; }
+    .filters-card.is-compact .seller-type-filter { flex-wrap:nowrap; flex:none; }
+  }
+
+  /* Curseur de distance autour de la ville */
+  .radius-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:2px 8px 10px; }
+  .radius-row b { color:#3E7A4A; font-size:0.95rem; }
+  .radius-wrap { flex:1; min-width:260px; max-width:520px; margin-right:16px; position:relative; height:84px; --pct:0; }
+  /* Le centre de la boule va de 13 px (0 km) à (largeur - 13 px) (30 km) : les chiffres et la bulle suivent le même calcul */
+  .radius-wrap input[type=range] { position:absolute; left:0; top:34px; width:100%; height:26px; margin:0; padding:0; background:transparent; -webkit-appearance:none; appearance:none; cursor:pointer; }
+  .radius-wrap input[type=range]:focus { outline:none; }
+  .radius-wrap input[type=range]::-webkit-slider-runnable-track { height:14px; border-radius:14px; background:linear-gradient(90deg,#9BDDA3 0,#6BBE76 calc(13px + var(--pct) * (100% - 26px)),#DCEBD8 calc(13px + var(--pct) * (100% - 26px))); box-shadow:inset 0 2px 3px rgba(0,0,0,.12); }
+  .radius-wrap input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:26px; height:26px; margin-top:-6px; border-radius:50%; background:#fff; border:3px solid #3E9B4D; box-sizing:border-box; box-shadow:0 2px 5px rgba(0,0,0,.3); }
+  .radius-wrap input[type=range]::-moz-range-track { height:14px; border-radius:14px; background:#DCEBD8; box-shadow:inset 0 2px 3px rgba(0,0,0,.12); }
+  .radius-wrap input[type=range]::-moz-range-progress { height:14px; border-radius:14px; background:#6BBE76; }
+  .radius-wrap input[type=range]::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:#fff; border:3px solid #3E9B4D; box-sizing:border-box; box-shadow:0 2px 5px rgba(0,0,0,.3); }
+  .radius-wrap input[type=range]:focus-visible::-webkit-slider-thumb { outline:2px solid #7CCB86; outline-offset:2px; }
+  .radius-wrap input[type=range]:focus-visible::-moz-range-thumb { outline:2px solid #7CCB86; outline-offset:2px; }
+  .radius-bubble { position:absolute; top:0; left:calc(13px + var(--pct) * (100% - 26px)); transform:translateX(-50%); background:#3E9B4D; color:#fff; font-weight:700; font-size:0.85rem; border-radius:10px; padding:3px 10px; white-space:nowrap; }
+  .radius-bubble:after { content:""; position:absolute; left:50%; bottom:-5px; margin-left:-5px; border:5px solid transparent; border-top-color:#3E9B4D; border-bottom:0; }
+  .radius-ticks span { position:absolute; top:62px; transform:translateX(-50%); font-size:0.78rem; color:#6B5842; white-space:nowrap; }
+  /* Choix de la ville quand plusieurs communes portent le même nom */
+  .choice-row { padding:4px 8px 10px; }
+  .choice-row b { display:block; color:#3E7A4A; font-size:0.95rem; margin-bottom:8px; }
+  .choice-pills { display:flex; flex-wrap:wrap; gap:8px; }
+  .choice { border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; color:#fff; font-weight:700; border-radius:999px; padding:7px 16px; font-size:0.92rem; font-family:inherit; cursor:pointer; }
+  .choice:hover { background:#fff; color:#3E9B4D; border-color:#7CCB86; box-shadow:none; }
+  .choice:focus-visible { outline:2px solid #7CCB86; outline-offset:2px; }
+  #noListingsMessage.city-empty { color:#4C7A50; font-weight:600; font-size:1.05rem; }
+
+  /* Pages d'annonces : Précédent, numéros, Suivant */
+  .pager { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:36px; }
+  .pager-btn { padding:9px 18px; border-radius:999px; border:1.5px solid #3AA5E3; background:#fff; font-family:inherit; font-size:0.95rem; font-weight:700; color:#1F8FD6; cursor:pointer; }
+  .pager-btn:hover:not(:disabled) { background:#EAF6FD; }
+  .pager-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .pager-num { min-width:42px; padding:9px 12px; }
+  .pager-num.is-current { background:#3AA5E3; border-color:#3AA5E3; color:#fff; }
+  .pager-dots { color:#1F8FD6; font-weight:700; padding:0 2px; }
+  .pager-btn:focus-visible { outline:2px solid #3AA5E3; outline-offset:2px; }
+
+  .price-wrap { display:inline-flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }
+  .price-wrap .price { color:#C8352F; }
+  .promo-pill { display:inline-block; margin:6px 0 0 0; padding:3px 10px; border-radius:999px; background:#FFE27A; color:#B45A00; font-size:0.75rem; font-weight:700; }
+  .or3 { font-family:'Josefin Sans',sans-serif; font-weight:400; text-transform:uppercase; letter-spacing:.25em; font-size:0.8em; transform:scaleX(1.12); transform-origin:left center; margin-left:.15em; margin-right:.65em; background-image:linear-gradient(180deg,#FFF1A8 0%,#E5B93C 45%,#B8860B 55%,#F2D675 100%); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; display:inline-block; filter:drop-shadow(0 2px 1px rgba(90,60,0,.35)); }
+</style>
 <script src="supabase.js"></script>
 </head>
 <body>
@@ -1013,142 +1149,9 @@
 
 <script src="script.js"></script>
 
-<style>
-  .page-header { background:url('fond-provence.jpg.jpg') center 35%/cover no-repeat; height:600px; padding:0; position:relative; }
-  .page-header .titre-cal { position:absolute; left:72%; top:18%; transform:translate(-50%,-50%); width:min(690px,56%); margin:0; line-height:0; mix-blend-mode:multiply; background:#fff; }
-  .page-header .titre-cal img { width:100%; height:auto; display:block; }
-  .page-header .titre-cal::after { content:''; position:absolute; inset:3px; background:#1FAE72; mix-blend-mode:lighten; pointer-events:none; }
-  .page-header .phrase-cal { position:absolute; left:76%; top:31%; transform:translateX(-50%); width:min(560px,44%); text-wrap:balance; text-align:center; font-family:'Merriweather',Georgia,serif; font-style:italic; font-weight:700; font-size:1.45rem; line-height:1.5; letter-spacing:0.02em; color:#fff; margin:0; text-shadow:0 2px 3px rgba(0,30,60,1), 0 0 8px rgba(0,30,60,.95), 0 0 18px rgba(0,30,60,.85), 0 0 28px rgba(0,30,60,.6); }
-  @media (max-width: 1100px) {
-    .page-header .titre-cal { left:70%; }
-    .page-header .phrase-cal { left:70%; width:min(560px,50%); }
-  }
-  @media (max-width: 700px) {
-    .page-header { height:430px; background-position:38% center; }
-    .page-header .titre-cal { left:50%; top:40%; width:88%; }
-    .page-header .phrase-cal { left:50%; top:54%; width:84%; font-size:1rem; }
-    .filters-card { margin-top:-40px; }
-  }
-  .page-header .container { max-width:none; padding-top:14px; }
-  .produce-card-body img.ship-sticker { display:block; width:130px; height:auto; margin:4px 0 4px -6px; }
-  .seller-type-disc { display:block; background:#fff; color:#C8352F; font-size:0.8rem; font-weight:700; padding:7px 15px 6px 14px; border-radius:0 18px 0 12px; box-shadow:inset 0 0 0 2px #C8352F; position:absolute; top:0; right:0; z-index:2; }
-  .produce-card-body p.stock-badge { margin:2px 0 6px; font-size:0.8rem; font-weight:700; color:#C26A1E; }
-  .produce-card-body p.stock-badge.stock-out { color:#C8352F; }
-  .produce-card-body p.freshness-badge { display:flex; flex-direction:column; align-items:flex-start; }
-  .freshness-icons { display:flex; gap:2px; }
-  .freshness-label { color:#4169E1; }
-  .freshness-icon { width:56px; height:56px; object-fit:contain; flex-shrink:0; }
-  .card-rating { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin:2px 0 8px; font-size:0.9rem; font-weight:700; color:var(--leaf-deep); }
-  .card-rating-icon { width:22px; height:22px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
-  .card-rating-count { font-size:0.8rem; font-weight:400; color:#6B5842; }
-  .card-rating-new { font-size:0.8rem; color:#6B5842; }
-  .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
-  /* Annonce dans le panier : bouton vert avec une coche */
-  .icon-btn.is-selected { background:#2F8F3A; }
-  .icon-btn.is-selected svg { color:#fff; }
-  .icon-btn.is-selected:hover { background:#27782F; }
-
-  /* Favoris : la banane épluchée, dans l'angle haut droit sous la photo */
-  .title-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .title-row h4 { margin:0; min-width:0; }
-  .produce-card-body { position:relative; }
-  .title-row { padding-right:44px; }
-  .fav-btn { position:absolute; top:4px; right:8px; width:44px; height:44px; padding:0; border:0; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
-  .fav-btn img { position:absolute; left:50%; top:50%; width:38px; height:38px; object-fit:contain; transform:translate(-50%,-50%); transition:opacity .25s ease, transform .25s ease; pointer-events:none; }
-  .fav-btn .fav-off { opacity:.6; }
-  .fav-btn .fav-on { opacity:0; transform:translate(-50%,-50%) scale(.8); }
-  .fav-btn.is-fav .fav-off { opacity:0; }
-  .fav-btn.is-fav .fav-on { opacity:1; transform:translate(-50%,-50%) scale(1.08); }
-  .fav-btn:focus-visible { outline:2px solid #D97D45; outline-offset:2px; border-radius:12px; }
-  .fav-link { display:inline-flex; align-items:center; gap:6px; padding:5px 10px 5px 10px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-size:0.95rem; font-weight:700; color:#fff; text-decoration:none; }
-  .fav-link img { width:46px; height:46px; object-fit:contain; }
-  #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
-  #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
-  #favToast a { color:#FFD21F; font-weight:700; }
-  .coming-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; box-sizing:border-box; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; text-decoration:none; cursor:pointer; }
-  .coming-pill:focus-visible { outline:2px solid #3E9B4D; outline-offset:2px; }
-  .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; margin-left:90px; }
-  @media (max-width: 900px) { .seller-type-filter { margin-left:0; } }
-  .type-check { position:relative; display:inline-flex; align-items:center; padding:9px 18px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; user-select:none; }
-  .type-check input { position:absolute; opacity:0; width:1px; height:1px; margin:0; pointer-events:none; }
-  .type-check:has(input:checked) { background:#fff; border-color:#7CCB86; box-shadow:none; color:#3E9B4D; }
-  .type-check:has(input:focus-visible) { outline:2px solid #7CCB86; outline-offset:2px; }
-
-  /* 3 annonces par rangée (2 sur tablette, 1 sur téléphone), chaque rangée sur son fond */
-  .bio-pill { display:inline-block; margin-left:6px; background:#fff; border:2px solid #2F8F3A; color:#2F8F3A; border-radius:999px; padding:2px 10px; font-weight:800; font-size:0.72rem; letter-spacing:0.05em; vertical-align:middle; }
-  .listings-grid { display: block; }
-  .listings-grid .row-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; padding: 16px; margin: 0 -16px; border-radius: 22px; }
-  .listings-grid .row-band-rose { background: #FCEBEE; }
-  .listings-grid .row-band-vert { background: #E4F3E0; }
-  .listings-grid .row-sep { height: 2px; margin: 16px 0; background: #BCD9B8; border-radius: 2px; }
-  @media (max-width: 900px) { .listings-grid .row-band { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 560px) { .listings-grid .row-band { grid-template-columns: 1fr; padding: 10px; margin: 0 -10px; } }
-  .produce-card { border: 1px solid #e3efe0; }
-
-  /* Carte des filtres posée sur le bas de la bannière ; annonces sur fond vert très clair */
-  body { background: linear-gradient(180deg, #EAF5E6 0%, #F7FBF5 100%); }
-  .filters-card { position:relative; z-index:5; width:calc(100% - 48px); max-width:1100px; margin:-320px auto 30px; background:linear-gradient(180deg,#fff 0%,#EEF7EB 100%); border:2px solid #1FAE72; border-radius:28px; box-shadow:inset 0 3px 0 #fff, inset 0 -4px 6px rgba(110,175,125,.20), 0 2px 0 #1FAE72, 0 24px 36px rgba(25,70,35,.38); padding:22px 28px 18px; box-sizing:border-box; }
-  .filters-card .filters-bar { padding:6px 0; border:none; }
-  .filters-card .container { padding:0; }
-  .filters-card .seller-type-filter { margin-left:0; }
-  @media (max-width: 560px) { .filters-card { width:calc(100% - 24px); margin-top:-40px; padding:16px 14px 12px; border-radius:22px; } }
-  /* Sur grand écran, la carte des filtres reste visible en haut quand on descend la page */
-  @media (min-width: 901px) { .filters-card { position:sticky; top:0; } }
-
-  /* Bande réduite (quand on a descendu la page) : Retour à gauche, panier à droite, tout sur une ligne */
-  .bar-back, .bar-cart { display:none; }
-  @media (min-width: 901px) {
-    .filters-card.is-compact { max-width:1240px; }
-    .filters-card.is-compact .bar-back { display:inline-flex; flex:none; }
-    .filters-card.is-compact .bar-cart { display:flex; flex:none; width:48px; height:48px; margin-left:auto; background:none; }
-    .filters-card.is-compact .filters-bar:first-child .container > div { flex-wrap:nowrap; gap:8px !important; }
-    .filters-card.is-compact #searchInput { min-width:120px !important; }
-    .filters-card.is-compact #buyerCityInput { min-width:90px !important; }
-    .filters-card.is-compact .seller-type-filter { flex-wrap:nowrap; flex:none; }
-  }
-
-  /* Curseur de distance autour de la ville */
-  .radius-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:2px 8px 10px; }
-  .radius-row b { color:#3E7A4A; font-size:0.95rem; }
-  .radius-wrap { flex:1; min-width:260px; max-width:520px; margin-right:16px; position:relative; height:84px; --pct:0; }
-  /* Le centre de la boule va de 13 px (0 km) à (largeur - 13 px) (30 km) : les chiffres et la bulle suivent le même calcul */
-  .radius-wrap input[type=range] { position:absolute; left:0; top:34px; width:100%; height:26px; margin:0; padding:0; background:transparent; -webkit-appearance:none; appearance:none; cursor:pointer; }
-  .radius-wrap input[type=range]:focus { outline:none; }
-  .radius-wrap input[type=range]::-webkit-slider-runnable-track { height:14px; border-radius:14px; background:linear-gradient(90deg,#9BDDA3 0,#6BBE76 calc(13px + var(--pct) * (100% - 26px)),#DCEBD8 calc(13px + var(--pct) * (100% - 26px))); box-shadow:inset 0 2px 3px rgba(0,0,0,.12); }
-  .radius-wrap input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:26px; height:26px; margin-top:-6px; border-radius:50%; background:#fff; border:3px solid #3E9B4D; box-sizing:border-box; box-shadow:0 2px 5px rgba(0,0,0,.3); }
-  .radius-wrap input[type=range]::-moz-range-track { height:14px; border-radius:14px; background:#DCEBD8; box-shadow:inset 0 2px 3px rgba(0,0,0,.12); }
-  .radius-wrap input[type=range]::-moz-range-progress { height:14px; border-radius:14px; background:#6BBE76; }
-  .radius-wrap input[type=range]::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:#fff; border:3px solid #3E9B4D; box-sizing:border-box; box-shadow:0 2px 5px rgba(0,0,0,.3); }
-  .radius-wrap input[type=range]:focus-visible::-webkit-slider-thumb { outline:2px solid #7CCB86; outline-offset:2px; }
-  .radius-wrap input[type=range]:focus-visible::-moz-range-thumb { outline:2px solid #7CCB86; outline-offset:2px; }
-  .radius-bubble { position:absolute; top:0; left:calc(13px + var(--pct) * (100% - 26px)); transform:translateX(-50%); background:#3E9B4D; color:#fff; font-weight:700; font-size:0.85rem; border-radius:10px; padding:3px 10px; white-space:nowrap; }
-  .radius-bubble:after { content:""; position:absolute; left:50%; bottom:-5px; margin-left:-5px; border:5px solid transparent; border-top-color:#3E9B4D; border-bottom:0; }
-  .radius-ticks span { position:absolute; top:62px; transform:translateX(-50%); font-size:0.78rem; color:#6B5842; white-space:nowrap; }
-  /* Choix de la ville quand plusieurs communes portent le même nom */
-  .choice-row { padding:4px 8px 10px; }
-  .choice-row b { display:block; color:#3E7A4A; font-size:0.95rem; margin-bottom:8px; }
-  .choice-pills { display:flex; flex-wrap:wrap; gap:8px; }
-  .choice { border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; color:#fff; font-weight:700; border-radius:999px; padding:7px 16px; font-size:0.92rem; font-family:inherit; cursor:pointer; }
-  .choice:hover { background:#fff; color:#3E9B4D; border-color:#7CCB86; box-shadow:none; }
-  .choice:focus-visible { outline:2px solid #7CCB86; outline-offset:2px; }
-  #noListingsMessage.city-empty { color:#4C7A50; font-weight:600; font-size:1.05rem; }
-
-  /* Pages d'annonces : Précédent, numéros, Suivant */
-  .pager { display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin-top:36px; }
-  .pager-btn { padding:9px 18px; border-radius:999px; border:1.5px solid #3AA5E3; background:#fff; font-family:inherit; font-size:0.95rem; font-weight:700; color:#1F8FD6; cursor:pointer; }
-  .pager-btn:hover:not(:disabled) { background:#EAF6FD; }
-  .pager-btn:disabled { opacity:0.4; cursor:not-allowed; }
-  .pager-num { min-width:42px; padding:9px 12px; }
-  .pager-num.is-current { background:#3AA5E3; border-color:#3AA5E3; color:#fff; }
-  .pager-dots { color:#1F8FD6; font-weight:700; padding:0 2px; }
-  .pager-btn:focus-visible { outline:2px solid #3AA5E3; outline-offset:2px; }
-
-  .price-wrap { display:inline-flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
-  .price-old { text-decoration:line-through; color:#8a7a62; font-weight:400; font-size:0.9rem; }
-  .price-wrap .price { color:#C8352F; }
-  .promo-pill { display:inline-block; margin:6px 0 0 0; padding:3px 10px; border-radius:999px; background:#FFE27A; color:#B45A00; font-size:0.75rem; font-weight:700; }
-  .or3 { font-family:'Josefin Sans',sans-serif; font-weight:400; text-transform:uppercase; letter-spacing:.25em; font-size:0.8em; transform:scaleX(1.12); transform-origin:left center; margin-left:.15em; margin-right:.65em; background-image:linear-gradient(180deg,#FFF1A8 0%,#E5B93C 45%,#B8860B 55%,#F2D675 100%); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; display:inline-block; filter:drop-shadow(0 2px 1px rgba(90,60,0,.35)); }
-</style>
 </body>
 </html>
+
+
+
 

@@ -352,10 +352,10 @@
         'Téléphone : ' + escapeHtml(formatPhone(a.phone)) + '</div>';
     }
     html += '<div class="ship-action" data-order="' + escapeHtml(sale.orderId) + '">' +
-      '<label>Numéro de suivi (facultatif)</label>' +
-      '<input type="text" class="ship-tracking" maxlength="40" placeholder="Par exemple : 6A12345678901" autocomplete="off">' +
+      '<label>Numéro de suivi du colis</label>' +
+      '<input type="text" class="ship-tracking" maxlength="30" placeholder="Par exemple : 6A12345678901" autocomplete="off">' +
       '<button type="button" class="btn btn-primary ship-btn">J\'ai expédié le colis</button>' +
-      '<p>Cliquez seulement quand le colis est remis au transporteur.</p>' +
+      '<p>Cliquez seulement quand le colis est remis au transporteur. Le numéro de suivi est obligatoire.</p>' +
       '<p class="ship-error" style="display:none;"></p></div>';
     return html;
   }
@@ -590,6 +590,23 @@
     const box = button.closest('.ship-action');
     const errorEl = box.querySelector('.ship-error');
     errorEl.style.display = 'none';
+
+    // Le numéro de suivi est obligatoire : 8 à 20 lettres ou chiffres (espaces et tirets ignorés)
+    const trackingInput = box.querySelector('.ship-tracking');
+    trackingInput.style.borderColor = '';
+    const trackingClean = trackingInput.value.replace(/[\s-]+/g, '');
+    if (!trackingClean) {
+      trackingInput.style.borderColor = '#C8352F';
+      errorEl.textContent = 'Indiquez le numéro de suivi du colis pour continuer.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    if (!/^[A-Za-z0-9]{8,20}$/.test(trackingClean)) {
+      trackingInput.style.borderColor = '#C8352F';
+      errorEl.textContent = 'Le numéro de suivi doit faire entre 8 et 20 caractères, avec seulement des lettres et des chiffres.';
+      errorEl.style.display = 'block';
+      return;
+    }
 
     if (!window.confirm('Confirmez-vous que le colis est bien remis au transporteur ?')) return;
 

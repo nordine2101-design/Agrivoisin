@@ -72,6 +72,12 @@ function validatePickupHours(input) {
 // Toutes les autres sont réservées aux vendeurs professionnels.
 const PARTICULIER_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin'];
 
+// Catégories où un professionnel peut expédier : toutes celles réservées aux professionnels (produits qui se conservent),
+// plus les aromates (frais ou séchés). Jamais les fruits, les légumes ni les fleurs du jardin.
+function isShippableCategory(category) {
+  return !PARTICULIER_CATEGORIES.includes(category) || category === 'Aromates';
+}
+
 // Quantité disponible : un nombre entier d'unités (par exemple 5 kg ou 3 bottes), de 1 à 9999
 const MAX_QUANTITY = 9999;
 
@@ -290,12 +296,12 @@ export default async function handler(req, res) {
 
     // 3. Le mode de remise : retrait (par défaut), expédition, ou les deux.
     //    L'expédition est réservée aux professionnels qui vendent une catégorie réservée aux professionnels
-    //    (produits qui se conservent), jamais aux fruits et légumes frais.
+    //    (produits qui se conservent) ou des aromates, jamais aux fruits, légumes et fleurs du jardin.
     const mode = deliveryMode == null ? 'retrait' : deliveryMode;
     if (!DELIVERY_MODES.includes(mode)) {
       return res.status(400).json({ error: "Mode de remise invalide : choisissez retrait, expédition ou les deux." });
     }
-    if (mode !== 'retrait' && !(seller.seller_type === 'professionnel' && !PARTICULIER_CATEGORIES.includes(category))) {
+    if (mode !== 'retrait' && !(seller.seller_type === 'professionnel' && isShippableCategory(category))) {
       return res.status(403).json({ error: "L'expédition n'est pas possible pour cette catégorie de produits : seul le retrait est proposé." });
     }
 

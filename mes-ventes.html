@@ -467,7 +467,12 @@
       }).join(' · ');
 
       let body = '';
-      if (slot.status === 'verse') {
+      if (slot.buyerCancelled) {
+        // Retrait annulé par l'acheteur : la moitié de la partie annulée reste au vendeur (rien pour un produit non périssable de professionnel)
+        body = Number(slot.cancelKeptAmount) > 0
+          ? '<div class="cancel-seller-box"><strong>Commande annulée par l\'acheteur.</strong> Vous recevez <strong>' + escapeHtml(formatAmount(slot.cancelKeptAmount)) + '</strong> (la moitié de la partie annulée), avant la commission et les frais de carte. Il n\'y a plus rien à préparer.</div>'
+          : '<div class="cancel-seller-box"><strong>Commande annulée par l\'acheteur</strong> (rétractation de 14 jours, produit non périssable). Aucun paiement pour ce retrait. Il n\'y a plus rien à préparer.</div>';
+      } else if (slot.status === 'verse') {
         body = slot.pickedUpAt
           ? '<div class="pickup-done">✓ Retirée. L\'argent a été libéré' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>'
           : '<div class="pickup-done">Argent versé' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>';
@@ -871,6 +876,7 @@
   .resch-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
   .resch-row label { display:block; font-size:0.75rem; font-weight:700; color:#8C1B3C; margin-bottom:3px; }
   .resch-row select { font:inherit; font-size:0.9rem; padding:7px; border:1px solid #ccc; border-radius:8px; background:#fff; max-width:100%; }
+  .cancel-seller-box { background:#E4F2DE; border:2px solid #2F6B3A; border-radius:10px; padding:10px; font-size:0.85rem; line-height:1.5; color:#3b2f22; }
   .pickup-done { background:#f6f9f5; border:1px solid #cfe3cf; border-radius:8px; padding:8px; font-size:0.85rem; line-height:1.5; color:#3E6B42; font-weight:600; }
   .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
   .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }

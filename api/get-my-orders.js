@@ -2,6 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
+// Produits frais : l'annulation d'un retrait coûte 50 % (les autres catégories, réservées aux professionnels, sont remboursées en totalité)
+const FRESH_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin'];
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -63,7 +66,7 @@ export default async function handler(req, res) {
 
     const { data: items, error: itemsError } = await supabase
       .from('order_items')
-      .select('id, order_id, seller_id, listing_id, payout_id, price_at_purchase, delivery_mode, listings(title, unit, image_url, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
+      .select('id, order_id, seller_id, listing_id, payout_id, price_at_purchase, delivery_mode, listings(title, unit, image_url, category, listing_pickup_hours(day_of_week, slot, start_time, end_time))')
       .in('order_id', orderIds);
 
     if (itemsError) throw itemsError;
@@ -96,7 +99,7 @@ export default async function handler(req, res) {
     let payouts = [];
     const { data: payoutsData, error: payoutsError } = await supabase
       .from('payouts')
-      .select('id, order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, pickup_end_at, pickup_code, picked_up_at, refunded_cents, shipping_cents, shipped_at, tracking_number, reschedule_status, reschedule_requested_at, reschedule_proposed_start_at, reschedule_proposed_end_at')
+      .select('id, order_id, seller_id, status, auto_release_at, released_at, pickup_start_at, pickup_end_at, pickup_code, picked_up_at, refunded_cents, shipping_cents, shipped_at, tracking_number, reschedule_status, reschedule_requested_at, reschedule_proposed_start_at, reschedule_proposed_end_at, buyer_cancelled_at, amount_cents, original_amount_cents')
       .in('order_id', orderIds);
 
     if (payoutsError) {
@@ -187,10 +190,23 @@ export default async function handler(req, res) {
             rescheduleProposedEndAt: p.reschedule_proposed_end_at || null,
             refundedAmount: p.status === 'rembourse' && p.refunded_cents != null ? (Number(p.refunded_cents) || 0) / 100 : null,
             // Le code n'est jamais envoyé avant le début du créneau, ni une fois la commande retirée (ni quand le versement n'est plus en attente)
-            code: started && p.status === 'en_attente' && !p.picked_up_at ? (p.pickup_code || null) : null,
+            code: started && p.status === 'en_attente' && !p.picked_up_at && !p.buyer_cancelled_at ? (p.pickup_code || null) : null,
+            // Retrait annulé par l'acheteur : ce qui lui a été remboursé et ce qui est resté au vendeur (en euros)
+            buyerCancelled: !!p.buyer_cancelled_at,
+            cancelRefundedAmount: p.buyer_cancelled_at && p.refunded_cents != null ? (Number(p.refunded_cents) || 0) / 100 : null,
+            cancelKeptAmount: p.buyer_cancelled_at && Number(p.original_amount_cents) > 0 ? (Number(p.amount_cents) || 0) / 100 : 0,
             items: Object.values(byListing),
           };
         });
+
+        // « Annuler » : possible tant qu'aucun retrait de ce vendeur n'a commencé (tout ou rien par vendeur).
+        // Gratuit (remboursement total) seulement si aucun des produits n'est un produit frais.
+        const toCancel = slotPayouts.filter((p) => !p.buyer_cancelled_at);
+        const cancelAllowed = toCancel.length > 0 && toCancel.every((p) => p.status === 'en_attente' && !p.picked_up_at && !p.reschedule_status && new Date(p.pickup_start_at).getTime() > nowMs);
+        const cancelFree = cancelAllowed && toCancel.every((p) => !orderItems.filter((it) => it.payout_id === p.id).some((it) => {
+          const category = it.listings && it.listings.category;
+          return !category || FRESH_CATEGORIES.includes(category);
+        }));
 
         // L'adresse du vendeur n'est donnée que tant que l'acheteur n'a pas confirmé la réception :
         // dès que le paiement est versé (ou suspendu), elle disparaît et n'est plus jamais renvoyée
@@ -216,8 +232,10 @@ export default async function handler(req, res) {
           ...s,
           items: s.items.map(({ amountCents, ...item }) => ({ ...item, amount: amountCents / 100 })),
           // L'adresse du vendeur ne sert que s'il reste au moins un article à retirer chez lui
-          sellerAddress: hasPickupItem && (slotPayouts.length > 0 ? slotPayouts.some((p) => p.status === 'en_attente' && !p.picked_up_at) : addressStillVisible) ? (addressesById[s.sellerId] || null) : null,
+          sellerAddress: hasPickupItem && (slotPayouts.length > 0 ? slotPayouts.some((p) => p.status === 'en_attente' && !p.picked_up_at && !p.buyer_cancelled_at) : addressStillVisible) ? (addressesById[s.sellerId] || null) : null,
           slots,
+          cancelAllowed,
+          cancelFree,
           delivery,
           review: existingReview || null,
           // null pour les anciennes commandes (payées avant l'argent retenu)

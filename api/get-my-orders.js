@@ -1,12 +1,230 @@
+import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 
 // Produits frais : l'annulation d'un retrait coûte 50 % (les autres catégories, réservées aux professionnels, sont remboursées en totalité)
 const FRESH_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin'];
 
+// ---------------------------------------------------------------------------
+// Avis sur un vendeur : l'envoi passe par le serveur.
+// Un avis est « lié » (jamais affiché, jamais compté dans la moyenne) quand l'acheteur et le vendeur semblent être la même
+// personne ou des proches : même e-mail, même téléphone, même adresse ou même carte bancaire.
+// L'acheteur ne le sait pas : pour lui, l'avis est envoyé comme les autres.
+// ---------------------------------------------------------------------------
+const MAX_REVIEW_COMMENT = 1000;
+const MAX_ORDERS_COMPARED = 5; // commandes les plus récentes de chaque personne, comparées pour la carte, le téléphone et l'adresse
+
+// Même adresse e-mail même écrite autrement : majuscules, « +quelquechose », points de Gmail
+function normalizeEmail(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  const at = raw.lastIndexOf('@');
+  if (at < 1) return '';
+  let local = raw.slice(0, at).split('+')[0];
+  let domain = raw.slice(at + 1);
+  if (domain === 'googlemail.com') domain = 'gmail.com';
+  if (domain === 'gmail.com') local = local.replace(/\./g, '');
+  return local && domain ? local + '@' + domain : '';
+}
+
+// Téléphone français : « 06 12 34 56 78 », « +33 6 12 34 56 78 » et « 0033612345678 » sont le même numéro
+function normalizePhone(value) {
+  let digits = String(value || '').replace(/[^\d+]/g, '');
+  if (digits.startsWith('+33')) digits = '0' + digits.slice(3);
+  else if (digits.startsWith('0033')) digits = '0' + digits.slice(4);
+  return /^0[1-9]\d{8}$/.test(digits) ? digits : '';
+}
+
+// Texte sans accents, sans ponctuation, en minuscules
+function normalizeText(value) {
+  return String(value == null ? '' : value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+// L'empreinte de la carte utilisée pour une commande : la même carte donne toujours la même empreinte
+async function cardFingerprints(orders) {
+  const found = new Set();
+  await Promise.all((orders || []).filter((o) => o.stripe_session_id).map(async (o) => {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(o.stripe_session_id, { expand: ['payment_intent.latest_charge'] });
+      const paymentIntent = session && session.payment_intent;
+      const charge = paymentIntent && typeof paymentIntent === 'object' ? paymentIntent.latest_charge : null;
+      const card = charge && typeof charge === 'object' && charge.payment_method_details ? charge.payment_method_details.card : null;
+      if (card && card.fingerprint) found.add(card.fingerprint);
+    } catch (err) {
+      console.error('Avis : carte d\'une commande illisible :', err.message);
+    }
+  }));
+  return found;
+}
+
+// Renvoie la raison du lien (« meme_email », « meme_telephone », « meme_adresse », « meme_carte ») ou null
+async function reviewLinkReason(buyer, seller) {
+  if (seller.user_id && String(seller.user_id) === String(buyer.id)) return 'meme_compte';
+
+  // 1. L'e-mail
+  const buyerEmail = normalizeEmail(buyer.email);
+  const sellerEmails = new Set();
+  if (seller.email) sellerEmails.add(normalizeEmail(seller.email));
+  if (seller.user_id) {
+    try {
+      const { data: sellerUser } = await supabase.auth.admin.getUserById(seller.user_id);
+      if (sellerUser && sellerUser.user && sellerUser.user.email) sellerEmails.add(normalizeEmail(sellerUser.user.email));
+    } catch (err) {
+      console.error('Avis : e-mail du vendeur illisible :', err.message);
+    }
+  }
+  sellerEmails.delete('');
+  if (buyerEmail && sellerEmails.has(buyerEmail)) return 'meme_email';
+
+  // 2. Les commandes de l'acheteur, et celles que le vendeur a lui-même passées comme acheteur
+  const readOrders = async (userId) => {
+    if (!userId) return [];
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, stripe_session_id, shipping_address, created_at')
+      .eq('buyer_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(MAX_ORDERS_COMPARED);
+    if (error) throw new Error('commandes : ' + error.message);
+    return data || [];
+  };
+  const buyerOrders = await readOrders(buyer.id);
+  const sellerOrders = await readOrders(seller.user_id);
+
+  const phonesOf = (orders) => new Set(orders.map((o) => normalizePhone(o.shipping_address && o.shipping_address.phone)).filter(Boolean));
+  const buyerPhones = phonesOf(buyerOrders);
+  for (const phone of phonesOf(sellerOrders)) {
+    if (buyerPhones.has(phone)) return 'meme_telephone';
+  }
+
+  // 3. L'adresse : celle du vendeur (sa fiche) ou celles de ses propres livraisons, comparées aux livraisons de l'acheteur
+  const addressKey = (a) => {
+    const street = normalizeText(a && a.address);
+    const postal = String((a && a.postal_code) || '').trim();
+    return street.length >= 6 ? street + '|' + postal : '';
+  };
+  const buyerAddresses = buyerOrders.map((o) => o.shipping_address).filter((a) => a && typeof a === 'object' && addressKey(a));
+  const sellerAddressText = normalizeText(seller.address);
+  const sellerKeys = new Set(sellerOrders.map((o) => addressKey(o.shipping_address)).filter(Boolean));
+  for (const a of buyerAddresses) {
+    const street = normalizeText(a.address);
+    const postal = String(a.postal_code || '').trim();
+    if (sellerKeys.has(addressKey(a))) return 'meme_adresse';
+    if (sellerAddressText && sellerAddressText.includes(street) && (!postal || sellerAddressText.includes(postal))) return 'meme_adresse';
+  }
+
+  // 4. La carte bancaire (seulement si le vendeur a déjà acheté sur Agrivoisin)
+  if (sellerOrders.length > 0 && buyerOrders.length > 0) {
+    const [buyerCards, sellerCards] = await Promise.all([cardFingerprints(buyerOrders), cardFingerprints(sellerOrders)]);
+    for (const fingerprint of buyerCards) {
+      if (sellerCards.has(fingerprint)) return 'meme_carte';
+    }
+  }
+
+  return null;
+}
+
+async function submitReview(req, res, buyer) {
+  const body = req.body || {};
+  const orderId = typeof body.orderId === 'string' || typeof body.orderId === 'number' ? String(body.orderId).trim() : '';
+  const sellerId = typeof body.sellerId === 'string' || typeof body.sellerId === 'number' ? String(body.sellerId).trim() : '';
+  const rating = Number(body.rating);
+  const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, MAX_REVIEW_COMMENT) : '';
+
+  if (!orderId || !sellerId || orderId.length > 64 || sellerId.length > 64) {
+    return res.status(400).json({ error: 'Commande introuvable.' });
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 4) {
+    return res.status(400).json({ error: 'Merci de choisir une note.' });
+  }
+
+  // La commande est bien celle de cette personne, et ce vendeur y figure
+  const { data: order, error: orderError } = await supabase.from('orders').select('id, buyer_id').eq('id', orderId).maybeSingle();
+  if (orderError) throw orderError;
+  if (!order || String(order.buyer_id) !== String(buyer.id)) {
+    return res.status(404).json({ error: 'Commande introuvable.' });
+  }
+  const { data: sold, error: soldError } = await supabase
+    .from('order_items')
+    .select('id')
+    .eq('order_id', order.id)
+    .eq('seller_id', sellerId)
+    .limit(1);
+  if (soldError) throw soldError;
+  if (!sold || sold.length === 0) {
+    return res.status(404).json({ error: 'Commande introuvable.' });
+  }
+
+  // Un avis n'est possible qu'une fois la réception confirmée (paiement versé) ; jamais pour une commande annulée.
+  // Les anciennes commandes, sans versement enregistré, ne sont pas concernées.
+  const { data: payouts, error: payoutsError } = await supabase
+    .from('payouts')
+    .select('status, buyer_cancelled_at')
+    .eq('order_id', order.id)
+    .eq('seller_id', sellerId);
+  if (payoutsError) throw payoutsError;
+  const list = payouts || [];
+  if (list.some((p) => p.buyer_cancelled_at || p.status !== 'verse')) {
+    return res.status(409).json({ error: 'Vous pourrez donner votre avis une fois la commande retirée et le paiement versé.' });
+  }
+
+  // Un seul avis par commande et par vendeur
+  const { data: already, error: alreadyError } = await supabase
+    .from('reviews')
+    .select('order_id')
+    .eq('order_id', order.id)
+    .eq('seller_id', sellerId)
+    .eq('buyer_id', buyer.id)
+    .limit(1);
+  if (alreadyError) throw alreadyError;
+  if (already && already.length > 0) {
+    return res.status(409).json({ error: 'Vous avez déjà donné votre avis pour cette commande.' });
+  }
+
+  // Avis lié ? En cas de doute technique, l'avis est publié (rien n'est refusé à un acheteur honnête)
+  let linkReason = null;
+  try {
+    const { data: seller, error: sellerError } = await supabase
+      .from('sellers')
+      .select('id, user_id, email, address')
+      .eq('id', sellerId)
+      .maybeSingle();
+    if (sellerError) throw sellerError;
+    if (seller) linkReason = await reviewLinkReason(buyer, seller);
+  } catch (err) {
+    console.error('Avis : comparaison impossible :', err.message);
+  }
+  if (linkReason) {
+    console.warn('Avis lié (non publié) : commande ' + order.id + ', vendeur ' + sellerId + ', raison : ' + linkReason);
+  }
+
+  const { error: insertError } = await supabase.from('reviews').insert({
+    order_id: order.id,
+    seller_id: sellerId,
+    buyer_id: buyer.id,
+    rating,
+    comment: comment || null,
+    linked: !!linkReason,
+  });
+  if (insertError) {
+    if (insertError.code === '23505') {
+      return res.status(409).json({ error: 'Vous avez déjà donné votre avis pour cette commande.' });
+    }
+    throw insertError;
+  }
+
+  // Même réponse dans tous les cas : l'acheteur ne sait pas si l'avis est lié
+  return res.status(200).json({ success: true });
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
 
@@ -25,6 +243,11 @@ export default async function handler(req, res) {
     }
 
     const buyerId = userData.user.id;
+
+    // Envoi d'un avis sur un vendeur
+    if (req.method === 'POST') {
+      return await submitReview(req, res, userData.user);
+    }
 
     // Page d'une annonce : l'acheteur qui l'a commandée peut savoir qu'elle a été retirée par le vendeur
     const askedListing = req.query && req.query.withdrawn ? String(req.query.withdrawn).slice(0, 64) : '';

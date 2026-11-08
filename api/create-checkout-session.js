@@ -175,6 +175,101 @@ function activeLot(listing, seller) {
 }
 
 // ---------------------------------------------------------------------------
+// Limite par compte : une personne ne peut pas acheter plus de la moitié d'une annonce (au moins 1 unité).
+// La moitié se calcule sur la quantité mise en vente au départ : ce qui reste en stock + ce qui a déjà été acheté
+// (les commandes annulées ou remboursées ne comptent pas, leurs quantités sont revenues en vente).
+// Le total acheté par une personne est cumulé sur toutes ses commandes.
+// ---------------------------------------------------------------------------
+function purchaseLimit(base) {
+  return Math.max(1, Math.ceil(base / 2));
+}
+
+function chunkList(list, size) {
+  const out = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
+// Renvoie { numéro d'annonce : { limit, bought, remaining } } pour les annonces qui ont une quantité
+async function purchaseLimitsFor(listingRows, buyerId) {
+  const result = {};
+  const limited = (listingRows || []).filter((l) => l && l.quantity_available != null && Number.isFinite(Number(l.quantity_available)));
+  if (limited.length === 0) return result;
+
+  const items = [];
+  for (const part of chunkList(limited.map((l) => l.id), 100)) {
+    const { data, error } = await supabase.from('order_items').select('order_id, listing_id, payout_id').in('listing_id', part);
+    if (error) throw new Error('achats déjà faits : ' + error.message);
+    (data || []).forEach((r) => items.push(r));
+  }
+
+  const payoutIds = [...new Set(items.map((r) => r.payout_id).filter(Boolean))];
+  const orderIds = [...new Set(items.map((r) => r.order_id).filter(Boolean))];
+
+  const cancelledPayouts = new Set();
+  for (const part of chunkList(payoutIds, 100)) {
+    const { data, error } = await supabase.from('payouts').select('id, status, cancel_reason').in('id', part);
+    if (error) throw new Error('versements des achats : ' + error.message);
+    (data || []).forEach((p) => {
+      if (p.status === 'rembourse' || p.cancel_reason === 'acheteur_annule') cancelledPayouts.add(String(p.id));
+    });
+  }
+
+  const buyerOfOrder = {};
+  for (const part of chunkList(orderIds, 100)) {
+    const { data, error } = await supabase.from('orders').select('id, buyer_id').in('id', part);
+    if (error) throw new Error('commandes des achats : ' + error.message);
+    (data || []).forEach((o) => { buyerOfOrder[String(o.id)] = o.buyer_id; });
+  }
+
+  const sold = {};
+  const bought = {};
+  items.forEach((r) => {
+    if (r.payout_id && cancelledPayouts.has(String(r.payout_id))) return;
+    const key = String(r.listing_id);
+    sold[key] = (sold[key] || 0) + 1;
+    if (buyerId && String(buyerOfOrder[String(r.order_id)]) === String(buyerId)) bought[key] = (bought[key] || 0) + 1;
+  });
+
+  limited.forEach((l) => {
+    const key = String(l.id);
+    const limit = purchaseLimit(Number(l.quantity_available) + (sold[key] || 0));
+    const mine = bought[key] || 0;
+    result[key] = { limit, bought: mine, remaining: Math.max(0, limit - mine) };
+  });
+  return result;
+}
+
+// Question du panier : « combien puis-je acheter de ces annonces ? » (la personne peut ne pas être connectée)
+async function purchaseLimitsAnswer(req, res) {
+  try {
+    const body = req.body || {};
+    const ids = (Array.isArray(body.listingIds) ? body.listingIds : [])
+      .filter((id) => typeof id === 'string' || typeof id === 'number')
+      .map((id) => String(id).trim())
+      .filter((id) => id && id.length <= 64)
+      .slice(0, 50);
+    if (ids.length === 0) return res.status(200).json({ limits: {} });
+
+    let buyerId = null;
+    const token = (req.headers.authorization || '').replace('Bearer ', '');
+    if (token) {
+      const { data: userData } = await supabase.auth.getUser(token);
+      if (userData && userData.user) buyerId = userData.user.id;
+    }
+
+    const { data: rows, error } = await supabase.from('listings').select('id, quantity_available').in('id', ids);
+    if (error) throw new Error(error.message);
+    const limits = await purchaseLimitsFor(rows || [], buyerId);
+    return res.status(200).json({ limits });
+  } catch (error) {
+    console.error('Erreur limites d\'achat :', error);
+    // Sans réponse, le panier n'affiche simplement pas la limite : le serveur la vérifie quand même au paiement
+    return res.status(200).json({ limits: {} });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // « Bientôt mûr » : réservation GRATUITE d'une récolte à venir.
 // Aucun paiement : la réservation est enregistrée tout de suite. Règles :
 //  - une réservation par personne et par annonce ;
@@ -529,6 +624,11 @@ export default async function handler(req, res) {
     return cancelReservation(req, res);
   }
 
+  // Combien l'acheteur peut-il acheter de chaque annonce (limite de 50 % par compte) ?
+  if (req.body && req.body.action === 'purchase_limits') {
+    return purchaseLimitsAnswer(req, res);
+  }
+
   try {
     const { cart, delivery, pickupRulesAccepted } = req.body;
 
@@ -696,6 +796,33 @@ export default async function handler(req, res) {
 
     if (stockProblems.length > 0) {
       return res.status(409).json({ error: stockProblems.join(' ') });
+    }
+
+    // Limite par compte : jamais plus de la moitié d'une annonce (au moins 1 unité), toutes commandes confondues
+    const accountLimits = await purchaseLimitsFor(Object.keys(requested).map((key) => listingsById[key]), buyerId);
+    const limitProblems = [];
+    Object.keys(requested).forEach((key) => {
+      const info = accountLimits[key];
+      if (!info || requested[key] <= info.remaining) return;
+      const listing = listingsById[key];
+      const title = String(listing.title || 'cette annonce').slice(0, 60);
+      const unit = listing.unit;
+      if (info.remaining <= 0) {
+        limitProblems.push(`Vous avez déjà acheté le maximum autorisé par compte pour « ${title} » (${info.limit} ${unitLabel(unit, info.limit)}). Retirez-la de votre panier.`);
+      } else if (info.bought > 0) {
+        limitProblems.push(
+          `Vous pouvez acheter au maximum ${info.limit} ${unitLabel(unit, info.limit)} de « ${title} » par compte, et vous en avez déjà acheté ${info.bought} ${unitLabel(unit, info.bought)}. ` +
+          `Il vous en reste ${info.remaining} ${unitLabel(unit, info.remaining)}, et votre panier en contient ${requested[key]} ${unitLabel(unit, requested[key])}. Réduisez la quantité.`
+        );
+      } else {
+        limitProblems.push(
+          `Vous pouvez acheter au maximum ${info.limit} ${unitLabel(unit, info.limit)} de « ${title} » par compte, ` +
+          `et votre panier en contient ${requested[key]} ${unitLabel(unit, requested[key])}. Réduisez la quantité.`
+        );
+      }
+    });
+    if (limitProblems.length > 0) {
+      return res.status(409).json({ error: limitProblems.join(' ') });
     }
 
     // L'expédition : pour chaque annonce, le mode de remise est celui du vendeur (retrait, expédition, ou les deux au choix de

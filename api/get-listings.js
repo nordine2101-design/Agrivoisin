@@ -116,7 +116,7 @@ function withCurrentPrice(item) {
   };
 }
 
-// Moyenne des notes (1 à 4 fraises) de chaque vendeur : { average, count }.
+// Moyenne des notes (1 à 4 fraises) de chaque vendeur : { average, count }. Les avis « liés » ne comptent pas.
 // Les avis sont lus par paquets de 1000 (limite de la base) pour que la moyenne soit toujours exacte.
 async function loadSellerRatings(sellerIds) {
   const totals = new Map();
@@ -128,6 +128,8 @@ async function loadSellerRatings(sellerIds) {
       .from('reviews')
       .select('seller_id, rating')
       .in('seller_id', sellerIds)
+      // Un avis « lié » (acheteur et vendeur qui semblent être la même personne) ne compte jamais
+      .eq('linked', false)
       .order('seller_id', { ascending: true })
       .order('order_id', { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
@@ -178,6 +180,7 @@ async function loadSellerComments(sellerId) {
     .select('rating, comment, created_at')
     .eq('seller_id', sellerId)
     .eq('hidden', false)
+    .eq('linked', false)
     .not('comment', 'is', null)
     .order('created_at', { ascending: false })
     .limit(30);

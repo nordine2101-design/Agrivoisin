@@ -98,6 +98,12 @@
     }[c]));
   }
 
+  // Fenêtre de confirmation au style Agrivoisin (définie dans script.js) ; sans elle, la fenêtre du navigateur sert de secours
+  function askConfirm(options) {
+    if (window.agrivoisinConfirm) return window.agrivoisinConfirm(options);
+    return Promise.resolve(window.confirm(options.title + '\n\n' + (options.message || '')));
+  }
+
   function formatAmount(value) {
     return Number(value).toFixed(2).replace('.', ',') + ' €';
   }
@@ -483,10 +489,18 @@
         throw new Error(info.data.error || 'Une erreur est survenue');
       }
 
-      const message = info.data.full
-        ? 'Annuler cette commande ? Vous serez remboursé de ' + formatAmount(info.data.refundAmount) + '. Cette action ne peut pas être annulée.'
-        : 'Annuler cette commande ? Vous serez remboursé de ' + formatAmount(info.data.refundAmount) + ' et vous perdrez ' + formatAmount(info.data.retainedAmount) + ' (50 % de la partie annulée). Les frais de service ne sont pas remboursés. Cette action ne peut pas être annulée.';
-      if (!window.confirm(message)) {
+      const sure = await askConfirm(info.data.full
+        ? {
+          title: 'Annuler cette commande ?',
+          message: 'Vous serez remboursé de ' + formatAmount(info.data.refundAmount) + '. Impossible de revenir en arrière.',
+          confirmText: 'Oui, je confirme', cancelText: 'Garder ma commande', danger: true,
+        }
+        : {
+          title: 'Annuler cette commande ?',
+          message: 'Vous serez remboursé de ' + formatAmount(info.data.refundAmount) + '. ' + formatAmount(info.data.retainedAmount) + ' ne vous seront pas rendus (50 % des produits périssables concernés). Les frais de service ne sont pas remboursés. Impossible de revenir en arrière.',
+          confirmText: 'Oui, je confirme', cancelText: 'Garder ma commande', danger: true,
+        });
+      if (!sure) {
         enable();
         return;
       }
@@ -608,13 +622,13 @@
     }
   }
 
-  document.addEventListener('click', (event) => {
+  document.addEventListener('click', async (event) => {
     const acceptBtn = event.target.closest('.resch-accept-btn');
     const refuseBtn = event.target.closest('.resch-refuse-btn');
     if (acceptBtn) {
       sendRescheduleAnswer(acceptBtn.closest('.resch-proposal'), 'accept');
     } else if (refuseBtn) {
-      if (window.confirm('Refuser ce créneau ? Vous serez remboursé tout de suite, et cette action ne peut pas être annulée.')) {
+      if (await askConfirm({ title: 'Refuser ce créneau ?', message: 'Vous serez remboursé tout de suite. Impossible de revenir en arrière.', confirmText: 'Oui, je refuse', cancelText: 'Non, revenir', danger: true })) {
         sendRescheduleAnswer(refuseBtn.closest('.resch-proposal'), 'refuse');
       }
     }
@@ -701,8 +715,8 @@
       }
 
       if (confirmBtn) {
-        confirmBtn.addEventListener('click', () => {
-          if (window.confirm("Confirmez-vous avoir bien reçu votre commande ? Le vendeur sera payé tout de suite, et cette action ne peut pas être annulée.")) {
+        confirmBtn.addEventListener('click', async () => {
+          if (await askConfirm({ title: 'Commande bien reçue ?', message: 'Le vendeur sera payé tout de suite. Impossible de revenir en arrière.', confirmText: 'Oui, je l\'ai reçue', cancelText: 'Non, revenir' })) {
             sendPayoutAction(box, 'confirm');
           }
         });
@@ -745,15 +759,15 @@
         });
       });
 
-      sendBtn.addEventListener('click', () => {
+      sendBtn.addEventListener('click', async () => {
         if (selectedKind() === 'absent') {
-          if (window.confirm("Confirmez-vous que le vendeur n'était pas là pendant le créneau ? Vous serez remboursé tout de suite, et cette action ne peut pas être annulée.")) {
+          if (await askConfirm({ title: 'Le vendeur était absent ?', message: 'Vous serez remboursé tout de suite. Impossible de revenir en arrière.', confirmText: 'Oui, il était absent', cancelText: 'Non, revenir', danger: true })) {
             sendPayoutAction(box, 'report', '', 'absent');
           }
           return;
         }
         if (selectedKind() === 'reschedule') {
-          if (window.confirm("Demander un autre créneau ? Le vendeur aura 24 h pour vous en proposer un. Sans réponse de sa part, vous serez remboursé.")) {
+          if (await askConfirm({ title: 'Demander un autre créneau ?', message: 'Le vendeur aura 24 h pour vous en proposer un. Sans réponse de sa part, vous serez remboursé.', confirmText: 'Oui, je demande', cancelText: 'Non, revenir' })) {
             sendPayoutAction(box, 'report', '', 'reschedule');
           }
           return;
@@ -764,7 +778,7 @@
           errorEl.style.display = 'block';
           return;
         }
-        if (window.confirm("Signaler un problème avec cette commande ? Le paiement au vendeur sera suspendu le temps qu'Agrivoisin examine la situation.")) {
+        if (await askConfirm({ title: 'Signaler un problème ?', message: "Le paiement du vendeur sera suspendu pendant qu'Agrivoisin examine la situation.", confirmText: 'Oui, je signale', cancelText: 'Non, revenir' })) {
           sendPayoutAction(box, 'report', reason);
         }
       });

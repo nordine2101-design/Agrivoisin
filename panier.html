@@ -155,6 +155,7 @@
   .cart-line-lot { font-size:0.85rem; font-weight:700; color:#4C7A50; }
   .cart-line-lot-hint { font-size:0.82rem; font-weight:600; color:#B45A00; }
   .cart-line-note { font-size:0.85rem; font-weight:600; color:#C8352F; }
+  .cart-line-limit { font-size:0.85rem; font-weight:600; color:#2A6B50; }
   .cart-fee-hint { font-size:0.75rem; color:#888; }
   .cart-summary p.cart-min-note { font-size:0.85rem; font-weight:600; color:#C8352F; margin:0 0 10px; text-align:left; }
   #cartServiceFee, #cartSubtotal, #cartTotal { white-space:nowrap; }
@@ -254,6 +255,8 @@
   let listingInfo = {};
   // Vrai seulement si la liste des annonces a bien été relue : sinon on ne dit jamais « plus disponible »
   let listingInfoLoaded = false;
+  // Limite par compte (50 % de la quantité mise en vente), relue sur le serveur : { numéro d'annonce : { limit, bought, remaining } }
+  let purchaseLimits = {};
 
   function unitFromPrice(priceText) {
     const m = String(priceText || '').match(/€\s*\/\s*(.+)$/);
@@ -345,6 +348,7 @@
           lotCents: info && info.lot_price != null ? Math.round(Number(info.lot_price) * 100) : null,
           qty: 0,
           stock: info && info.quantity_available != null ? Number(info.quantity_available) : null,
+          limit: item.listingId && purchaseLimits[String(item.listingId)] ? purchaseLimits[String(item.listingId)] : null,
           sample: item,
           deliveryMode: info && (info.delivery_mode === 'expedition' || info.delivery_mode === 'les_deux') ? info.delivery_mode : 'retrait',
           tiers: info && Array.isArray(info.shipping_tiers) ? info.shipping_tiers : [],
@@ -537,13 +541,19 @@
 
       const plusBtn = makeRoundButton('cart-qty-btn cart-qty-plus', 'Une unité de plus : ' + g.name, '+');
       // Jamais plus que ce qui reste en stock (le serveur le vérifie aussi au paiement)
-      const atMax = g.unavailable || (g.stock !== null && g.qty >= g.stock);
+      // ni plus que la limite par compte (50 % de la quantité mise en vente)
+      const stockMax = g.stock !== null && g.qty >= g.stock;
+      const limitMax = !!(g.limit && g.qty >= g.limit.remaining);
+      const atMax = g.unavailable || stockMax || limitMax;
       if (g.unavailable) {
         plusBtn.disabled = true;
         plusBtn.title = 'Cette annonce n\'est plus disponible';
-      } else if (atMax) {
+      } else if (stockMax) {
         plusBtn.disabled = true;
         plusBtn.title = 'Il ne reste que ' + g.stock + ' ' + unitLabel(g.unit, g.stock);
+      } else if (limitMax) {
+        plusBtn.disabled = true;
+        plusBtn.title = 'Maximum par compte atteint : ' + g.limit.limit + ' ' + unitLabel(g.unit, g.limit.limit);
       }
       plusBtn.addEventListener('click', () => {
         if (atMax) return;
@@ -563,6 +573,20 @@
       row.appendChild(calc);
       if (lotNote) row.appendChild(lotNote);
       row.appendChild(bottom);
+
+      // La limite par compte, dite sous la quantité
+      if (g.limit) {
+        const limitEl = document.createElement('div');
+        limitEl.className = 'cart-line-limit';
+        let limitText = 'Maximum : ' + g.limit.limit + ' ' + unitLabel(g.unit, g.limit.limit) + ' par compte pour cette annonce.';
+        if (g.limit.bought > 0) {
+          limitText += g.limit.remaining > 0
+            ? ' Vous en avez déjà acheté ' + g.limit.bought + ' ' + unitLabel(g.unit, g.limit.bought) + ' : il vous en reste ' + g.limit.remaining + ' ' + unitLabel(g.unit, g.limit.remaining) + '.'
+            : ' Vous avez déjà acheté le maximum.';
+        }
+        limitEl.textContent = limitText;
+        row.appendChild(limitEl);
+      }
 
       // Mode de remise : choix retrait / expédition, et frais d'expédition selon la quantité de cette annonce
       let shipProblem = '';
@@ -655,6 +679,10 @@
         note = 'Cette annonce n\'est plus disponible. Retirez-la de votre panier.';
       } else if (g.stock !== null && g.qty > g.stock) {
         note = 'Il ne reste que ' + g.stock + ' ' + unitLabel(g.unit, g.stock) + ' : réduisez la quantité.';
+      } else if (g.limit && g.qty > g.limit.remaining) {
+        note = g.limit.remaining <= 0
+          ? 'Vous avez déjà acheté le maximum autorisé pour cette annonce. Retirez-la de votre panier.'
+          : 'Vous ne pouvez plus acheter que ' + g.limit.remaining + ' ' + unitLabel(g.unit, g.limit.remaining) + ' de cette annonce : réduisez la quantité.';
       } else if (shipProblem) {
         note = shipProblem;
       }
@@ -725,8 +753,34 @@
       });
       listingInfoLoaded = true;
       renderCart();
+      loadPurchaseLimits();
     })
     .catch((err) => console.error('Erreur chargement des annonces du panier :', err));
+
+  // La limite par compte (50 % de la quantité mise en vente) est calculée par le serveur ; sans réponse, on n'affiche rien
+  // de plus : le serveur la vérifie quand même au paiement
+  async function loadPurchaseLimits() {
+    try {
+      const ids = [...new Set(getCart().map((item) => item.listingId).filter(Boolean))];
+      if (ids.length === 0) return;
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const headers = { 'Content-Type': 'application/json' };
+      if (session && session.access_token) headers.Authorization = 'Bearer ' + session.access_token;
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'purchase_limits', listingIds: ids }),
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data && data.limits && typeof data.limits === 'object') {
+        purchaseLimits = data.limits;
+        renderCart();
+      }
+    } catch (e) {
+      console.error('Erreur chargement des limites par compte :', e);
+    }
+  }
 
   // Le paiement est réservé aux personnes connectées
   const checkoutBtn = document.getElementById('checkoutBtn');
@@ -910,5 +964,4 @@
 </script>
 </body>
 </html>
-
 

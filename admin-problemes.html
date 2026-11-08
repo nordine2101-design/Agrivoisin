@@ -402,10 +402,24 @@
     }
   }
 
-  const CONFIRM_TEXTS = {
-    admin_refund: (amount) => "Rembourser l'acheteur de " + formatAmount(amount) + " ?\n\nL'argent est remboursé sur sa carte (les frais de carte de Stripe ne sont pas rendus, et les 0,25 € de frais de service ne sont pas remboursés). Le vendeur ne sera pas payé.\n\nCette action ne peut pas être annulée.",
-    admin_pay_seller: () => "Payer le vendeur ?\n\nIl recevra l'argent de cette vente, comme si l'acheteur avait confirmé la réception. L'acheteur ne sera pas remboursé.\n\nCette action ne peut pas être annulée.",
+  // Fenêtre de confirmation au style Agrivoisin (définie dans script.js) ; sans elle, la fenêtre du navigateur sert de secours
+  const CONFIRM_WINDOWS = {
+    admin_refund: (amount) => ({
+      title: 'Rembourser l\'acheteur de ' + formatAmount(amount) + ' ?',
+      message: 'L\'acheteur sera remboursé sur sa carte. Les frais de carte de Stripe et les 0,25 € de frais de service ne sont pas rendus. Le vendeur ne sera pas payé. Impossible de revenir en arrière.',
+      confirmText: 'Oui, je rembourse', cancelText: 'Non, revenir', danger: true,
+    }),
+    admin_pay_seller: () => ({
+      title: 'Payer le vendeur ?',
+      message: 'Le vendeur recevra l\'argent de cette vente, comme si l\'acheteur avait confirmé la réception. L\'acheteur ne sera pas remboursé. Impossible de revenir en arrière.',
+      confirmText: 'Oui, je paie le vendeur', cancelText: 'Non, revenir', danger: true,
+    }),
   };
+
+  function askConfirm(options) {
+    if (window.agrivoisinConfirm) return window.agrivoisinConfirm(options);
+    return Promise.resolve(window.confirm(options.title + '\n\n' + (options.message || '')));
+  }
 
   function resultBox(action, data) {
     let text;
@@ -426,7 +440,7 @@
   async function decide(card, action) {
     if (busy) return;
     const amount = Number(card.dataset.amount);
-    if (!window.confirm(CONFIRM_TEXTS[action](amount))) return;
+    if (!(await askConfirm(CONFIRM_WINDOWS[action](amount)))) return;
 
     const errorEl = card.querySelector('.admin-error');
     const controls = card.querySelectorAll('button, textarea');

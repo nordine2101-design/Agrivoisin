@@ -156,6 +156,7 @@
   .cart-line-lot-hint { font-size:0.82rem; font-weight:600; color:#B45A00; }
   .cart-line-note { font-size:0.85rem; font-weight:600; color:#C8352F; }
   .cart-line-limit { font-size:0.85rem; font-weight:600; color:#2A6B50; }
+  .cart-line-limit.is-max { color:#C8352F; }
   .cart-fee-hint { font-size:0.75rem; color:#888; }
   .cart-summary p.cart-min-note { font-size:0.85rem; font-weight:600; color:#C8352F; margin:0 0 10px; text-align:left; }
   #cartServiceFee, #cartSubtotal, #cartTotal { white-space:nowrap; }
@@ -574,7 +575,7 @@
       if (lotNote) row.appendChild(lotNote);
       row.appendChild(bottom);
 
-      // La limite par compte, dite sous la quantité
+      // La limite par compte, dite sous la quantité (en rouge quand le maximum est atteint)
       if (g.limit) {
         const limitEl = document.createElement('div');
         limitEl.className = 'cart-line-limit';
@@ -583,6 +584,10 @@
           limitText += g.limit.remaining > 0
             ? ' Vous en avez déjà acheté ' + g.limit.bought + ' ' + unitLabel(g.unit, g.limit.bought) + ' : il vous en reste ' + g.limit.remaining + ' ' + unitLabel(g.unit, g.limit.remaining) + '.'
             : ' Vous avez déjà acheté le maximum.';
+        }
+        if (g.limit.remaining > 0 && g.qty >= g.limit.remaining) {
+          limitEl.classList.add('is-max');
+          limitText = limitText.replace('Maximum :', 'Maximum atteint :');
         }
         limitEl.textContent = limitText;
         row.appendChild(limitEl);
@@ -964,4 +969,3 @@
 </script>
 </body>
 </html>
-

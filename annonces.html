@@ -1054,13 +1054,15 @@
       const shouldCompact = wide.matches && window.scrollY > 300;
       if (shouldCompact === compact) return;
       compact = shouldCompact;
-      card.classList.toggle('is-compact', compact);
       if (compact) {
-        // On garde la même hauteur de page pour que les annonces ne sautent pas
-        const h = extra.offsetHeight;
+        // On garde exactement la même hauteur de page pour que les annonces ne sautent pas
+        const before = card.offsetHeight;
+        card.classList.add('is-compact');
         extra.style.display = 'none';
-        card.style.marginBottom = (30 + h) + 'px';
+        const after = card.offsetHeight;
+        card.style.marginBottom = (30 + before - after) + 'px';
       } else {
+        card.classList.remove('is-compact');
         extra.style.display = '';
         card.style.marginBottom = '';
       }
@@ -1150,5 +1152,4 @@
 
 </body>
 </html>
-
 

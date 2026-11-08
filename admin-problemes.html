@@ -30,7 +30,13 @@
     <button type="button" id="retryBtn" class="btn btn-primary" style="display:none;margin:0 auto 16px;">Réessayer</button>
 
     <div id="content" style="display:none;">
-      <div class="admin-toolbar">
+      <h2 id="alertsTitle" class="admin-section-title">Alertes à examiner</h2>
+      <div class="admin-info">Ce sont des faits à regarder, pas une preuve. Rien n'est bloqué ni remboursé automatiquement : c'est toi qui décides, après avoir regardé le cas.</div>
+      <p id="noAlerts" class="admin-empty" style="display:none;">Aucune alerte à examiner pour le moment.</p>
+      <p id="alertsError" class="admin-empty" style="display:none;color:#C8352F;">Impossible de charger les alertes pour le moment. Cliquez sur « Actualiser ».</p>
+      <div id="alertsList"></div>
+
+      <div class="admin-toolbar" style="margin-top:36px;">
         <h2 id="problemsTitle">À traiter</h2>
         <button type="button" id="refreshBtn" class="btn btn-ghost">Actualiser</button>
       </div>
@@ -40,6 +46,10 @@
       <h2 id="decidedTitle" style="margin-top:36px;">Dernières décisions</h2>
       <p id="noDecided" class="admin-empty" style="display:none;">Aucune décision pour le moment.</p>
       <div id="decidedList"></div>
+
+      <h2 id="examinedTitle" class="admin-section-title" style="margin-top:36px;">Dernières alertes examinées</h2>
+      <p id="noExamined" class="admin-empty" style="display:none;">Aucune alerte examinée pour le moment.</p>
+      <div id="examinedList"></div>
     </div>
   </div>
 </section>
@@ -107,6 +117,13 @@
   const problemsTitle = document.getElementById('problemsTitle');
   const decidedTitle = document.getElementById('decidedTitle');
   const refreshBtn = document.getElementById('refreshBtn');
+  const alertsTitle = document.getElementById('alertsTitle');
+  const alertsList = document.getElementById('alertsList');
+  const noAlerts = document.getElementById('noAlerts');
+  const alertsError = document.getElementById('alertsError');
+  const examinedTitle = document.getElementById('examinedTitle');
+  const examinedList = document.getElementById('examinedList');
+  const noExamined = document.getElementById('noExamined');
 
   // Protège l'affichage : rien de ce qu'écrit un acheteur ou un vendeur n'est interprété comme du code
   function escapeHtml(value) {
@@ -229,6 +246,78 @@
       </div>`;
   }
 
+  // ---------- Les alertes (des faits à regarder, jamais une note) ----------
+
+  function alertTitle(a) {
+    const f = a.facts || {};
+    const days = f.periodeJours;
+    if (a.kind === 'acheteur_problemes') {
+      return 'Acheteur : ' + f.nombre + ' problème' + (f.nombre > 1 ? 's' : '') + ' en ' + days + ' jours';
+    }
+    if (a.kind === 'vendeur_absences') {
+      return 'Vendeur : ' + f.nombre + ' absence' + (f.nombre > 1 ? 's' : '') + ' déclarée' + (f.nombre > 1 ? 's' : '') + ' en ' + days + ' jours';
+    }
+    if (a.kind === 'vendeur_taux') {
+      return 'Vendeur : ' + f.pourcentage + ' % de commandes signalées sur ' + days + ' jours';
+    }
+    return 'Alerte';
+  }
+
+  function alertFactsHtml(a) {
+    const f = a.facts || {};
+    if (a.kind === 'vendeur_taux') {
+      return '<div class="admin-item">' + escapeHtml(f.commandes + ' commande' + (f.commandes > 1 ? 's' : '') + ', dont ' + f.signalees + ' signalée' + (f.signalees > 1 ? 's' : '')) + '</div>';
+    }
+    const list = a.kind === 'acheteur_problemes' ? (f.signalements || []) : (f.absences || []);
+    const lines = list.map((x) => {
+      let label = '';
+      if (a.kind === 'acheteur_problemes') label = x.absence ? ' (vendeur absent)' : ' (autre problème)';
+      return '<li>' + escapeHtml(formatDate(x.date) + ' : ' + formatAmount(x.montant) + label) + '</li>';
+    }).join('');
+    const more = (f.nombre || 0) - list.length;
+    return '<ul class="admin-facts">' + lines + (more > 0 ? '<li>et ' + escapeHtml(more) + ' autre' + (more > 1 ? 's' : '') + '</li>' : '') + '</ul>';
+  }
+
+  function alertPersonHtml(a) {
+    const p = a.person || {};
+    if (a.subjectType === 'vendeur') {
+      return '<div><span class="admin-label">Vendeur</span> ' + escapeHtml(p.city || 'ville inconnue') + (p.pseudo ? ' · ' + escapeHtml(p.pseudo) : '') + ' · ' + emailHtml(p.email) + '</div>';
+    }
+    return '<div><span class="admin-label">Acheteur</span> ' + emailHtml(p.email) + '</div>';
+  }
+
+  function alertCard(a) {
+    return `
+      <div class="admin-card admin-alert" data-alert-id="${escapeHtml(a.id)}">
+        <div class="admin-card-head">
+          <span class="admin-card-title">${escapeHtml(alertTitle(a))}</span>
+          <span class="admin-meta" style="margin:0;">repérée le ${escapeHtml(formatDate(a.createdAt))}</span>
+        </div>
+        <div class="admin-people">${alertPersonHtml(a)}</div>
+        <div class="admin-label">Les faits</div>
+        ${alertFactsHtml(a)}
+        <label class="admin-label" for="alert-note-${escapeHtml(a.id)}">Note pour toi (facultative, 500 caractères au maximum)</label>
+        <textarea class="admin-note alert-note" id="alert-note-${escapeHtml(a.id)}" maxlength="500" placeholder="Par exemple : vérifié, rien d'anormal"></textarea>
+        <div class="admin-actions">
+          <button type="button" class="btn btn-primary alert-done-btn">J'ai examiné</button>
+        </div>
+        <p class="admin-error" style="display:none;"></p>
+      </div>`;
+  }
+
+  function examinedCard(a) {
+    return `
+      <div class="admin-card admin-card-done admin-paid">
+        <div class="admin-card-head">
+          <span class="admin-card-title">${escapeHtml(alertTitle(a))}</span>
+          <span class="admin-meta" style="margin:0;">examinée le ${escapeHtml(formatDate(a.handledAt))}</span>
+        </div>
+        <div class="admin-people">${alertPersonHtml(a)}</div>
+        ${a.kind === 'vendeur_taux' ? alertFactsHtml(a) : ''}
+        ${a.note ? '<div class="admin-meta">Ta note : ' + escapeHtml(a.note) + '</div>' : ''}
+      </div>`;
+  }
+
   function showOnly(which) {
     [loadingMessage, notLoggedMessage, forbiddenMessage, errorMessage, content].forEach((el) => { el.style.display = 'none'; });
     retryBtn.style.display = 'none';
@@ -260,7 +349,10 @@
     }
 
     try {
-      const result = await callAdmin(token, { action: 'admin_list' });
+      const [result, alertsResult] = await Promise.all([
+        callAdmin(token, { action: 'admin_list' }),
+        callAdmin(token, { action: 'admin_list_alerts' }).catch(() => null),
+      ]);
 
       if (result.status === 401) {
         showOnly(notLoggedMessage);
@@ -283,6 +375,24 @@
       decidedList.innerHTML = resolved.map(decidedCard).join('');
       noProblems.style.display = problems.length === 0 ? 'block' : 'none';
       noDecided.style.display = resolved.length === 0 ? 'block' : 'none';
+
+      // Les alertes : si elles ne se chargent pas, le reste de la page fonctionne quand même
+      if (alertsResult && alertsResult.ok) {
+        const alerts = alertsResult.data.alerts || [];
+        const examined = alertsResult.data.examined || [];
+        alertsTitle.textContent = 'Alertes à examiner (' + alerts.length + ')';
+        examinedTitle.textContent = 'Dernières alertes examinées (' + examined.length + ')';
+        alertsList.innerHTML = alerts.map(alertCard).join('');
+        examinedList.innerHTML = examined.map(examinedCard).join('');
+        noAlerts.style.display = alerts.length === 0 ? 'block' : 'none';
+        noExamined.style.display = examined.length === 0 ? 'block' : 'none';
+        alertsError.style.display = 'none';
+      } else {
+        alertsTitle.textContent = 'Alertes à examiner';
+        alertsList.innerHTML = '';
+        noAlerts.style.display = 'none';
+        alertsError.style.display = 'block';
+      }
       showOnly(content);
     } catch (err) {
       console.error(err);
@@ -356,6 +466,46 @@
     else if (e.target.closest('.admin-pay-btn')) decide(card, 'admin_pay_seller');
   });
 
+  // « J'ai examiné » : l'alerte passe dans les alertes examinées, avec ta note facultative
+  async function handleAlert(card) {
+    if (busy) return;
+    const errorEl = card.querySelector('.admin-error');
+    const controls = card.querySelectorAll('button, textarea');
+    errorEl.style.display = 'none';
+    busy = true;
+    controls.forEach((c) => { c.disabled = true; });
+
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Session expirée, reconnectez-vous.');
+
+      const result = await callAdmin(token, {
+        action: 'admin_handle_alert',
+        alertId: card.dataset.alertId,
+        note: card.querySelector('.alert-note').value,
+      });
+      if (!result.ok) throw new Error(result.data.error || 'Une erreur est survenue');
+
+      card.innerHTML = '<div class="admin-result admin-paid">Alerte marquée comme examinée. Elle apparaîtra dans « Dernières alertes examinées » à la prochaine actualisation.</div>';
+      card.classList.add('admin-card-done');
+      card.classList.remove('admin-alert');
+      card.removeAttribute('data-alert-id');
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.style.display = 'block';
+      controls.forEach((c) => { c.disabled = false; });
+    } finally {
+      busy = false;
+    }
+  }
+
+  alertsList.addEventListener('click', (e) => {
+    const btn = e.target.closest('.alert-done-btn');
+    if (!btn) return;
+    const card = btn.closest('.admin-card[data-alert-id]');
+    if (card) handleAlert(card);
+  });
+
   refreshBtn.addEventListener('click', load);
   retryBtn.addEventListener('click', load);
 
@@ -393,6 +543,10 @@
   .admin-paid { border-left:4px solid #4C7A50; }
   .admin-result.admin-refunded { background:#f3f6fe; color:#3b4a7a; border:1px solid #cfd9f3; }
   .admin-result.admin-paid { background:#f6f9f5; color:#4C7A50; border:1px solid #cfe3cf; }
+  .admin-section-title { font-size:1.2rem; margin:0 0 12px; text-align:left; }
+  .admin-info { background:#fff8ea; border:1px solid #f0dcb0; border-radius:10px; padding:10px; font-size:0.88rem; margin-bottom:14px; text-align:left; }
+  .admin-alert { border-left:4px solid #D9902F; }
+  .admin-facts { margin:4px 0 12px 18px; padding:0; font-size:0.95rem; line-height:1.6; }
   @media (max-width: 540px) {
     .admin-actions .btn { width:100%; }
     .admin-card-head { flex-direction:column; gap:4px; }

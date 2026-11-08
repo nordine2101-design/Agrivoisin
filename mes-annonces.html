@@ -561,7 +561,14 @@
 
     const payload = { listingId: item.id };
     if (removeBtn) {
-      if (!confirm('Retirer la promotion de cette annonce ?')) return;
+      const stopPromo = window.agrivoisinConfirm
+        ? await window.agrivoisinConfirm({
+          title: 'Arrêter la promotion ?',
+          message: 'Elle s\'arrêtera tout de suite. Les acheteurs verront de nouveau le prix normal.',
+          confirmText: 'Oui, j\'arrête', cancelText: 'Non, revenir',
+        })
+        : window.confirm('Retirer la promotion de cette annonce ?');
+      if (!stopPromo) return;
       payload.mode = 'none';
     } else {
       const offer = form.querySelector('.promo-offer').value;
@@ -699,7 +706,13 @@
       if (honor && Array.isArray(honor.lines) && honor.lines.length > 0) {
         agreed = await askDeleteWithOrders(honor);
       } else {
-        agreed = confirm('Supprimer définitivement cette annonce ?');
+        agreed = window.agrivoisinConfirm
+          ? await window.agrivoisinConfirm({
+            title: 'Supprimer cette annonce ?',
+            message: 'L\'annonce disparaîtra du site pour toujours. Impossible de revenir en arrière.',
+            confirmText: 'Oui, je supprime', cancelText: 'Garder mon annonce', danger: true,
+          })
+          : window.confirm('Supprimer définitivement cette annonce ?');
       }
       if (!agreed) {
         deleteBtn.disabled = false;

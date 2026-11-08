@@ -450,7 +450,8 @@
     let anyFreshPickup = false;
     const shipParts = [];
 
-    groupCart(cart).forEach((g) => {
+    // La dernière annonce ajoutée au panier s'affiche en premier
+    groupCart(cart).reverse().forEach((g) => {
       // Les lots : autant de lots complets que possible, le reste au prix normal
       const hasLot = g.lotQuantity != null && g.lotQuantity >= 2 && g.lotCents != null && g.lotCents > 0;
       const lotCount = hasLot ? Math.floor(g.qty / g.lotQuantity) : 0;

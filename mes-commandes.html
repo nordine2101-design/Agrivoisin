@@ -956,16 +956,22 @@
           return;
         }
 
-        const { error } = await supabaseClient.from('reviews').insert({
-          order_id: orderId,
-          seller_id: sellerId,
-          buyer_id: session.user.id,
-          rating: rating,
-          comment: comment || null,
-        });
+        // L'avis est envoyé au serveur, qui vérifie la commande avant de l'enregistrer
+        let reviewError = '';
+        try {
+          const reviewResponse = await fetch('/api/get-my-orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+            body: JSON.stringify({ orderId, sellerId, rating, comment }),
+          });
+          const reviewData = await reviewResponse.json().catch(() => ({}));
+          if (!reviewResponse.ok) reviewError = reviewData.error || 'Une erreur est survenue, réessayez.';
+        } catch (err) {
+          reviewError = 'Connexion impossible, réessayez.';
+        }
 
-        if (error) {
-          errorEl.textContent = 'Erreur : ' + error.message;
+        if (reviewError) {
+          errorEl.textContent = reviewError;
           errorEl.style.display = 'block';
           return;
         }

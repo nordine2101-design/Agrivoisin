@@ -295,13 +295,14 @@
       '</div>';
   }
 
-  // Un avis n'est possible qu'une fois la réception confirmée (paiement versé).
-  // Les anciennes commandes, sans versement enregistré, ne sont pas concernées.
+  // Un avis n'est possible qu'une fois tout réglé : chaque retrait est soit payé au vendeur, soit remboursé, et au moins un a été payé.
+  // Jamais pour une commande annulée par l'acheteur. Les anciennes commandes, sans versement enregistré, ne sont pas concernées.
   function reviewAllowed(seller) {
-    // Une commande annulée par l'acheteur n'a jamais été retirée : pas d'avis possible
-    if ((seller.slots || []).some((slot) => slot.buyerCancelled)) return false;
-    const slotsDone = (seller.slots || []).every((slot) => slot.status === 'verse');
-    return slotsDone && (!seller.payout || seller.payout.status === 'verse');
+    const parts = (seller.slots || []).map((slot) => ({ status: slot.status, cancelled: !!slot.buyerCancelled }));
+    if (seller.payout) parts.push({ status: seller.payout.status, cancelled: false });
+    if (parts.length === 0) return true;
+    if (parts.some((p) => p.cancelled)) return false;
+    return parts.every((p) => p.status === 'verse' || p.status === 'rembourse') && parts.some((p) => p.status === 'verse');
   }
 
   // « lundi 12 octobre à 18 h » ou « lundi 12 octobre à 18 h 30 » (heure de Paris)

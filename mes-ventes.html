@@ -613,7 +613,14 @@
       return;
     }
 
-    if (!window.confirm('Confirmez-vous que le colis est bien remis au transporteur ?')) return;
+    const sure = window.agrivoisinConfirm
+      ? await window.agrivoisinConfirm({
+        title: 'Colis bien remis ?',
+        message: "Cliquez seulement si le transporteur a bien pris le colis. L'acheteur verra que son colis est parti, avec le numéro de suivi.",
+        confirmText: 'Oui, il est parti', cancelText: 'Non, revenir',
+      })
+      : window.confirm('Confirmez-vous que le colis est bien remis au transporteur ?');
+    if (!sure) return;
 
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) {

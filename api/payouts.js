@@ -551,10 +551,26 @@ async function handleAdminAction(req, res) {
     const admin = await requireAdmin(req, res);
     if (!admin) return;
 
-    const { action, payoutId, note } = req.body || {};
+    const { action, payoutId, note, alertId } = req.body || {};
 
     if (action === 'admin_list') {
       return res.status(200).json(await adminList());
+    }
+    if (action === 'admin_list_alerts') {
+      return res.status(200).json(await adminListFraudAlerts());
+    }
+    if (action === 'admin_handle_alert') {
+      if (typeof alertId !== 'string' || !alertId.trim() || alertId.length > 64) {
+        return res.status(400).json({ error: 'Alerte manquante.' });
+      }
+      if (note !== undefined && note !== null && typeof note !== 'string') {
+        return res.status(400).json({ error: 'Note invalide.' });
+      }
+      const alertNote = typeof note === 'string' ? note.trim() : '';
+      if (alertNote.length > FRAUD_ALERT_NOTE_MAX) {
+        return res.status(400).json({ error: 'La note est trop longue (' + FRAUD_ALERT_NOTE_MAX + ' caractères au maximum).' });
+      }
+      return await adminHandleFraudAlert(res, alertId.trim(), alertNote);
     }
     if (action !== 'admin_refund' && action !== 'admin_pay_seller') {
       return res.status(400).json({ error: 'Action inconnue.' });
@@ -1384,6 +1400,239 @@ async function expireReschedules(now, deadline, summary) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Alertes de fraude : le passage automatique de la nuit repère des cas à regarder, et prévient l'administrateur.
+// Il ne bloque, ne sanctionne et ne rembourse jamais rien tout seul : une alerte montre des FAITS (dates, montants, nombres),
+// jamais une note, et c'est l'administrateur qui examine chaque cas (la personne peut contester).
+// Les seuils ne sont pas publiés. Une alerte est effacée après 12 mois.
+// ---------------------------------------------------------------------------
+const FRAUD_DAY_MS = 24 * 60 * 60 * 1000;
+const FRAUD_BUYER_PROBLEMS = 3;       // un acheteur : 3 remboursements ou problèmes signalés...
+const FRAUD_BUYER_DAYS = 30;          // ...en 30 jours
+const FRAUD_SELLER_ABSENCES = 2;      // un vendeur : 2 absences déclarées...
+const FRAUD_SELLER_ABSENCE_DAYS = 30; // ...en 30 jours
+const FRAUD_SELLER_MIN_ORDERS = 5;    // un vendeur : au moins 5 commandes...
+const FRAUD_SELLER_SHARE = 0.3;       // ...dont 30 % ou plus finissent remboursées ou signalées...
+const FRAUD_SELLER_DAYS = 60;         // ...sur 60 jours
+const FRAUD_REPEAT_DAYS = 30;         // pas de nouvelle alerte du même type pour la même personne pendant 30 jours
+const FRAUD_KEEP_DAYS = 365;          // durée de conservation d'une alerte
+const FRAUD_ALERT_NOTE_MAX = 500;
+const FRAUD_MAX_LISTED_FACTS = 10;
+
+// Les cas à signaler, à partir des versements récents.
+// rows : les versements ; buyerByOrder : { identifiant de la commande -> identifiant de l'acheteur } ; nowMs : l'heure du passage.
+function fraudCandidates(rows, buyerByOrder, nowMs) {
+  const ms = (iso) => (iso ? new Date(iso).getTime() : NaN);
+  const within = (iso, days) => ms(iso) >= nowMs - days * FRAUD_DAY_MS;
+  const money = (r) => ((Number(r.amount_cents) || 0) + (Number(r.shipping_cents) || 0)) / 100;
+  const candidates = [];
+
+  // 1. Un acheteur avec beaucoup de remboursements ou de problèmes signalés (hors annulations qu'il a faites lui-même)
+  const byBuyer = {};
+  rows.forEach((r) => {
+    if (!r.problem_reported_at || !within(r.problem_reported_at, FRAUD_BUYER_DAYS) || r.buyer_cancelled_at) return;
+    const buyerId = buyerByOrder[r.order_id];
+    if (!buyerId) return;
+    (byBuyer[buyerId] = byBuyer[buyerId] || []).push(r);
+  });
+  Object.keys(byBuyer).forEach((buyerId) => {
+    const list = byBuyer[buyerId];
+    if (list.length < FRAUD_BUYER_PROBLEMS) return;
+    const absences = list.filter((r) => r.absence_reported_at).length;
+    candidates.push({
+      kind: 'acheteur_problemes',
+      subject_type: 'acheteur',
+      subject_id: String(buyerId),
+      facts: {
+        periodeJours: FRAUD_BUYER_DAYS,
+        nombre: list.length,
+        absencesDeclarees: absences,
+        autresProblemes: list.length - absences,
+        signalements: list.slice(0, FRAUD_MAX_LISTED_FACTS).map((r) => ({ date: r.problem_reported_at, montant: money(r), absence: !!r.absence_reported_at })),
+      },
+    });
+  });
+
+  // 2. Un vendeur absent à plusieurs reprises
+  const absentBySeller = {};
+  rows.forEach((r) => {
+    if (!r.absence_reported_at || !within(r.absence_reported_at, FRAUD_SELLER_ABSENCE_DAYS) || !r.seller_id) return;
+    (absentBySeller[r.seller_id] = absentBySeller[r.seller_id] || []).push(r);
+  });
+  Object.keys(absentBySeller).forEach((sellerId) => {
+    const list = absentBySeller[sellerId];
+    if (list.length < FRAUD_SELLER_ABSENCES) return;
+    candidates.push({
+      kind: 'vendeur_absences',
+      subject_type: 'vendeur',
+      subject_id: String(sellerId),
+      facts: {
+        periodeJours: FRAUD_SELLER_ABSENCE_DAYS,
+        nombre: list.length,
+        absences: list.slice(0, FRAUD_MAX_LISTED_FACTS).map((r) => ({ date: r.absence_reported_at, montant: money(r) })),
+      },
+    });
+  });
+
+  // 3. Un vendeur dont une grande part des commandes finit remboursée ou signalée (les annulations faites par l'acheteur ne comptent pas)
+  const ordersBySeller = {};
+  rows.forEach((r) => {
+    if (!r.seller_id || r.buyer_cancelled_at || !within(r.created_at, FRAUD_SELLER_DAYS)) return;
+    (ordersBySeller[r.seller_id] = ordersBySeller[r.seller_id] || []).push(r);
+  });
+  Object.keys(ordersBySeller).forEach((sellerId) => {
+    const list = ordersBySeller[sellerId];
+    if (list.length < FRAUD_SELLER_MIN_ORDERS) return;
+    const flagged = list.filter((r) => r.problem_reported_at).length;
+    if (flagged / list.length < FRAUD_SELLER_SHARE) return;
+    candidates.push({
+      kind: 'vendeur_taux',
+      subject_type: 'vendeur',
+      subject_id: String(sellerId),
+      facts: {
+        periodeJours: FRAUD_SELLER_DAYS,
+        commandes: list.length,
+        signalees: flagged,
+        pourcentage: Math.round((flagged / list.length) * 100),
+      },
+    });
+  });
+
+  return candidates;
+}
+
+// Lecture, repérage, enregistrement. Ne bloque jamais le reste du passage : en cas de panne, on réessaie la nuit suivante.
+async function runFraudDetection() {
+  try {
+    const nowMs = Date.now();
+    const sinceShort = new Date(nowMs - Math.max(FRAUD_BUYER_DAYS, FRAUD_SELLER_ABSENCE_DAYS) * FRAUD_DAY_MS).toISOString();
+    const sinceLong = new Date(nowMs - FRAUD_SELLER_DAYS * FRAUD_DAY_MS).toISOString();
+
+    const rows = [];
+    const PAGE = 1000;
+    for (let page = 0; page < 20; page += 1) {
+      const { data, error } = await supabase
+        .from('payouts')
+        .select('id, order_id, seller_id, created_at, problem_reported_at, absence_reported_at, buyer_cancelled_at, amount_cents, shipping_cents')
+        .or('created_at.gte.' + sinceLong + ',problem_reported_at.gte.' + sinceShort + ',absence_reported_at.gte.' + sinceShort)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(page * PAGE, page * PAGE + PAGE - 1);
+      if (error) throw new Error('lecture des versements : ' + error.message);
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE) break;
+    }
+
+    const orderIds = uniqueValues(rows.map((r) => r.order_id));
+    const buyerByOrder = {};
+    for (let i = 0; i < orderIds.length; i += 200) {
+      const { data, error } = await supabase.from('orders').select('id, buyer_id').in('id', orderIds.slice(i, i + 200));
+      if (error) throw new Error('lecture des commandes : ' + error.message);
+      (data || []).forEach((o) => { buyerByOrder[o.id] = o.buyer_id; });
+    }
+
+    const candidates = fraudCandidates(rows, buyerByOrder, nowMs);
+
+    // Pas de nouvelle alerte du même type pour la même personne tant que la précédente est récente
+    const { data: recent, error: recentError } = await supabase
+      .from('fraud_alerts')
+      .select('kind, subject_id')
+      .gte('created_at', new Date(nowMs - FRAUD_REPEAT_DAYS * FRAUD_DAY_MS).toISOString());
+    if (recentError) throw new Error('lecture des alertes : ' + recentError.message);
+    const seen = new Set((recent || []).map((a) => a.kind + '|' + a.subject_id));
+    const fresh = candidates.filter((c) => !seen.has(c.kind + '|' + c.subject_id));
+
+    if (fresh.length > 0) {
+      const { error: insertError } = await supabase.from('fraud_alerts').insert(fresh);
+      if (insertError) throw new Error('enregistrement des alertes : ' + insertError.message);
+    }
+
+    // Les alertes de plus de 12 mois sont effacées
+    const { error: cleanError } = await supabase
+      .from('fraud_alerts')
+      .delete()
+      .lt('created_at', new Date(nowMs - FRAUD_KEEP_DAYS * FRAUD_DAY_MS).toISOString());
+    if (cleanError) console.error('Effacement des anciennes alertes impossible :', cleanError.message);
+
+    return fresh.length;
+  } catch (error) {
+    console.error('Repérage des fraudes impossible (réessayé la nuit suivante) :', error.message);
+    return 0;
+  }
+}
+
+// La liste pour l'administrateur : les alertes à examiner (les plus anciennes d'abord) et les 20 dernières examinées
+async function adminListFraudAlerts() {
+  const { data: open, error: openError } = await supabase
+    .from('fraud_alerts')
+    .select('id, kind, subject_type, subject_id, facts, status, note, created_at, handled_at')
+    .eq('status', 'nouvelle')
+    .order('created_at', { ascending: true })
+    .limit(100);
+  if (openError) throw new Error('Lecture des alertes impossible : ' + openError.message);
+
+  const { data: done, error: doneError } = await supabase
+    .from('fraud_alerts')
+    .select('id, kind, subject_type, subject_id, facts, status, note, created_at, handled_at')
+    .eq('status', 'examinee')
+    .order('handled_at', { ascending: false })
+    .limit(20);
+  if (doneError) throw new Error('Lecture des alertes examinées impossible : ' + doneError.message);
+
+  const rows = [...(open || []), ...(done || [])];
+  const sellerIds = uniqueValues(rows.filter((r) => r.subject_type === 'vendeur').map((r) => r.subject_id));
+  const buyerIds = uniqueValues(rows.filter((r) => r.subject_type === 'acheteur').map((r) => r.subject_id));
+
+  const sellers = {};
+  if (sellerIds.length > 0) {
+    const { data, error } = await supabase.from('sellers').select('id, city, pseudo, email').in('id', sellerIds);
+    if (error) throw new Error('Lecture des vendeurs impossible : ' + error.message);
+    (data || []).forEach((s) => { sellers[String(s.id)] = s; });
+  }
+  const buyerEmails = {};
+  await Promise.all(buyerIds.map(async (buyerId) => {
+    try {
+      const { data } = await supabase.auth.admin.getUserById(buyerId);
+      buyerEmails[buyerId] = (data && data.user && data.user.email) || null;
+    } catch (err) {
+      buyerEmails[buyerId] = null;
+    }
+  }));
+
+  const describe = (r) => ({
+    id: r.id,
+    kind: r.kind,
+    subjectType: r.subject_type,
+    createdAt: r.created_at,
+    handledAt: r.handled_at || null,
+    note: r.note || null,
+    facts: r.facts || {},
+    person: r.subject_type === 'vendeur'
+      ? { city: (sellers[r.subject_id] || {}).city || null, pseudo: (sellers[r.subject_id] || {}).pseudo || null, email: (sellers[r.subject_id] || {}).email || null }
+      : { email: buyerEmails[r.subject_id] || null },
+  });
+  return { alerts: (open || []).map(describe), examined: (done || []).map(describe) };
+}
+
+// « J'ai examiné » : l'alerte passe dans les alertes examinées, avec une note facultative
+async function adminHandleFraudAlert(res, alertId, note) {
+  const { data, error } = await supabase
+    .from('fraud_alerts')
+    .update({ status: 'examinee', handled_at: new Date().toISOString(), note: note || null })
+    .eq('id', alertId)
+    .eq('status', 'nouvelle')
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    console.error('Erreur Supabase (alerte de fraude) :', error);
+    return res.status(500).json({ error: "Impossible d'enregistrer pour le moment. Réessayez." });
+  }
+  if (!data) {
+    return res.status(409).json({ error: 'Cette alerte a déjà été examinée, ou elle n\'existe plus.' });
+  }
+  return res.status(200).json({ status: 'examinee' });
+}
+
 async function runAutomaticReleases(req, res) {
   try {
     const secret = process.env.CRON_SECRET;
@@ -1448,6 +1697,9 @@ async function runAutomaticReleases(req, res) {
     }
 
     summary.listingsDeleted = await deleteFinishedWithdrawnListings();
+
+    // Repérage des cas à examiner (alertes pour l'administrateur ; jamais de sanction automatique)
+    summary.fraudAlerts = Date.now() < deadline ? await runFraudDetection() : 'reporté';
 
     console.log('Passage automatique des versements :', JSON.stringify(summary));
     return res.status(200).json(summary);

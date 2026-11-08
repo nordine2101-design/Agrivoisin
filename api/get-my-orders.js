@@ -161,7 +161,8 @@ async function submitReview(req, res, buyer) {
     return res.status(404).json({ error: 'Commande introuvable.' });
   }
 
-  // Un avis n'est possible qu'une fois la réception confirmée (paiement versé) ; jamais pour une commande annulée.
+  // Un avis n'est possible qu'une fois tout réglé : chaque retrait est soit payé au vendeur, soit remboursé, et au moins un a été payé.
+  // Jamais pour une commande annulée par l'acheteur, ni tant qu'un problème est examiné.
   // Les anciennes commandes, sans versement enregistré, ne sont pas concernées.
   const { data: payouts, error: payoutsError } = await supabase
     .from('payouts')
@@ -170,7 +171,8 @@ async function submitReview(req, res, buyer) {
     .eq('seller_id', sellerId);
   if (payoutsError) throw payoutsError;
   const list = payouts || [];
-  if (list.some((p) => p.buyer_cancelled_at || p.status !== 'verse')) {
+  const settled = list.every((p) => !p.buyer_cancelled_at && (p.status === 'verse' || p.status === 'rembourse'));
+  if (list.length > 0 && (!settled || !list.some((p) => p.status === 'verse'))) {
     return res.status(409).json({ error: 'Vous pourrez donner votre avis une fois la commande retirée et le paiement versé.' });
   }
 

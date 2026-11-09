@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { findForbiddenText } from '../lib/moderation.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
   realtime: {
@@ -190,6 +191,17 @@ export default async function handler(req, res) {
 
     const userId = userData.user.id;
     const { title, description, price, unit, category, subcategory, harvestDate, imageUrl, pickupHours, quantity, proAttest, deliveryMode, shippingTiers, multiParcel, isBio, harvestAt, availabilityStatus, plannedDate } = req.body;
+
+    // Le titre et la description sont publics : ni insulte ni propos discriminatoire (racisme, sexisme, homophobie…)
+    for (const [field, text] of [['le titre', title], ['la description', description]]) {
+      const forbidden = findForbiddenText(text);
+      if (forbidden) {
+        console.warn('Annonce refusée (' + forbidden + ') : vendeur ' + userId + ', ' + field);
+        return res.status(400).json({
+          error: 'Votre annonce n\'a pas été publiée : ' + field + ' contient des propos injurieux ou discriminatoires. Modifiez-' + (field === 'le titre' ? 'le' : 'la') + ' puis réessayez.',
+        });
+      }
+    }
 
     // 0 bis. Statut de l'annonce : disponible tout de suite (par défaut) ou « Bientôt mûr »
     const status = availabilityStatus == null || availabilityStatus === '' ? 'disponible' : availabilityStatus;

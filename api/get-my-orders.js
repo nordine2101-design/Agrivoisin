@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { findForbiddenText } from '../lib/moderation.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
@@ -142,6 +143,17 @@ async function submitReview(req, res, buyer) {
   }
   if (!Number.isInteger(rating) || rating < 1 || rating > 4) {
     return res.status(400).json({ error: 'Merci de choisir une note.' });
+  }
+
+  // Le texte de l'avis ne doit contenir ni insulte ni propos discriminatoire (racisme, sexisme, homophobie…)
+  if (comment) {
+    const forbidden = findForbiddenText(comment);
+    if (forbidden) {
+      console.warn('Avis refusé (' + forbidden + ') : acheteur ' + buyer.id + ', commande ' + orderId);
+      return res.status(400).json({
+        error: 'Votre avis n\'a pas été publié : il contient des propos injurieux ou discriminatoires (racisme, antisémitisme, islamophobie, sexisme, homophobie, insultes). Reformulez-le en décrivant simplement votre expérience.',
+      });
+    }
   }
 
   // La commande est bien celle de cette personne, et ce vendeur y figure

@@ -625,6 +625,7 @@ const CONTACT_REASONS = [
   'Question sur mon compte',
   'Réclamation vendeur',
   'Mes données personnelles',
+  'Signaler un texte insultant ou discriminatoire',
   'Autre',
 ];
 const CONTACT_MESSAGE_MIN = 10;

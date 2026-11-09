@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { findForbiddenText } from '../lib/moderation.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
@@ -13,7 +14,7 @@ function normalizeName(value) {
   return String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/œ/g, 'oe')
     .replace(/æ/g, 'ae')
     .replace(/[^a-z0-9]+/g, ' ')
@@ -96,6 +97,7 @@ async function lookupCommune(city, postalCode) {
 // 3 à 20 caractères : lettres, chiffres, espaces et tirets ; ni espace ni tiret au début ou à la fin.
 // Vide = pas de pseudo : cleanPseudo l'accepte (la vérification GET s'en sert), mais un vendeur doit toujours en avoir un
 // (voir PSEUDO_REQUIRED_ERROR plus bas).
+const PSEUDO_FORBIDDEN_ERROR = 'Ce pseudo n\'est pas accepté : il contient des propos injurieux ou discriminatoires. Choisissez-en un autre.';
 const PSEUDO_ERROR =
   'Le pseudo doit comporter de 3 à 20 caractères (lettres, chiffres, espaces ou tirets), sans espace ni tiret au début ou à la fin.';
 
@@ -106,6 +108,12 @@ function cleanPseudo(raw) {
   const pseudo = String(raw).trim().replace(/\s+/g, ' ');
   if (!/^[A-Za-z0-9À-ÿ][A-Za-z0-9À-ÿ -]{1,18}[A-Za-z0-9À-ÿ]$/.test(pseudo)) {
     return { ok: false, status: 400, error: PSEUDO_ERROR };
+  }
+  // Le pseudo est public : ni insulte ni propos discriminatoire (racisme, sexisme, homophobie…)
+  const forbidden = findForbiddenText(pseudo);
+  if (forbidden) {
+    console.warn('Pseudo refusé (' + forbidden + ')');
+    return { ok: false, status: 400, error: PSEUDO_FORBIDDEN_ERROR };
   }
   return { ok: true, pseudo };
 }

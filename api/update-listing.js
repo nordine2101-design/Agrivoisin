@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { findForbiddenText } from '../lib/moderation.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
   realtime: {
@@ -517,6 +518,17 @@ export default async function handler(req, res) {
     const cleanDescription = typeof description === 'string' ? description : '';
     if (cleanDescription.length > MAX_DESCRIPTION) {
       return res.status(400).json({ error: 'La description est trop longue (' + MAX_DESCRIPTION + ' caractères au maximum).' });
+    }
+
+    // Le titre et la description sont publics : ni insulte ni propos discriminatoire (racisme, sexisme, homophobie…)
+    for (const [field, text] of [['le titre', cleanTitle], ['la description', cleanDescription]]) {
+      const forbidden = findForbiddenText(text);
+      if (forbidden) {
+        console.warn('Modification refusée (' + forbidden + ') : vendeur ' + seller.id + ', ' + field);
+        return res.status(400).json({
+          error: 'Votre annonce n\'a pas été publiée : ' + field + ' contient des propos injurieux ou discriminatoires. Modifiez-' + (field === 'le titre' ? 'le' : 'la') + ' puis réessayez.',
+        });
+      }
     }
 
     // Prix et unité

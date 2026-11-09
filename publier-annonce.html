@@ -51,8 +51,12 @@
         <div class="st-note"><b>Important :</b><br>1) Si un acheteur réserve, vous devez lui vendre au prix indiqué, même si les prix montent.<br>2) Un acheteur ne peut pas réserver plus du quart de votre récolte, et tous ensemble pas plus de la moitié.<br>3) Si vous ne mettez pas votre récolte en vente à la date prévue, l'annonce disparaît 1 jour après et les réservations sont annulées.</div>
       </div>
 
-      <label for="harvestDate" id="harvestDateLabel" style="display:none;">Date et heure de récolte</label>
-      <input type="datetime-local" id="harvestDate" style="display:none;">
+      <label for="harvestDay" id="harvestDateLabel" style="display:none;">Date de récolte</label>
+      <input type="date" id="harvestDay" style="display:none;">
+      <input type="hidden" id="harvestDate">
+      <label for="harvestHour" id="harvestTimeLabel" style="display:none;">Heure de récolte</label>
+      <div class="hr-row" id="harvestTimeRow" style="display:none;"><select id="harvestHour" aria-label="Heure de récolte"></select><span>h</span><select id="harvestMin" aria-label="Minutes de récolte"></select><span>min</span></div>
+      <p id="harvestWarn" style="display:none;font-size:0.85em;color:#C8352F;font-weight:600;margin:0;"></p>
       <p id="harvestDateHint" style="display:none;font-size:0.85em;color:#888;margin-top:-8px;">Cette date et cette heure déterminent le niveau de fraîcheur affiché sur votre annonce : « Très frais » pendant 24 h après la récolte.</p>
 
       <div id="proAttestWrap" style="display:none;text-align:left;background:var(--cream-soft);border-radius:10px;padding:12px;">
@@ -236,6 +240,61 @@
   const harvestDateInput = document.getElementById('harvestDate');
   const harvestDateLabel = document.getElementById('harvestDateLabel');
   const harvestDateHint = document.getElementById('harvestDateHint');
+  const harvestDayInput = document.getElementById('harvestDay');
+  const harvestTimeLabel = document.getElementById('harvestTimeLabel');
+  const harvestTimeRow = document.getElementById('harvestTimeRow');
+  const harvestHourSelect = document.getElementById('harvestHour');
+  const harvestMinSelect = document.getElementById('harvestMin');
+  const harvestWarn = document.getElementById('harvestWarn');
+  const harvestFields = [harvestDateLabel, harvestDayInput, harvestTimeLabel, harvestTimeRow, harvestDateHint];
+
+  // Date et heure de récolte : un jour (les jours à venir sont grisés) et une heure à la minute près
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+  (function fillHarvestLists() {
+    let h = '<option value="">--</option>';
+    for (let i = 0; i < 24; i++) h += '<option value="' + pad2(i) + '">' + pad2(i) + '</option>';
+    harvestHourSelect.innerHTML = h;
+    let m = '<option value="">--</option>';
+    for (let i = 0; i < 60; i++) m += '<option value="' + pad2(i) + '">' + pad2(i) + '</option>';
+    harvestMinSelect.innerHTML = m;
+  })();
+  // Rassemble le jour, l'heure et les minutes dans la valeur utilisée à l'enregistrement
+  function refreshHarvestValue() {
+    const day = harvestDayInput.value;
+    const hh = harvestHourSelect.value;
+    const mm = harvestMinSelect.value;
+    harvestDateInput.value = (day && hh !== '' && mm !== '') ? day + 'T' + hh + ':' + mm : '';
+    if (harvestDateInput.value && new Date(harvestDateInput.value).getTime() > Date.now() + 5 * 60 * 1000) {
+      harvestWarn.textContent = 'Cette heure n\'est pas encore passée. Indiquez l\'heure à laquelle vous avez récolté.';
+      harvestWarn.style.display = 'block';
+    } else {
+      harvestWarn.style.display = 'none';
+    }
+  }
+  function showHarvestFields(on) {
+    harvestFields.forEach(function (el) { el.style.display = on ? '' : 'none'; });
+    harvestDayInput.required = on;
+    harvestHourSelect.required = on;
+    harvestMinSelect.required = on;
+    harvestDayInput.max = todayIso();
+    if (!on) harvestWarn.style.display = 'none';
+  }
+  // Remplit les champs à partir d'une valeur « AAAA-MM-JJTHH:MM » (ou les vide)
+  function setHarvestFields(value) {
+    const v = String(value || '');
+    harvestDayInput.value = v ? v.slice(0, 10) : '';
+    harvestHourSelect.value = v ? v.slice(11, 13) : '';
+    harvestMinSelect.value = v ? v.slice(14, 16) : '';
+    refreshHarvestValue();
+  }
+  [harvestDayInput, harvestHourSelect, harvestMinSelect].forEach(function (el) {
+    el.addEventListener('change', refreshHarvestValue);
+    el.addEventListener('input', refreshHarvestValue);
+  });
   const statusWrap = document.getElementById('statusWrap');
   const plannedWrap = document.getElementById('plannedWrap');
   const plannedInput = document.getElementById('plannedDate');
@@ -321,11 +380,9 @@
 
     // La date de récolte n'existe que pour un produit déjà récolté (fruits et légumes)
     const needHarvest = HARVEST_DATE_REQUIRED_CATEGORIES.includes(categorySelect.value) && !soon;
-    harvestDateInput.style.display = needHarvest ? '' : 'none';
-    harvestDateLabel.style.display = needHarvest ? '' : 'none';
-    harvestDateHint.style.display = needHarvest ? '' : 'none';
-    harvestDateInput.required = needHarvest;
-    if (!needHarvest) harvestDateInput.value = '';
+    showHarvestFields(needHarvest);
+    if (needHarvest && !harvestDayInput.value) { harvestDayInput.value = todayIso(); refreshHarvestValue(); }
+    if (!needHarvest) setHarvestFields('');
   }
 
   function setListingStatus(status) {
@@ -1157,8 +1214,8 @@
       if (l.subcategory) subcategorySelect.value = l.subcategory;
 
       if (HARVEST_DATE_REQUIRED_CATEGORIES.includes(l.category)) {
-        if (l.harvest_at) harvestDateInput.value = toLocalInput(l.harvest_at);
-        else if (l.harvest_date) harvestDateInput.value = String(l.harvest_date).slice(0, 10) + 'T00:00';
+        if (l.harvest_at) setHarvestFields(toLocalInput(l.harvest_at));
+        else if (l.harvest_date) setHarvestFields(String(l.harvest_date).slice(0, 10) + 'T00:00');
       }
 
       descriptionInput.value = l.description || '';
@@ -1470,9 +1527,8 @@
       listingForm.reset();
       subcategorySelect.style.display = 'none';
       subcategoryLabel.style.display = 'none';
-      harvestDateInput.style.display = 'none';
-      harvestDateLabel.style.display = 'none';
-      harvestDateHint.style.display = 'none';
+      showHarvestFields(false);
+      setHarvestFields('');
       photoPreviewWrap.style.display = 'none';
       document.getElementById('proAttestWrap').style.display = 'none';
       document.getElementById('bioWrap').style.display = currentSellerType === 'professionnel' ? '' : 'none';
@@ -1580,6 +1636,9 @@
   .un-mode:focus-visible { outline:3px solid rgba(131,193,61,0.55); outline-offset:2px; }
   .un-free { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px; font-size:0.9rem; color:var(--soil); font-weight:600; }
   .auth-form .un-free input { width:90px; padding:7px 10px; border:1px solid #e6e0d3; border-radius:8px; font:inherit; font-weight:400; box-sizing:border-box; }
+  .hr-row { display:flex; gap:10px; align-items:center; }
+  .hr-row select { flex:1; min-width:0; padding:12px 14px; border-radius:var(--radius-sm); border:1.5px solid #9FC49A; font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background:#fff; }
+  .hr-row span { font-weight:700; color:var(--leaf-deep); }
   .auth-form .un-free select { width:auto; padding:7px 10px; border:1px solid #e6e0d3; border-radius:8px; font:inherit; font-weight:400; background:#fff; }
   .un-result { margin:10px 0 0; padding:10px 12px; border-radius:10px; background:#fff; font-size:0.9rem; color:var(--soil); text-align:left; }
   .pc-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }

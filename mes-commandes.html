@@ -420,7 +420,11 @@
           ${showCancel ? '<button type="button" class="btn payout-cancel-btn">Annuler</button><span class="cancel-note">' + (seller.cancelFree ? 'Annulation gratuite : produit non périssable' : 'Annuler vous coûtera 50 % de la partie annulée') + '</span>' : ''}
         </div>
         ${reportLocked ? `<p class="payout-report-hint">Vous pourrez signaler un problème à partir du ${escapeHtml(formatParisMoment(payout.pickupStartAt))}.</p>` : ''}
-        ${pickedUp ? '<p class="payout-report-hint">Vous pouvez signaler un problème jusqu\'à cette date.</p>' : ''}
+        ${pickedUp && releaseDate && !Number.isNaN(releaseDate.getTime())
+          ? '<p class="payout-report-hint">' + (releaseDate.getTime() > Date.now()
+            ? 'Vous pouvez signaler un problème jusqu\'au ' + escapeHtml(formatParisMoment(payout.autoReleaseAt)) + '.'
+            : 'Le délai pour signaler un problème est terminé.') + '</p>'
+          : ''}
         <div class="payout-report-form" style="display:none;">
           ${absentChoiceHtml}
           <div class="payout-other"${absentChoiceHtml && slotEnded ? ' style="display:none;"' : ''}>

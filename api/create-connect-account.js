@@ -364,6 +364,16 @@ async function handleShop(action, body, res, userId) {
   if (description.length > SHOP_DESCRIPTION_MAX) {
     return res.status(400).json({ error: 'La présentation est trop longue (' + SHOP_DESCRIPTION_MAX + ' caractères au maximum).' });
   }
+  // Le nom et la présentation de la vitrine sont publics : ni insulte ni propos discriminatoire (racisme, sexisme, homophobie…)
+  for (const [field, article, text] of [['le nom de la boutique', 'le', name], ['la présentation', 'la', description]]) {
+    const forbidden = findForbiddenText(text);
+    if (forbidden) {
+      console.warn('Vitrine refusée (' + forbidden + ') : vendeur ' + seller.id + ', ' + field);
+      return res.status(400).json({
+        error: 'Votre vitrine n\'a pas été enregistrée : ' + field + ' contient des propos injurieux ou discriminatoires. Modifiez-' + article + ' puis réessayez.',
+      });
+    }
+  }
   const logo = cleanShopImage(body.logoUrl, userId);
   const cover = cleanShopImage(body.coverUrl, userId);
   if (!logo.ok || !cover.ok) {

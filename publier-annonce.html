@@ -1244,6 +1244,16 @@
     }
   }
 
+  // Bouton « Retour » d'une nouvelle annonce : on revient à « Mes annonces » si on en vient, sinon à l'accueil
+  if (!isEdit) {
+    try {
+      const ref = document.referrer ? new URL(document.referrer) : null;
+      if (ref && ref.origin === window.location.origin && /\/mes-annonces(\.html)?$/.test(ref.pathname)) {
+        document.querySelector('.btn-back').setAttribute('href', 'mes-annonces.html');
+      }
+    } catch (err) {}
+  }
+
   if (isEdit) {
     document.title = 'Modifier une annonce — Agrivoisin';
     document.querySelector('.my-panel h1').textContent = 'Modifier l\'annonce';

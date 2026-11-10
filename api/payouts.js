@@ -1693,7 +1693,7 @@ async function runAutomaticReleases(req, res) {
 
       if (result.ok) summary.released++;
       else if (result.reason === 'not_claimable') summary.skipped++;
-      else summary.failed++;
+      else { summary.failed++; (summary.errors = summary.errors || []).push({ id: item.id, error: String(result.error || result.reason).slice(0, 200) }); }
     }
 
     summary.listingsDeleted = await deleteFinishedWithdrawnListings();
@@ -1701,11 +1701,36 @@ async function runAutomaticReleases(req, res) {
     // Repérage des cas à examiner (alertes pour l'administrateur ; jamais de sanction automatique)
     summary.fraudAlerts = Date.now() < deadline ? await runFraudDetection() : 'reporté';
 
+    // Trace : les versements encore en attente (pour comprendre pourquoi ils ne sont pas partis)
+    try {
+      const { data: waiting } = await supabase
+        .from('payouts')
+        .select('id, auto_release_at, picked_up_at, pickup_end_at')
+        .eq('status', 'en_attente')
+        .order('auto_release_at', { ascending: true, nullsFirst: true })
+        .limit(20);
+      summary.waiting = waiting || [];
+    } catch (traceError) {
+      summary.waiting = 'lecture impossible : ' + traceError.message;
+    }
+    summary.ranAt = nowIso;
+    await saveRunLog(summary);
+
     console.log('Passage automatique des versements :', JSON.stringify(summary));
     return res.status(200).json(summary);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message });
+  }
+}
+
+// Garde une trace de chaque passage automatique dans la table cron_runs (jamais bloquant)
+async function saveRunLog(summary) {
+  try {
+    const { error } = await supabase.from('cron_runs').insert({ summary });
+    if (error) console.error('Trace du passage non enregistrée :', error.message);
+  } catch (err) {
+    console.error('Trace du passage non enregistrée :', err.message);
   }
 }
 

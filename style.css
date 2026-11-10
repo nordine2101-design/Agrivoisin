@@ -1332,7 +1332,7 @@ h1, h2, h3, h4 {
 /* Pastilles et disques du menu : même réaction au survol de la souris (elles montent un peu, avec une ombre) */
 .main-nav a,
 .header-actions .btn {
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
 }
 
 .main-nav a:hover,
@@ -1341,13 +1341,30 @@ h1, h2, h3, h4 {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
+/* Au survol, chaque pastille fonce dans sa propre couleur */
+.main-nav a[href="annonces.html"]:hover {
+  background: #7A1F11;
+  border-color: #7A1F11;
+}
+
+.main-nav a[href="publier-annonce.html"]:hover {
+  background: #5E9A1F;
+  border-color: #5E9A1F;
+}
+
+.main-nav a[href="index.html#pourquoi"]:hover,
+.main-nav a[href="index.html#comment-ca-marche"]:hover {
+  background: #D9A71C;
+}
+
 .header-actions .btn-ghost:hover {
-  background: var(--leaf-deep);
-  border-color: var(--leaf-deep);
+  background: #1F3A22;
+  border-color: #1F3A22;
 }
 
 .header-actions .btn-primary:hover {
-  background: var(--carrot);
+  background: #C4642A;
+  border-color: #C4642A;
 }
 
 .main-nav a::after {

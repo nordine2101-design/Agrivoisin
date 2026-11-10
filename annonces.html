@@ -63,8 +63,8 @@
   .coming-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; box-sizing:border-box; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-family:inherit; font-size:0.95rem; font-weight:700; color:#fff; text-decoration:none; cursor:pointer; }
   .coming-pill:focus-visible { outline:2px solid #3E9B4D; outline-offset:2px; }
   /* « Favoris » et « Bientôt mûr » : même réaction au survol que les pastilles de l'accueil (elles montent, deviennent blanches avec un liseré vert) */
-  .fav-link, .coming-pill { transition:transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease; }
-  .fav-link:hover, .coming-pill:hover { background:#fff; color:#3E9B4D; transform:translateY(-3px); box-shadow:inset 0 0 0 4px #7CCB86, 0 8px 18px rgba(0,0,0,.28); }
+  .fav-link, .coming-pill { transition:transform .18s ease, box-shadow .18s ease, background .18s ease, color .18s ease, border-color .18s ease; }
+  .fav-link:hover, .coming-pill:hover { background:#fff; color:#3E9B4D; border-color:#7CCB86; transform:translateY(-3px); box-shadow:0 8px 18px rgba(0,0,0,.28); }
   .seller-type-filter { display:flex; gap:8px; flex-wrap:wrap; margin-left:90px; }
   @media (max-width: 900px) { .seller-type-filter { margin-left:0; } }
   .type-check { position:relative; display:inline-flex; align-items:center; padding:9px 18px; border-radius:999px; border:4.5px solid #fff; box-shadow:0 0 0 1.5px #7CCB86; background:#7CCB86; font-size:0.95rem; font-weight:700; color:#fff; cursor:pointer; user-select:none; }

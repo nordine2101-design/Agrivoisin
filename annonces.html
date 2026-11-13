@@ -153,9 +153,6 @@
     .filters-card .seller-type-filter { flex-wrap:nowrap; justify-content:space-between; gap:5px; }
     .filters-card .type-check, .filters-card .coming-pill, .filters-card .fav-link { padding:5px 7px; border-width:3px; font-size:0.74rem; gap:3px; white-space:nowrap; }
     .filters-card .fav-link img { width:20px; height:20px; }
-    /* La carte se cache quand on descend la page et revient dès qu'on remonte */
-    .filters-card { transition:transform .25s ease; }
-    .filters-card.is-hidden { transform:translateY(-135%); }
   }
   @media (max-width: 700px) {
     .filters-card .seller-type-filter { width:100%; }
@@ -1077,16 +1074,7 @@
     const phone = window.matchMedia('(max-width: 700px), (max-width: 1000px) and (max-height: 520px)');
     const banner = document.querySelector('.page-header');
     let compact = false;
-    let lastY = window.scrollY;
     function update() {
-      // Sur téléphone, la carte se cache quand on descend et revient dès qu'on remonte
-      if (phone.matches) {
-        const delta = window.scrollY - lastY;
-        if (delta < -4) { card.classList.remove('is-hidden'); lastY = window.scrollY; }
-        else if (delta > 4) { if (compact) card.classList.add('is-hidden'); lastY = window.scrollY; }
-      } else {
-        card.classList.remove('is-hidden');
-      }
       // Sur téléphone, la carte se réduit au moment où elle se colle en haut de l'écran
       const limit = phone.matches && banner ? banner.offsetHeight + parseFloat(getComputedStyle(card).marginTop) : 300;
       const shouldCompact = (wide.matches || phone.matches) && window.scrollY > limit;
@@ -1107,7 +1095,6 @@
         card.style.marginBottom = (30 + before - after) + 'px';
       } else {
         card.classList.remove('is-compact');
-        card.classList.remove('is-hidden');
         extra.style.display = '';
         card.style.marginBottom = '';
       }

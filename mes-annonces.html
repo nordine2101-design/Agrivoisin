@@ -187,6 +187,19 @@
   #delOk { background:#4C7A50; box-shadow:0 4px 12px rgba(76,122,80,0.35); }
   #delOk:hover { background:#2F5A33; }
   .del-cancel { background:none; border:0; cursor:pointer; color:var(--leaf-deep); font-weight:700; font-size:0.95rem; font-family:inherit; padding:10px 8px; }
+  /* Téléphone : le titre est tout en haut, puis la vidéo entière, puis les annonces. L'ordinateur ne change pas. */
+  @media (max-width: 700px) {
+    .my-page { position:relative; flex-direction:column; align-items:stretch; gap:0; padding:58px 10px 24px; }
+    .my-panel { position:static; padding:14px 14px 26px; border-radius:22px; }
+    .my-panel h1 { font-size:1.55rem; padding:11px 28px; top:4px; transform:translateX(-50%); border:2px solid #fff; }
+    .my-panel h1::before { display:none; }
+    .my-video { order:-1; width:100%; height:auto; position:static; padding:6px; box-sizing:border-box; border-radius:22px; display:block; }
+    .my-video video { width:100%; height:auto; aspect-ratio:1 / 1; object-fit:contain; display:block; border-radius:16px; }
+    .my-topbar { grid-template-columns:1fr; grid-template-areas:"back" "actions"; row-gap:10px; margin-bottom:10px; }
+    .my-topbar-actions { gap:12px; }
+    .listing-photo-box { width:100%; height:190px; }
+    .listing-body { flex-basis:100%; }
+  }
 </style>
 
 <!-- Avertissement avant de supprimer une annonce qui a encore des commandes à honorer -->

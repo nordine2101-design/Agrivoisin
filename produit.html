@@ -12,7 +12,7 @@
 
 <!-- ============ FICHE ANNONCE ============ -->
 <section class="page-header" style="display:flex;align-items:flex-start;justify-content:center;gap:24px;">
-  <div style="position:relative;background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:32px 32px 36px;max-width:780px;width:100%;box-sizing:border-box;text-align:center;">
+  <div class="fiche-carte" style="position:relative;background:var(--white);border-radius:28px;box-shadow:var(--shadow-soft);padding:32px 32px 36px;max-width:780px;width:100%;box-sizing:border-box;text-align:center;">
     <div style="text-align:left;margin:-24px 0 12px -20px;">
       <a href="annonces.html" id="backLink" class="btn btn-ghost btn-back">Retour</a>
     </div>
@@ -72,7 +72,7 @@
       <p style="margin:14px 0 0;text-align:center;"><a href="#" id="reportOpenLink" style="font-size:0.82rem;color:#8a7a62;text-decoration:underline;text-underline-offset:2px;">Signaler cette annonce</a></p>
     </div>
   </div>
-  <div style="position:sticky;top:20px;width:500px;height:600px;flex-shrink:0;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+  <div class="fiche-photo" style="position:sticky;top:20px;width:500px;height:600px;flex-shrink:0;background:var(--cream-soft);border-radius:28px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
     <span id="sellerTypePill" style="display:none;background:#fff;color:#C8352F;font-size:0.9rem;font-weight:700;padding:9px 20px 8px 18px;border-radius:0 28px 0 14px;box-shadow:inset 0 0 0 2px #C8352F;position:absolute;top:0;right:0;z-index:2;"></span>
     <img id="listingImage" src="agrivoisin-logo-final.png" alt="Agrivoisin - Le frais tout près" style="max-width:80%;max-height:80%;width:auto;height:auto;object-fit:contain;">
   </div>
@@ -847,6 +847,38 @@
   .report-cancel { color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-decoration:none; }
   #addToCartBtn.in-cart { background:#2F8F3A; box-shadow:0 4px 14px rgba(47,143,58,.4); }
   #addToCartBtn.in-cart:hover { background:#27782F; box-shadow:0 6px 18px rgba(47,143,58,.48); }
+  /* Téléphone : même page que sur ordinateur (4 cadres à gauche, photo à droite), simplement réduite. L'ordinateur ne change pas. */
+  @media (max-width: 700px) {
+    .page-header { gap:6px !important; padding:58px 6px 18px !important; }
+    .fiche-carte { flex:1 1 0; min-width:0; width:auto !important; padding:38px 6px 10px !important; border-radius:18px !important; }
+    .fiche-carte > div:first-child { margin:-4px 0 8px -2px !important; }
+    .fiche-carte > div:first-child .btn { padding:6px 14px; font-size:0.78rem; }
+    .fiche-photo { width:124px !important; height:400px !important; top:10px !important; border-radius:18px !important; }
+    .listing-chip { right:8px; top:38px; font-size:0.58rem; padding:4px 8px; }
+    .listing-pill, h1.listing-pill { max-width:calc(100% - 16px); font-size:0.85rem !important; padding:4px 14px; line-height:1.2; }
+    .info-grid { gap:6px; }
+    .info-box { padding:7px 7px; border-radius:10px; font-size:0.72rem; }
+    .info-box .info-title { font-size:0.62rem; }
+    .info-box #listingDescription { font-size:0.74rem; }
+    .info-box .freshness-icon { width:34px; height:34px; }
+    .info-box #listingShipBadge img { width:70px; }
+    .info-box #listingShipBadge strong { font-size:0.8rem !important; }
+    .info-box #listingTrustNote { font-size:0.64rem; padding:5px 6px !important; }
+    .info-box .seller-card-btn { padding:5px 8px; font-size:0.7rem; }
+    .info-box .seller-card-avatar { width:28px; height:28px; font-size:0.85rem; }
+    .info-box .seller-card-name { font-size:0.8rem; }
+    .info-box #listingPrice { font-size:1.2rem !important; }
+    .info-box #addToCartBtn { padding:8px 6px; font-size:0.72rem; }
+    .site-footer { display:none; }
+  }
+  /* Téléphone couché */
+  @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
+    .page-header { gap:12px !important; padding:46px 10px 18px !important; }
+    .fiche-carte { flex:1 1 0; min-width:0; width:auto !important; padding:30px 14px 14px !important; }
+    .fiche-photo { width:300px !important; height:340px !important; top:10px !important; }
+    .listing-pill, h1.listing-pill { max-width:calc(100% - 20px); font-size:1.05rem !important; padding:4px 16px; }
+    .site-footer { display:none; }
+  }
 </style>
 
 <!-- ============ SIGNALER UNE ANNONCE ============ -->
@@ -982,5 +1014,3 @@
 </script>
 </body>
 </html>
-
-

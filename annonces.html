@@ -156,13 +156,13 @@
   }
   @media (max-width: 700px) {
     .filters-card .seller-type-filter { width:100%; }
-    /* Carte réduite : Retour, recherche et panier sur la 1re ligne ; ville et Valider sur la 2e ; les 4 boutons sur la 3e */
-    .filters-card.is-compact .filters-bar:first-child .container > div { gap:6px; }
-    .filters-card.is-compact .bar-back { display:inline-flex; order:1; flex:none; padding:6px 12px; font-size:0.8rem; }
-    .filters-card.is-compact #searchInput { order:2; flex:1 1 150px !important; min-width:150px !important; padding:7px 12px !important; font-size:0.85rem !important; }
-    .filters-card.is-compact .bar-cart { display:flex; order:3; flex:none; width:40px; height:40px; margin:0; background:none; }
-    .filters-card.is-compact #buyerCityInput { order:4; flex:1 1 55% !important; min-width:0 !important; padding:7px 12px !important; font-size:0.85rem !important; }
-    .filters-card.is-compact #buyerCityBtn { order:5; flex:none; padding:6px 14px; font-size:0.85rem; }
+    /* Carte réduite B : ligne 1 tout (Retour, recherche, ville, Valider, panier) ; ligne 2 les 4 boutons */
+    .filters-card.is-compact .filters-bar:first-child .container > div { gap:5px; }
+    .filters-card.is-compact .bar-back { display:inline-flex; order:1; flex:none; padding:6px 10px; font-size:0.74rem; }
+    .filters-card.is-compact #searchInput { order:2; flex:1 1 0 !important; min-width:0 !important; padding:7px 10px !important; font-size:0.76rem !important; }
+    .filters-card.is-compact #buyerCityInput { order:3; flex:1 1 0 !important; min-width:0 !important; padding:7px 10px !important; font-size:0.76rem !important; }
+    .filters-card.is-compact #buyerCityBtn { order:4; flex:none; padding:6px 10px; font-size:0.74rem; }
+    .filters-card.is-compact .bar-cart { display:flex; order:5; flex:none; width:34px; height:34px; margin:0; background:none; }
     .filters-card.is-compact .seller-type-filter { order:6; }
   }
 </style>

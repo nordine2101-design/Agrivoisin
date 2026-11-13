@@ -1178,6 +1178,17 @@
   .my-panel .payout-cancel-btn { background:#C8352F; border:0; color:#fff; font-weight:700; box-shadow:none; }
   .my-panel .payout-cancel-btn:hover { background:#A82A25; }
   .cancel-note { font-size:0.8rem; font-weight:600; color:#6B5842; line-height:1.3; flex:1; min-width:150px; text-decoration:underline; text-decoration-color:#C8352F; text-decoration-thickness:2px; text-underline-offset:3px; }
+  /* Téléphone : le titre est tout en haut, puis la vidéo entière, puis les commandes. L'ordinateur ne change pas. */
+  @media (max-width: 700px) {
+    .my-page { position:relative; flex-direction:column; align-items:stretch; gap:0; padding:58px 10px 24px; }
+    .my-topbar { position:static; margin-bottom:6px; justify-content:flex-start; }
+    .my-topbar .btn { position:static; transform:none; }
+    .my-video { order:-1; width:100%; height:auto; position:static; padding:6px; box-sizing:border-box; border-radius:22px; display:block; }
+    .my-video video { width:100%; height:auto; aspect-ratio:640 / 624; object-fit:contain; display:block; border-radius:16px; }
+    .my-panel { padding:14px 14px 26px; border-radius:22px; }
+    .my-panel h1 { font-size:1.55rem; padding:11px 28px; top:4px; transform:translateX(-50%); border:2px solid #fff; }
+    .my-panel h1::before { display:none; }
+  }
 </style>
 
 </body>

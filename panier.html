@@ -195,6 +195,28 @@
   .my-panel .btn-primary:hover { background:#0B7A4B; box-shadow:0 6px 18px rgba(15,155,97,0.48); }
   .cart-qty-btn { background:#EAFAF2; color:#0E8F5A; }
   .cart-qty-btn:hover:not(:disabled) { background:#9BE6C2; }
+  /* Téléphone : le titre est tout en haut, puis la photo du panier, puis la commande. L'ordinateur ne change pas. */
+  @media (max-width: 700px) {
+    .my-page { position:relative; flex-direction:column; align-items:stretch; gap:14px; padding:58px 10px 24px; }
+    .my-panel { position:static; padding:14px 14px 26px; border-radius:22px; }
+    .my-panel h1 { font-size:1.55rem; padding:11px 28px; top:4px; transform:translateX(-50%); border:2px solid #fff; }
+    .my-panel h1::before { display:none; }
+    .my-topbar { position:static; justify-content:flex-start; min-height:0; margin-bottom:10px; }
+    .my-video { order:-1; width:100%; height:auto; position:static; padding:6px; box-sizing:border-box; border-radius:22px; display:block; }
+    .my-video img { width:100%; height:auto; aspect-ratio:1 / 1; object-fit:contain; display:block; border-radius:16px; }
+    .cart-line-top { align-items:flex-start; }
+    .cart-line-bottom { flex-wrap:wrap; }
+    .addr-row { flex-direction:column; gap:0; }
+    .site-footer { display:none; }
+  }
+  /* Téléphone couché : le panier à gauche, la photo à droite, à la hauteur de l'écran. L'ordinateur ne change pas. */
+  @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
+    .my-page { padding:58px 16px 24px; gap:16px; align-items:flex-start; }
+    .my-panel { flex:1; min-width:0; }
+    .my-video { width:auto; height:calc(100svh - 80px); aspect-ratio:1 / 1; flex-shrink:0; top:10px; padding:8px; box-sizing:border-box; }
+    .my-video img { width:100%; height:100%; object-fit:contain; border-radius:16px; }
+    .site-footer { display:none; }
+  }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(

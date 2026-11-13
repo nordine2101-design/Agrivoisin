@@ -847,51 +847,77 @@
   .report-cancel { color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-decoration:none; }
   #addToCartBtn.in-cart { background:#2F8F3A; box-shadow:0 4px 14px rgba(47,143,58,.4); }
   #addToCartBtn.in-cart:hover { background:#27782F; box-shadow:0 6px 18px rgba(47,143,58,.48); }
-  /* Téléphone : même page que sur ordinateur (4 cadres à gauche, photo à droite), simplement réduite. L'ordinateur ne change pas. */
+  /* Téléphone debout : les 4 cadres en haut (toute la largeur), la photo juste en dessous. L'ordinateur ne change pas. */
   @media (max-width: 700px) {
-    .page-header { gap:6px !important; padding:58px 6px 18px !important; }
-    .fiche-carte { flex:1 1 0; min-width:0; width:auto !important; padding:38px 6px 10px !important; border-radius:18px !important; }
+    .page-header { flex-direction:column !important; align-items:stretch !important; gap:12px !important; padding:58px 8px 20px !important; }
+    .fiche-carte { width:auto !important; max-width:none !important; padding:38px 8px 12px !important; border-radius:22px !important; }
     .fiche-carte > div:first-child { margin:-4px 0 8px -2px !important; }
     .fiche-carte > div:first-child .btn { padding:6px 14px; font-size:0.78rem; }
-    .fiche-photo { width:124px !important; height:400px !important; top:10px !important; border-radius:18px !important; }
-    .listing-chip { right:8px; top:38px; font-size:0.58rem; padding:4px 8px; }
-    .listing-pill, h1.listing-pill { max-width:calc(100% - 16px); font-size:0.85rem !important; padding:4px 14px; line-height:1.2; }
-    .info-grid { gap:6px; }
-    .info-box { padding:7px 7px; border-radius:10px; font-size:0.72rem; }
-    .info-box .info-title { font-size:0.62rem; }
-    .info-box #listingDescription { font-size:0.74rem; }
-    .info-box .freshness-icon { width:34px; height:34px; }
-    .info-box #listingShipBadge img { width:70px; }
-    .info-box #listingShipBadge strong { font-size:0.8rem !important; }
-    .info-box #listingTrustNote { font-size:0.64rem; padding:5px 6px !important; }
-    .info-box .seller-card-btn { padding:5px 8px; font-size:0.7rem; }
+    .fiche-photo { position:relative !important; top:auto !important; width:100% !important; height:auto !important; min-height:200px; border-radius:22px !important; }
+    .fiche-photo #listingImage { display:block; width:100% !important; max-width:100% !important; max-height:none !important; height:auto !important; border-radius:22px !important; }
+    #sellerTypePill { font-size:0.8rem !important; padding:7px 14px 6px 12px !important; border-radius:0 22px 0 12px !important; }
+    .listing-chip { right:10px; top:40px; font-size:0.62rem; padding:4px 9px; }
+    .listing-pill, h1.listing-pill { max-width:calc(100% - 16px); font-size:1rem !important; padding:4px 16px; line-height:1.2; }
+    .info-grid { gap:8px; }
+    .info-box { padding:9px 9px; border-radius:12px; font-size:0.8rem; }
+    .info-box .info-title { font-size:0.66rem; margin-bottom:5px; }
+    .info-box #listingDescription { font-size:0.8rem; }
+    .info-box .freshness-icon { width:40px; height:40px; }
+    .info-box #listingFreshness .freshness-label { font-size:0.85rem; }
+    .info-box #listingShipBadge img { width:80px; }
+    .info-box #listingShipBadge strong { font-size:0.9rem !important; }
+    .info-box #listingPickup, .info-box #listingShip { padding:6px 7px; }
+    .info-box #listingPickupLines, .info-box #listingShipLines { font-size:0.72rem !important; line-height:1.35 !important; }
+    .info-box #listingShipNote { font-size:0.66rem !important; }
+    .info-box #listingTrustNote { font-size:0.64rem; gap:5px; padding:6px 7px !important; overflow-wrap:anywhere; }
+    .info-box #listingTrustNote svg { width:14px !important; height:14px !important; }
+    .info-box .seller-card-top { gap:7px; }
     .info-box .seller-card-avatar { width:28px; height:28px; font-size:0.85rem; }
-    .info-box .seller-card-name { font-size:0.8rem; }
-    .info-box #listingPrice { font-size:1.2rem !important; }
-    .info-box #addToCartBtn { padding:8px 6px; font-size:0.72rem; }
-    .fiche-photo { align-self:stretch !important; height:auto !important; min-height:400px; }
-    #sellerTypePill { font-size:0.62rem !important; padding:6px 10px 5px 8px !important; border-radius:0 18px 0 10px !important; }
-    .info-box #listingPickup, .info-box #listingShip { padding:6px 6px; }
-    .info-box #listingPickupLines, .info-box #listingShipLines { font-size:0.64rem !important; line-height:1.3 !important; }
-    .info-box #listingShipNote { font-size:0.6rem !important; }
-    .info-box #listingTrustNote { font-size:0.58rem; gap:4px; overflow-wrap:anywhere; }
-    .info-box #listingTrustNote svg { width:12px !important; height:12px !important; }
+    .info-box .seller-card-name { font-size:0.82rem; }
+    .info-box .seller-card-sub { font-size:0.72rem; }
+    .info-box .seller-rating { font-size:0.78rem; }
+    .info-box .seller-card .seller-rating-icon, .info-box .seller-rating-icon { width:18px; height:18px; }
+    .info-box .seller-rating-count { font-size:0.64rem; }
+    .info-box .seller-card-btn { padding:6px 6px; font-size:0.68rem; white-space:nowrap; margin-top:7px; }
+    .bio-line { margin:5px 0 7px; }
+    .bio-line .bio-big { padding:4px 9px; font-size:0.78rem; gap:0; border-width:1.5px; border-radius:14px; max-width:100%; box-sizing:border-box; flex-direction:column; text-align:center; line-height:1.25; }
+    .bio-line .bio-text { font-size:0.6rem; }
+    .info-box #listingPrice { font-size:1.3rem !important; }
+    .info-box .price-old { font-size:0.76rem !important; }
+    #listingStock { font-size:0.76rem; margin:-4px 0 8px !important; }
+    .info-box #addToCartBtn { padding:9px 6px; font-size:0.78rem; }
+    #listingLegal { font-size:0.68rem !important; }
+
+    /* Écran coupé en 2 moitiés égales, sans défilement */
+    html, body { height:100%; overflow:hidden; }
+    .page-header { height:100svh !important; box-sizing:border-box !important; padding:46px 8px 8px !important; gap:8px !important; }
+    .fiche-carte { flex:1 1 0 !important; min-height:0 !important; overflow:hidden !important; padding:30px 8px 6px !important; }
+    .fiche-photo { flex:1 1 0 !important; min-height:0 !important; height:auto !important; overflow:hidden !important; }
+    .fiche-photo #listingImage { height:100% !important; max-height:100% !important; object-fit:cover !important; }
+
+    /* compactage pour tenir dans la moitié */
+    .page-header { padding:50px 8px 8px !important; }
+    .fiche-carte { overflow:visible !important; padding:24px 6px 6px !important; }
+    .fiche-carte > div:first-child { margin:-4px 0 2px -2px !important; }
+    .fiche-carte > div:first-child .btn { padding:4px 12px; font-size:0.72rem; }
+    .listing-chip { top:26px; }
+    .info-grid { gap:6px; }
+    .info-box { padding:5px 8px 6px; }
+    .info-box .info-title { margin-bottom:2px; font-size:0.6rem; }
+    .info-box .freshness-icon { width:26px; height:26px; }
+    .info-box #listingFreshness .freshness-label { font-size:0.74rem; }
+    .bio-line { margin:2px 0 2px; }
+    .bio-line .bio-big { padding:2px 8px; font-size:0.7rem; }
     .info-box .seller-card-top { gap:6px; }
-    .info-box .seller-card-avatar { width:22px; height:22px; font-size:0.7rem; }
-    .info-box .seller-card-name { font-size:0.72rem; }
-    .info-box .seller-card-sub { font-size:0.64rem; }
-    .info-box .seller-rating { font-size:0.7rem; }
-    .info-box .seller-rating-icon { width:16px; height:16px; }
-    .info-box .seller-card .seller-rating-icon { width:16px; height:16px; }
-    .info-box .seller-rating-count { font-size:0.58rem; }
-    .info-box .seller-card-btn { padding:5px 4px; font-size:0.6rem; white-space:nowrap; margin-top:6px; }
-    .bio-line { margin:4px 0 6px; }
-    .bio-line .bio-big { padding:3px 8px; font-size:0.72rem; gap:4px; border-width:1.5px; max-width:100%; box-sizing:border-box; flex-wrap:wrap; justify-content:center; }
-    .bio-line .bio-text { font-size:0.56rem; }
-    .info-box .info-title { margin-bottom:4px; }
-    .info-box .price-old { font-size:0.7rem !important; }
-    #listingStock { font-size:0.7rem; margin:-4px 0 8px !important; }
-    #listingLegal { font-size:0.62rem !important; }
+    .info-box .seller-card-name { font-size:0.76rem; }
+    .info-box .seller-card-sub { font-size:0.66rem; }
+    .info-box .seller-card-btn { margin-top:4px; padding:4px 6px; }
+    .info-box #listingPickupLines { font-size:0.66rem !important; line-height:1.25 !important; }
+    .info-box #listingPickup { padding:4px 6px; }
+    .info-box #listingPrice { font-size:1.1rem !important; }
+    .info-box #addToCartBtn { padding:6px; }
+    #listingStock { margin:-6px 0 4px !important; font-size:0.7rem; }
+    #listingLegal, .fiche-carte > a, #listingTrustNote { display:none !important; }
     .site-footer { display:none; }
   }
   /* Téléphone couché */

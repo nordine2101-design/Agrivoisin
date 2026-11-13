@@ -112,6 +112,11 @@
 
         <label for="sellerBirthDate">Votre date de naissance</label>
         <input type="date" id="sellerBirthDate" min="1900-01-01" style="width:100%;box-sizing:border-box;display:block;min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;background:#fff;height:48px;">
+        <div id="birthSelects" class="birth-selects" role="group" aria-label="Votre date de naissance">
+          <select id="birthDay" aria-label="Jour de naissance"></select>
+          <select id="birthMonth" aria-label="Mois de naissance"></select>
+          <select id="birthYear" aria-label="Année de naissance"></select>
+        </div>
 
         <label for="sellerTaxId">Votre numéro fiscal (13 chiffres)</label>
         <input type="text" id="sellerTaxId" placeholder="Ex : 12 34 567 890 123" inputmode="numeric" maxlength="17" autocomplete="off" style="width:100%;box-sizing:border-box;">
@@ -272,6 +277,16 @@
   .my-panel .auth-switch a { color:#C2185B; }
   .pw-eye:focus-visible { outline-color:#EC407A; }
   .seller-address-note { margin:-4px 0 4px; padding:10px 12px; border-radius:10px; background:var(--cream-soft); font-size:0.85rem; line-height:1.4; color:var(--soil); text-align:left; }
+  /* Ordinateur (souris) : la date de naissance se choisit avec trois cases (jour, mois, année). Téléphone et tablette : sélecteur du téléphone. */
+  .birth-selects { display:none; gap:10px; }
+  .birth-selects select { flex:1; height:48px; box-sizing:border-box; padding:0 12px; border:1.5px solid #F48FB1; border-radius:var(--radius-sm); background:#fff; font-family:var(--font-body); font-size:0.95rem; color:var(--ink); cursor:pointer; }
+  .birth-selects select:nth-child(1) { flex:0.7; }
+  .birth-selects select:nth-child(3) { flex:0.9; }
+  .birth-selects select:focus { outline:none; border-color:#EC407A; }
+  @media (hover:hover) and (pointer:fine) {
+    #sellerBirthDate { display:none !important; }
+    .birth-selects { display:flex; }
+  }
   /* Téléphone : le titre est tout en haut, puis la vidéo, puis le formulaire. L'ordinateur ne change pas. */
   @media (max-width: 700px) {
     .my-page { position:relative; flex-direction:column; align-items:stretch; gap:0; padding:58px 10px 24px; }
@@ -319,6 +334,55 @@
     const limit = new Date();
     limit.setFullYear(limit.getFullYear() - 18);
     birthDateInput.max = limit.toISOString().slice(0, 10);
+  })();
+
+  // Ordinateur : trois cases (jour, mois, année) qui remplissent la date de naissance
+  const desktopDate = window.matchMedia('(hover:hover) and (pointer:fine)');
+  const birthDay = document.getElementById('birthDay');
+  const birthMonth = document.getElementById('birthMonth');
+  const birthYear = document.getElementById('birthYear');
+  const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  function fillOptions(sel, placeholder, items, keep) {
+    sel.innerHTML = '';
+    const first = document.createElement('option');
+    first.value = ''; first.textContent = placeholder;
+    sel.appendChild(first);
+    items.forEach((it) => {
+      const o = document.createElement('option');
+      o.value = it.value; o.textContent = it.label;
+      sel.appendChild(o);
+    });
+    if (keep && items.some((it) => String(it.value) === String(keep))) sel.value = keep;
+  }
+  function refreshDays() {
+    const m = Number(birthMonth.value);
+    const y = Number(birthYear.value) || 2000;
+    const count = m ? new Date(y, m, 0).getDate() : 31;
+    const days = [];
+    for (let d = 1; d <= count; d++) days.push({ value: d, label: String(d) });
+    fillOptions(birthDay, 'Jour', days, birthDay.value);
+  }
+  function syncBirthDate() {
+    const d = birthDay.value, m = birthMonth.value, y = birthYear.value;
+    birthDateInput.value = (d && m && y)
+      ? y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0')
+      : '';
+  }
+  function resetBirthSelects() {
+    birthMonth.value = ''; birthYear.value = '';
+    refreshDays(); birthDay.value = '';
+    birthDateInput.value = '';
+  }
+  (function () {
+    const lastYear = new Date().getFullYear() - 18;
+    const years = [];
+    for (let y = lastYear; y >= 1900; y--) years.push({ value: y, label: String(y) });
+    fillOptions(birthYear, 'Année', years);
+    fillOptions(birthMonth, 'Mois', MONTHS.map((n, i) => ({ value: i + 1, label: n })));
+    refreshDays();
+    birthMonth.addEventListener('change', () => { refreshDays(); syncBirthDate(); });
+    birthYear.addEventListener('change', () => { refreshDays(); syncBirthDate(); });
+    birthDay.addEventListener('change', syncBirthDate);
   })();
 
   // Informations fiscales : mêmes règles que sur le serveur (qui les revérifie)
@@ -396,7 +460,7 @@
         postalCodeInput.required = true;
         sellerTypeBlock.style.display = 'block';
         pseudoInput.required = true;
-        birthDateInput.required = true;
+        birthDateInput.required = !desktopDate.matches;
       } else {
         sellerAddressLabel.style.display = 'none';
         sellerAddressInput.style.display = 'none';
@@ -414,6 +478,7 @@
         pseudoInput.value = '';
         birthDateInput.required = false;
         birthDateInput.value = '';
+        resetBirthSelects();
         taxIdInput.value = '';
         birthPlaceInput.value = '';
         legalNameInput.value = '';
@@ -439,6 +504,7 @@
   // Après la création du compte, le formulaire se vide : le code redevient caché
   document.getElementById('signupForm').addEventListener('reset', function () {
     setPasswordShown(false);
+    setTimeout(resetBirthSelects, 0);
   });
 
   document.getElementById('signupForm').addEventListener('submit', async function (e) {

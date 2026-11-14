@@ -489,8 +489,28 @@
   .fav-btn img { position:absolute; left:50%; top:50%; width:38px; height:38px; object-fit:contain; transform:translate(-50%,-50%); pointer-events:none; }
   .fav-btn .fav-off { display:none; }
   .fav-btn:focus-visible { outline:2px solid #D97D45; outline-offset:2px; border-radius:12px; }
+
+  /* Téléphone : le titre est tout en haut, puis tes favoris. L'ordinateur ne change pas. */
+  @media (max-width: 700px) {
+    .my-page { position:relative; flex-direction:column; align-items:stretch; gap:14px; padding:58px 10px 24px; }
+    .my-panel { position:static; padding:14px 14px 26px; border-radius:22px; }
+    .my-panel h1 { font-size:1.55rem; padding:11px 28px; top:4px; transform:translateX(-50%); border:2px solid #fff; }
+    .my-topbar { position:static; justify-content:flex-start; min-height:0; margin-bottom:10px; }
+    .my-topbar .btn { position:static; transform:none; }
+    .fav-tabs { gap:8px; flex-wrap:nowrap; }
+    .fav-tab { flex:1; min-width:0; justify-content:center; padding:4px 8px 4px 6px; font-size:0.82rem; line-height:1.15; text-align:left; }
+    .fav-tab img { width:32px; height:32px; flex-shrink:0; }
+    .my-video:empty { display:none; }
+    .site-footer { display:none; }
+  }
+  /* Téléphone couché : les favoris prennent la largeur de l'écran. L'ordinateur ne change pas. */
+  @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
+    .my-page { padding:58px 16px 24px; gap:16px; align-items:flex-start; }
+    .my-panel { flex:1; min-width:0; }
+    .my-video:empty { display:none; }
+    .site-footer { display:none; }
+  }
 </style>
 </body>
 </html>
-
 

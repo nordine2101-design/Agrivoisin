@@ -31,6 +31,9 @@
     .logo-bar .logo img { width:125vw !important; max-width:none !important; height:auto !important; object-fit:fill; margin-left:0; margin-top:-85.7vw; }
     .site-header .nav-bar { bottom:2vw !important; }
   }
+  /* Connecté : l'adresse mail reste cachée sur téléphone debout, on écrit seulement « Connecté » */
+  .mail-court { display:none; }
+  @media (max-width: 700px) { .mail-adresse { display:none; } .mail-court { display:inline; } }
   /* Téléphone couché : la bannière entière, le menu en bas comme sur ordinateur, en plus petit. */
   @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
     .site-header { position:relative !important; }
@@ -472,7 +475,15 @@
     const emailDisplay = document.getElementById('userEmailDisplay');
     if (session) {
       const email = (session.user && session.user.email) || 'Connecté';
-      emailDisplay.textContent = '🍏 ' + email;
+      emailDisplay.textContent = '🍏 ';
+      const mailAdresse = document.createElement('span');
+      mailAdresse.className = 'mail-adresse';
+      mailAdresse.textContent = email;
+      const mailCourt = document.createElement('span');
+      mailCourt.className = 'mail-court';
+      mailCourt.textContent = 'Connecté';
+      emailDisplay.appendChild(mailAdresse);
+      emailDisplay.appendChild(mailCourt);
       emailDisplay.style.color = '#4C7A50';
 
       // Connecté : « Se connecter » devient « Se déconnecter » (« Créer un compte » reste visible)

@@ -14,8 +14,8 @@
     .logo-bar { padding:0 !important; }
     .logo-bar .logo { display:block; }
     .logo-bar .logo picture, .logo-bar .logo img { display:block; width:100%; }
-    .logo-bar .logo img { height:100vh !important; height:100svh !important; object-fit:cover; object-position:8% top; }
-    #userEmailDisplay { top:20px !important; right:84px !important; font-size:0.78rem !important; background:rgba(255,252,240,0.88); padding:3px 10px; border-radius:999px; }
+    .logo-bar .logo img { height:100vh !important; height:100svh !important; object-fit:cover; object-position:center top; }
+    #userEmailDisplay { top:20px !important; right:84px !important; font-size:0.78rem !important; }
     .cart-icon { top:8px !important; right:12px !important; width:62px !important; height:62px !important; }
     .site-header .nav-bar { position:absolute !important; left:0 !important; right:0 !important; bottom:28.5% !important; margin-top:0 !important; width:100%; max-width:none; padding:0 6px; min-height:0; flex-direction:column-reverse; align-items:center; gap:7px; box-sizing:border-box; }
     .site-header .main-nav { display:flex !important; flex-wrap:nowrap; justify-content:center; align-items:center; gap:6px; }
@@ -25,7 +25,11 @@
     .site-header .header-actions { flex-wrap:nowrap; justify-content:center; gap:5px; }
     .site-header .header-actions .btn { padding:9px 8px; font-size:0.68rem; margin-top:0; gap:0; }
     .site-header .nav-toggle { display:none !important; }
-    .site-header .nav-bar { bottom:19svh !important; }
+    /* Taille de l'image : zoom de 30 % vers la gauche pour garder le rouge-gorge */
+    .logo-bar .logo { height:87vw; overflow:hidden; }
+    .logo-bar .logo picture { width:auto; }
+    .logo-bar .logo img { width:130vw !important; max-width:none !important; height:auto !important; object-fit:fill; margin-left:-4vw; margin-top:-73vw; }
+    .site-header .nav-bar { bottom:2vw !important; }
   }
   /* Téléphone couché : la bannière entière, le menu en bas comme sur ordinateur, en plus petit. */
   @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
@@ -51,7 +55,7 @@
   <div class="logo-bar" style="position:relative;padding-top:0;">
     <a href="index.html" class="logo" style="width:100%;">
       <picture>
-        <source media="(max-width: 700px)" srcset="accueil-telephone2.jpg">
+        <source media="(max-width: 700px)" srcset="accueil-telephone.jpg">
         <img src="agrivoisin-banniere.png" alt="Agrivoisin - Le frais tout près" style="width:100%;height:auto;">
       </picture>
     </a>

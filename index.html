@@ -7,6 +7,40 @@
 <meta name="description" content="Agrivoisin met en relation les jardiniers particuliers et leurs voisins pour vendre les surplus du potager. Paiement sécurisé en ligne.">
 <link rel="stylesheet" href="style.css">
 <script src="supabase.js"></script>
+<style>
+  /* Téléphone debout : l'image en hauteur remplit l'écran, le menu est posé dessus. L'ordinateur ne change pas. */
+  @media (max-width: 700px) {
+    .site-header { position:relative !important; background:none; border-bottom:0; backdrop-filter:none; }
+    .logo-bar { padding:0 !important; }
+    .logo-bar .logo { display:block; }
+    .logo-bar .logo picture, .logo-bar .logo img { display:block; width:100%; }
+    .logo-bar .logo img { height:100vh !important; height:100svh !important; object-fit:cover; object-position:center top; }
+    #userEmailDisplay { top:20px !important; right:84px !important; font-size:0.78rem !important; }
+    .cart-icon { top:8px !important; right:12px !important; width:62px !important; height:62px !important; }
+    .site-header .nav-bar { position:absolute !important; left:0 !important; right:0 !important; bottom:28.5% !important; margin-top:0 !important; width:100%; max-width:none; padding:0 6px; min-height:0; flex-direction:column-reverse; align-items:center; gap:7px; box-sizing:border-box; }
+    .site-header .main-nav { display:flex !important; flex-wrap:nowrap; justify-content:center; align-items:center; gap:6px; }
+    .site-header .main-nav a[href="index.html#pourquoi"], .site-header .main-nav a[href="index.html#comment-ca-marche"] { width:54px; height:54px; font-size:0.5rem; line-height:1.15; }
+    .site-header .main-nav a[href="annonces.html"] { padding:5px 8px; font-size:0.6rem; }
+    .site-header .main-nav a[href="publier-annonce.html"] { padding:5px 8px; font-size:0.6rem; margin-right:0; }
+    .site-header .header-actions { flex-wrap:nowrap; justify-content:center; gap:5px; }
+    .site-header .header-actions .btn { padding:5px 7px; font-size:0.57rem; margin-top:0; gap:0; }
+    .site-header .nav-toggle { display:none !important; }
+  }
+  /* Téléphone couché : la bannière entière, le menu en bas comme sur ordinateur, en plus petit. */
+  @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
+    .site-header { position:relative !important; }
+    #userEmailDisplay { top:14px !important; right:84px !important; font-size:0.72rem !important; }
+    .cart-icon { top:6px !important; right:12px !important; width:54px !important; height:54px !important; }
+    .site-header .nav-bar { position:absolute !important; left:0 !important; right:0 !important; bottom:8px !important; margin-top:0 !important; width:100%; max-width:none; padding:0 8px; min-height:0; gap:6px; box-sizing:border-box; justify-content:center; }
+    .site-header .main-nav { display:flex !important; gap:5px; }
+    .site-header .main-nav a[href="index.html#pourquoi"], .site-header .main-nav a[href="index.html#comment-ca-marche"] { width:60px; height:60px; font-size:0.5rem; line-height:1.15; }
+    .site-header .main-nav a[href="annonces.html"] { padding:5px 9px; font-size:0.66rem; }
+    .site-header .main-nav a[href="publier-annonce.html"] { padding:5px 10px; font-size:0.66rem; margin-right:0; }
+    .site-header .header-actions { gap:5px; }
+    .site-header .header-actions .btn { padding:5px 9px; font-size:0.66rem; margin-top:0; }
+    .site-header .nav-toggle { display:none !important; }
+  }
+</style>
 </head>
 <body>
 
@@ -15,7 +49,10 @@
 <header class="site-header" style="position:static;">
   <div class="logo-bar" style="position:relative;padding-top:0;">
     <a href="index.html" class="logo" style="width:100%;">
-      <img src="agrivoisin-banniere.png" alt="Agrivoisin - Le frais tout près" style="width:100%;height:auto;">
+      <picture>
+        <source media="(max-width: 700px)" srcset="accueil-telephone.jpg">
+        <img src="agrivoisin-banniere.png" alt="Agrivoisin - Le frais tout près" style="width:100%;height:auto;">
+      </picture>
     </a>
     <span id="userEmailDisplay" style="position:absolute;top:40px;right:122px;font-size:0.85rem;color:#C8352F;font-weight:600;">🍎 Non connecté</span>
     <a href="panier.html" class="cart-icon" aria-label="Panier" style="position:absolute;top:12px;right:32px;width:76px;height:76px;">

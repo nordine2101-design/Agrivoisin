@@ -438,9 +438,10 @@
 </script>
 
 <style>
-  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:#fff; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#FFE94D 0%,#FFF59A 50%,#FFFDE6 100%); }
   .my-panel { background:#FFF98A; border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:left; }
   .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#FFF44F; color:#9C8F00; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .my-panel h1::before { content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:calc(50% + 2px); box-sizing:border-box; border:2px solid #fff; border-bottom:none; border-radius:999px 999px 0 0; pointer-events:none; }
   .my-topbar { position:relative; display:flex; justify-content:center; align-items:center; min-height:48px; margin-bottom:16px; }
   .my-topbar .btn { position:absolute; left:0; top:50%; transform:translateY(-50%); }
   .my-intro { font-size:0.95rem; color:#6B5842; margin:0 0 16px; text-align:left; }
@@ -495,6 +496,7 @@
     .my-page { position:relative; flex-direction:column; align-items:stretch; gap:16px; padding:58px 10px 24px; }
     .my-panel { position:static; padding:14px 14px 26px; border-radius:22px; }
     .my-panel h1 { font-size:1.55rem; padding:11px 28px; top:4px; transform:translateX(-50%); border:2px solid #fff; }
+    .my-panel h1::before { display:none; }
     .my-topbar { position:static; justify-content:flex-start; min-height:0; margin-bottom:6px; }
     .my-topbar .btn { position:static; transform:none; }
     .fav-tabs { gap:8px; flex-wrap:nowrap; }
@@ -515,4 +517,3 @@
 </style>
 </body>
 </html>
-

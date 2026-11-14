@@ -200,6 +200,23 @@
   .auth-form .seller-type-option:has(input:focus-visible) { outline:2px solid #EE5A44; outline-offset:2px; }
   .my-panel .auth-form .seller-type-option, .my-panel .auth-form label[style*="display:flex"] { color:var(--ink); }
   .my-panel .auth-form .seller-type-option strong { color:#D6402B; }
+  /* Téléphone : le titre est tout en haut, puis le formulaire. L'ordinateur ne change pas. */
+  @media (max-width: 700px) {
+    .my-page { position:relative; flex-direction:column; align-items:stretch; gap:14px; padding:58px 10px 24px; }
+    .my-panel { position:static; padding:14px 16px 26px; border-radius:22px; }
+    .my-panel h1 { font-size:1.55rem; padding:11px 28px; top:4px; transform:translateX(-50%); border:2px solid #fff; }
+    .my-topbar { position:static; justify-content:flex-start; min-height:0; margin-bottom:6px; }
+    .my-panel .auth-subtitle { line-height:1.45; margin-bottom:10px; }
+    .my-video:empty { display:none; }
+    .site-footer { display:none; }
+  }
+  /* Téléphone couché : le formulaire prend la largeur de l'écran. L'ordinateur ne change pas. */
+  @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
+    .my-page { padding:58px 16px 24px; gap:16px; align-items:flex-start; }
+    .my-panel { flex:1; min-width:0; }
+    .my-video:empty { display:none; }
+    .site-footer { display:none; }
+  }
 </style>
 <script>
   const supabaseClient = window.supabase.createClient(

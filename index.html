@@ -25,11 +25,11 @@
     .site-header .header-actions { flex-wrap:nowrap; justify-content:center; gap:5px; }
     .site-header .header-actions .btn { padding:9px 8px; font-size:0.68rem; margin-top:0; gap:0; }
     .site-header .nav-toggle { display:none !important; }
-    /* Taille de l'image : zoom de 25 %, coin gauche de l'image dans le coin gauche de l'écran pour garder le rouge-gorge */
-    .logo-bar .logo { height:78.2vw; overflow:hidden; }
-    .logo-bar .logo picture { width:auto; }
-    .logo-bar .logo img { width:125vw !important; max-width:none !important; height:auto !important; object-fit:fill; margin-left:0; margin-top:-85.7vw; }
-    .site-header .nav-bar { bottom:2vw !important; }
+    /* Image verticale entière, toute la largeur, sans recadrage */
+    .logo-bar .logo { height:auto; overflow:visible; }
+    .logo-bar .logo picture { width:100%; }
+    .logo-bar .logo img { width:100% !important; max-width:none !important; height:auto !important; object-fit:fill; margin:0; }
+    .site-header .nav-bar { top:150vw !important; bottom:auto !important; }
   }
   /* Connecté : l'adresse mail reste cachée sur téléphone debout, on écrit seulement « Connecté » */
   .mail-court { display:none; }
@@ -58,7 +58,7 @@
   <div class="logo-bar" style="position:relative;padding-top:0;">
     <a href="index.html" class="logo" style="width:100%;">
       <picture>
-        <source media="(max-width: 700px)" srcset="accueil-telephone.jpg">
+        <source media="(max-width: 700px)" srcset="accueil-telephone3.jpg">
         <img src="agrivoisin-banniere.png" alt="Agrivoisin - Le frais tout près" style="width:100%;height:auto;">
       </picture>
     </a>

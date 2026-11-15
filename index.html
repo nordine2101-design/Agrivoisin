@@ -30,6 +30,12 @@
     .logo-bar .logo picture { width:100%; }
     .logo-bar .logo img { width:100% !important; max-width:none !important; height:auto !important; object-fit:fill; margin:0; }
     .site-header .nav-bar { top:143vw !important; bottom:auto !important; }
+    /* « Les annonces » en grand tout en haut du bloc de boutons, puis les boutons du compte, puis les disques et « Publier une annonce » */
+    .site-header .nav-bar { flex-direction:row !important; flex-wrap:wrap; justify-content:center; align-items:center; gap:7px 5px; top:auto !important; bottom:8.6vw !important; }
+    .site-header .main-nav, .site-header .header-actions { display:contents !important; }
+    .site-header .header-actions .btn { order:2; }
+    .site-header .main-nav a[href="index.html#pourquoi"], .site-header .main-nav a[href="index.html#comment-ca-marche"], .site-header .main-nav a[href="publier-annonce.html"] { order:3; }
+    .site-header .main-nav a[href="annonces.html"] { order:1; width:84%; box-sizing:border-box; justify-content:center; text-align:center; padding:14px 10px; font-size:1.1rem; border:3px solid #fff; box-shadow:0 3px 10px rgba(0,0,0,.35); }
   }
   /* Connecté : l'adresse mail reste cachée sur téléphone debout, on écrit seulement « Connecté » */
   .mail-court { display:none; }
@@ -514,3 +520,5 @@
 
 </body>
 </html>
+
+

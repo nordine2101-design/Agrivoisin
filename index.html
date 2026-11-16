@@ -394,7 +394,7 @@
 </section>
 
 <!-- ============ ANNONCES EN VEDETTE ============ -->
-<section class="featured-section">
+<section class="featured-section" id="homeRecentSection" style="display:none;">
   <div class="container">
     <div class="section-heading">
       <span class="eyebrow">Fraîchement publié</span>
@@ -402,77 +402,14 @@
       <p>Un aperçu des annonces déposées par les jardiniers de la communauté.</p>
     </div>
 
-    <div class="produce-grid">
-      <div class="produce-card">
-        <div class="produce-card-image">
-          <img src="https://images.unsplash.com/photo-1717959159782-98c42b1d4f37?w=600&q=80&auto=format&fit=crop" alt="Carottes fraîchement récoltées du potager">
-        </div>
-        <div class="produce-card-body">
-          <span class="tag">Légume racine</span>
-          <h4>Carottes du potager</h4>
-          <p class="seller">Marie · à 1,2 km</p>
-          <div class="produce-card-footer">
-            <span class="price">3,50 €/kg</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div class="produce-grid" id="homeRecent"></div>
 
-      <div class="produce-card">
-        <div class="produce-card-image">
-          <img src="https://images.unsplash.com/photo-1502234977800-a244761625eb?w=600&q=80&auto=format&fit=crop" alt="Tomates anciennes fraîchement cueillies">
-        </div>
-        <div class="produce-card-body">
-          <span class="tag">Fruit-légume</span>
-          <h4>Tomates anciennes</h4>
-          <p class="seller">Julien · à 800 m</p>
-          <div class="produce-card-footer">
-            <span class="price">4,00 €/kg</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="produce-card">
-        <div class="produce-card-image">
-          <img src="https://images.unsplash.com/photo-1753445657076-5c3c710c42c4?w=600&q=80&auto=format&fit=crop" alt="Courgettes vertes fraîches empilées">
-        </div>
-        <div class="produce-card-body">
-          <span class="tag">Courgette</span>
-          <h4>Courgettes vertes</h4>
-          <p class="seller">Sophie · à 2 km</p>
-          <div class="produce-card-footer">
-            <span class="price">2,80 €/kg</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="produce-card">
-        <div class="produce-card-image">
-          <img src="https://images.unsplash.com/photo-1749655248287-d1e0acb5f8d1?w=600&q=80&auto=format&fit=crop" alt="Basilic frais aux feuilles vibrantes">
-        </div>
-        <div class="produce-card-body">
-          <span class="tag">Aromate</span>
-          <h4>Basilic frais</h4>
-          <p class="seller">Nadia · à 1,5 km</p>
-          <div class="produce-card-footer">
-            <span class="price">1,50 €/botte</span>
-            <button class="icon-btn" aria-label="Ajouter au panier">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div class="home-recent-empty" id="homeRecentEmpty" style="display:none;text-align:center;">
+      <p style="margin:0 0 16px;">Soyez le premier à publier une récolte !</p>
+      <a href="publier-annonce.html" class="btn btn-primary">Publier une annonce</a>
     </div>
 
-    <div class="featured-cta">
+    <div class="featured-cta" id="homeRecentCta">
       <a href="annonces.html" class="btn btn-primary">Voir toutes les annonces</a>
     </div>
   </div>
@@ -627,7 +564,54 @@
     'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
   );
 
+  // Section « Fraîchement publié » : les 4 annonces les plus récentes (les vraies, comme sur la page des annonces)
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function loadRecent(session) {
+    var section = document.getElementById('homeRecentSection');
+    var grid = document.getElementById('homeRecent');
+    if (!section || !grid) return;
+    fetch('/api/get-listings', {
+      headers: session && session.access_token ? { Authorization: 'Bearer ' + session.access_token } : {},
+    })
+      .then(function (res) { if (!res.ok) throw new Error('listings'); return res.json(); })
+      .then(function (data) {
+        var items = (data.listings || []).filter(function (it) {
+          return it && it.id && !(it.quantity_available != null && Number(it.quantity_available) <= 0);
+        });
+        items.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+        items = items.slice(0, 4);
+        if (!items.length) {
+          grid.style.display = 'none';
+          var cta = document.getElementById('homeRecentCta');
+          if (cta) cta.style.display = 'none';
+          document.getElementById('homeRecentEmpty').style.display = 'block';
+          section.style.display = '';
+          return;
+        }
+        grid.innerHTML = items.map(function (it) {
+          var unit = escapeHtml(it.unit || 'kg');
+          var price = Number(it.price).toFixed(2).replace('.', ',') + ' €/' + unit;
+          var city = it.sellers && it.sellers.city ? it.sellers.city : '';
+          return '<a class="produce-card" href="produit.html?id=' + encodeURIComponent(it.id) + '" style="text-decoration:none;color:inherit;display:block;">' +
+            '<div class="produce-card-image"><img src="' + escapeHtml(it.image_url || 'agrivoisin-logo-final.png') + '" alt="' + escapeHtml(it.title) + '"></div>' +
+            '<div class="produce-card-body">' +
+            '<span class="tag">' + escapeHtml(it.subcategory || it.category || 'Récolte') + '</span>' +
+            '<h4>' + escapeHtml(it.title) + '</h4>' +
+            (city ? '<p class="seller">' + escapeHtml(city) + '</p>' : '') +
+            '<div class="produce-card-footer"><span class="price">' + price + '</span></div>' +
+            '</div></a>';
+        }).join('');
+        section.style.display = '';
+      })
+      .catch(function () { /* échec du chargement : la section reste cachée */ });
+  }
+
   supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    loadRecent(session);
     const emailDisplay = document.getElementById('userEmailDisplay');
     // Accueil téléphone : en haut, « Connecté » en vert ou « Déconnecté » en rouge
     const mobStatus = document.getElementById('mobStatus');
@@ -711,4 +695,6 @@
 </script>
 </body>
 </html>
+
+
 

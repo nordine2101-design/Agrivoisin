@@ -246,7 +246,7 @@
     <p id="heroText">Agrivoisin relie les jardiniers particuliers qui récoltent plus qu'ils ne consomment aux voisins qui rêvent de légumes fraîchement cueillis. Simple, local, et payé en toute sécurité avant même de connaître l'adresse du vendeur.</p>
     <div class="hero-cta">
       <a href="annonces.html" class="btn btn-primary">Découvrir les annonces</a>
-      <a href="inscription.html" class="btn btn-outline-light">Créer un compte</a>
+      <a href="inscription.html" class="btn btn-outline-light" id="heroSignup">Créer un compte</a>
     </div>
   </div>
 
@@ -503,7 +503,7 @@
     <div class="final-cta-box">
       <h2>Votre jardin déborde de récoltes ?</h2>
       <p>Publiez votre première annonce en quelques minutes et rencontrez les voisins gourmands de votre quartier.</p>
-      <a href="inscription.html" class="btn btn-outline-light">Créer un compte</a>
+      <a href="inscription.html" class="btn btn-outline-light" id="finalSignup">Créer un compte</a>
     </div>
   </div>
 </section>
@@ -633,6 +633,11 @@
       mobStatus.setAttribute('href', session ? 'compte.html' : 'connexion.html');
     }
     if (session) {
+      // Connecté : plus de « Créer un compte » sous le titre ; dans la case du bas, le bouton devient « Publier une annonce »
+      const heroSignup = document.getElementById('heroSignup');
+      if (heroSignup) heroSignup.style.display = 'none';
+      const finalSignup = document.getElementById('finalSignup');
+      if (finalSignup) { finalSignup.textContent = 'Publier une annonce'; finalSignup.setAttribute('href', 'publier-annonce.html'); }
       const email = (session.user && session.user.email) || 'Connecté';
       emailDisplay.textContent = '🍏 ';
       const mailAdresse = document.createElement('span');
@@ -677,3 +682,6 @@
 
 </body>
 </html>
+
+
+

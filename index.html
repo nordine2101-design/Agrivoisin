@@ -113,28 +113,30 @@
     .mob-badge.on { display:block; }
   }
   @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
-    body { padding-bottom:70px; }
-    .mob-app { min-height:100vh; }
-    .mob-bar { padding:6px 16px 2px; }
+    body { padding-bottom:0; }
+    .mob-app { height:100vh; height:100svh; overflow:hidden; }
+    .mob-bar { padding:6px 16px 2px; height:38px; }
     .mob-fav { margin-right:26px; }
     .mob-sb { display:none; }
-    .mob-hero { height:330px; width:50%; }
-    .mob-hero img.mob-ph { margin-top:-170px; }
-    .mob-hero:after { content:""; position:absolute; left:0; right:0; bottom:0; height:100%; background:linear-gradient(0deg,rgba(20,35,20,.7),rgba(0,0,0,0) 35%); }
-    .mob-t { bottom:10px; z-index:2; }
-    .mob-b { padding:9px 14px; font-size:.8rem; }
-    .mob-sec { position:absolute; left:52%; right:8px; top:40px; padding:0 0 4px; font-size:.95rem; }
-    .mob-row { position:absolute; left:52%; right:8px; top:72px; gap:8px; padding:0; }
-    .mob-c { flex:1 1 0; }
-    .mob-im { height:96px; border-radius:10px; }
-    .mob-tg { font-size:.55rem; padding:2px 5px; left:5px; bottom:5px; }
-    .mob-tr b { font-size:.72rem; margin-top:0; }
-    .mob-tr img { width:20px; height:20px; }
-    .mob-p { font-size:.8rem; }
-    .mob-c small { font-size:.6rem; }
-    .mob-acc { position:absolute; left:52%; right:8px; top:232px; padding:12px 0; }
-    .mob-fl { height:46px; bottom:8px; right:auto; width:60%; }
-    .mob-fl a span { display:none; }
+    /* La bannière entière (logo complet) en haut de la moitié gauche, les deux boutons juste dessous, puis le menu : tout est toujours visible */
+    .mob-hero { height:auto; width:50%; overflow:visible; }
+    .mob-hero img.mob-ph { display:block; width:100%; height:min(calc(50vw / 2.5), calc(100vh - 162px), calc(100svh - 162px)); min-height:70px; object-fit:contain; object-position:center; margin-top:0; }
+    .mob-t { position:static; padding:8px 10px 0; }
+    .mob-b { padding:9px 14px; font-size:.8rem; margin-right:6px; }
+    /* Le bandeau qui défile prend la moitié droite */
+    .mob-app .mob-rot { position:absolute; left:52%; right:10px; top:44px; margin:0; }
+    .mob-app .mob-rot { padding:8px 0 22px; }
+    .mob-rot .mob-im { height:min(96px, 22vh); }
+    .mob-rot .mob-tr b { font-size:.74rem; }
+    .mob-rot .mob-p { font-size:.8rem; }
+    .mob-rot .mob-c small { font-size:.6rem; }
+    .mob-rot .rt { padding-bottom:4px; }
+    .mob-rot .rs:not(.rs-a):not(.rs-b).on { min-height:84px; }
+    .mob-rot .bm { min-height:84px; }
+    .mob-rot .big { width:84px; height:84px; }
+    .mob-rot .fi { width:84px; } .mob-rot .fi img { width:80px; height:80px; }
+    .mob-fl { height:54px; bottom:4px; left:0; right:auto; width:50%; }
+    .mob-fl a { height:46px; }
   }
 
   .mob-sec{padding-left:16px}
@@ -174,7 +176,7 @@
     </div>
   </div>
   <div class="mob-hero">
-    <img class="mob-ph" src="accueil-telephone3.jpg" alt="Agrivoisin - Le frais tout près">
+    <picture><source media="(min-width: 701px) and (max-height: 520px)" srcset="agrivoisin-banniere.png"><img class="mob-ph" src="accueil-telephone3.jpg" alt="Agrivoisin - Le frais tout près"></picture>
     <div class="mob-t"><a class="mob-b m" href="annonces.html">Les annonces</a><a class="mob-b s" href="publier-annonce.html">Publier une annonce</a></div>
   </div>
   <div class="mob-rot" id="mobRot">
@@ -709,5 +711,4 @@
 </script>
 </body>
 </html>
-
 

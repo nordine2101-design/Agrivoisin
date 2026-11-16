@@ -103,6 +103,8 @@
     .mob-fl { position:fixed; left:0; right:0; bottom:2px; height:62px; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:0 6px; background:#fff; border:1px solid #eee; border-radius:999px; box-shadow:0 4px 18px rgba(0,0,0,.2); font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; }
     .mob-fl a { flex:1 1 0; height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:.6rem; font-weight:600; color:#777; border-radius:999px; text-decoration:none; }
     .mob-fl a.on { background:#E6EFE3; color:#385C3B; margin:0 2px; }
+    .mob-fl a { flex:1 1 auto; min-width:0; padding:0 2px; }
+    .mob-fl a span { white-space:nowrap; font-size:clamp(.5rem,2.6vw,.6rem); }
     .mob-fl svg { width:22px; height:22px; }
     .mob-fav { align-items:center; }
     .mob-fav-t { font-size:.82rem; font-weight:700; color:#385C3B; margin-right:8px; }
@@ -690,6 +692,21 @@
   });
 </script>
 
+<script>
+/* Menu du bas : si le texte est agrandi sur le téléphone, on réduit les mots juste ce qu'il faut pour qu'ils tiennent tous sur une ligne */
+(function(){
+  var nav=document.querySelector('.mob-fl');if(!nav)return;
+  function fit(){
+    var sp=nav.querySelectorAll('a span');if(!sp.length||!nav.offsetWidth)return;
+    sp.forEach(function(s){s.style.fontSize='';});
+    var base=parseFloat(getComputedStyle(sp[0]).fontSize),size=base;
+    function ok(){for(var i=0;i<sp.length;i++){var a=sp[i].parentNode;if(sp[i].scrollWidth>a.clientWidth-2)return false;}return true;}
+    while(!ok()&&size>5){size-=0.25;sp.forEach(function(s){s.style.fontSize=size+'px';});}
+  }
+  fit();window.addEventListener('resize',fit);window.addEventListener('load',fit);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
+})();
+</script>
 </body>
 </html>
 

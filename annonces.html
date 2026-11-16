@@ -152,8 +152,8 @@
   /* Téléphone (debout ou couché) : la carte des filtres reste fixée en haut quand on descend ; elle se réduit à la recherche et aux 4 boutons. L'ordinateur ne change pas. */
   @media (max-width: 700px), (max-width: 1000px) and (max-height: 520px) {
     .filters-card { position:sticky; top:0; width:calc(100% - 16px); padding:12px 10px 8px; }
-    .filters-card .seller-type-filter { flex-wrap:wrap; justify-content:center; gap:5px; }
-    .filters-card .seller-type-filter > * { flex:1 1 auto; justify-content:center; box-sizing:border-box; }
+    .filters-card .seller-type-filter { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+    .filters-card .seller-type-filter > * { justify-content:center; box-sizing:border-box; min-width:0; min-height:34px; }
     .filters-card #searchInput, .filters-card #buyerCityInput { min-width:0 !important; box-sizing:border-box; }
     .filters-card #searchInput { flex:1 1 100% !important; }
     .filters-card #buyerCityInput { flex:1 1 120px !important; }
@@ -162,15 +162,18 @@
     .filters-card .fav-link img:first-child { margin-left:-3px; }
     .filters-card .fav-link img:last-child { transform:translateX(-2px); }
   }
+  @media (min-width: 561px) and (max-width: 700px), (min-width: 561px) and (max-width: 1000px) and (max-height: 520px) {
+    .filters-card .seller-type-filter { grid-template-columns:repeat(4,1fr); }
+  }
   @media (max-width: 700px) {
     .filters-card .seller-type-filter { width:100%; }
     /* Carte réduite B : ligne 1 tout (Retour, recherche, ville, Valider, panier) ; ligne 2 les 4 boutons */
     .filters-card.is-compact .filters-bar:first-child .container > div { gap:5px; }
     .filters-card.is-compact .bar-back { display:inline-flex; order:1; flex:none; padding:6px 10px; font-size:0.74rem; }
     .filters-card.is-compact #searchInput { order:2; flex:1 1 0 !important; min-width:0 !important; padding:7px 10px !important; font-size:0.76rem !important; }
-    .filters-card.is-compact #buyerCityInput { order:3; flex:1 1 0 !important; min-width:0 !important; padding:7px 10px !important; font-size:0.76rem !important; }
-    .filters-card.is-compact #buyerCityBtn { order:4; flex:none; padding:6px 10px; font-size:0.74rem; }
-    .filters-card.is-compact .bar-cart { display:flex; order:5; flex:none; width:34px; height:34px; margin:0; background:none; }
+    .filters-card.is-compact #buyerCityInput { order:4; flex:1 1 calc(100% - 110px) !important; min-width:0 !important; padding:7px 10px !important; font-size:0.76rem !important; }
+    .filters-card.is-compact #buyerCityBtn { order:5; flex:none; padding:6px 10px; font-size:0.74rem; }
+    .filters-card.is-compact .bar-cart { display:flex; order:3; flex:none; width:34px; height:34px; margin:0; background:none; }
     .filters-card.is-compact .seller-type-filter { order:6; }
   }
 </style>

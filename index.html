@@ -531,8 +531,8 @@
       <div class="footer-col">
         <h5>Compte</h5>
         <ul>
-          <li><a href="connexion.html">Se connecter</a></li>
-          <li><a href="inscription.html">Créer un compte</a></li>
+          <li><a href="connexion.html" id="footLogin">Se connecter</a></li>
+          <li><a href="inscription.html" id="footSignup">Créer un compte</a></li>
           <li><a href="panier.html">Mon panier</a></li>
         </ul>
       </div>
@@ -673,6 +673,16 @@
         window.location.href = 'index.html';
       });
 
+      // Bas de page, colonne « Compte » : « Se déconnecter » et « Mon compte » quand on est connecté
+      const footLogin = document.getElementById('footLogin');
+      if (footLogin) {
+        footLogin.textContent = 'Se déconnecter';
+        footLogin.setAttribute('href', '#');
+        footLogin.addEventListener('click', (event) => { event.preventDefault(); loginLink.click(); });
+      }
+      const footSignup = document.getElementById('footSignup');
+      if (footSignup) { footSignup.textContent = 'Mon compte'; footSignup.setAttribute('href', 'compte.html'); }
+
       // Accueil téléphone : l'onglet « Compte » ouvre la page « Mon compte » quand on est connecté (sinon « Rejoindre Agrivoisin »)
       const mobCompte = document.getElementById('mobCompte');
       if (mobCompte) mobCompte.setAttribute('href', 'compte.html');
@@ -682,6 +692,5 @@
 
 </body>
 </html>
-
 
 

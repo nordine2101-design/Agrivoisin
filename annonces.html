@@ -540,6 +540,9 @@
   buyerCityInput.addEventListener('input', () => {
     if (buyerCityInput.value.trim()) return;
     hideCityChoices();
+    // Ville effacée : le curseur revient à 0 km
+    buyerRadius = 0;
+    syncCityUi();
     if (buyerLocation) {
       buyerLocation = null;
       try { localStorage.removeItem('agrivoisin_buyer_location'); } catch (e) {}
@@ -591,7 +594,8 @@
     const city = buyerCityInput.value.trim();
     hideCityChoices();
     if (!city) {
-      // Case vide : on enlève la ville et on revoit toutes les annonces
+      // Case vide : on enlève la ville, le curseur revient à 0 km et on revoit toutes les annonces
+      buyerRadius = 0;
       buyerLocation = null;
       try { localStorage.removeItem('agrivoisin_buyer_location'); } catch (e) {}
       syncCityUi();
@@ -1199,4 +1203,3 @@
 
 </body>
 </html>
-

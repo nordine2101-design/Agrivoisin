@@ -152,7 +152,11 @@
   /* Téléphone (debout ou couché) : la carte des filtres reste fixée en haut quand on descend ; elle se réduit à la recherche et aux 4 boutons. L'ordinateur ne change pas. */
   @media (max-width: 700px), (max-width: 1000px) and (max-height: 520px) {
     .filters-card { position:sticky; top:0; width:calc(100% - 16px); padding:12px 10px 8px; }
-    .filters-card .seller-type-filter { flex-wrap:nowrap; justify-content:space-between; gap:5px; }
+    .filters-card .seller-type-filter { flex-wrap:wrap; justify-content:center; gap:5px; }
+    .filters-card .seller-type-filter > * { flex:1 1 auto; justify-content:center; box-sizing:border-box; }
+    .filters-card #searchInput, .filters-card #buyerCityInput { min-width:0 !important; box-sizing:border-box; }
+    .filters-card #searchInput { flex:1 1 100% !important; }
+    .filters-card #buyerCityInput { flex:1 1 120px !important; }
     .filters-card .type-check, .filters-card .coming-pill, .filters-card .fav-link { padding:5px 7px; border-width:3px; font-size:0.74rem; gap:3px; white-space:nowrap; }
     .filters-card .fav-link img { width:20px; height:20px; }
     .filters-card .fav-link img:first-child { margin-left:-3px; }

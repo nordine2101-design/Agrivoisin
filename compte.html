@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon compte — Agrivoisin</title>
+<link rel="stylesheet" href="style.css">
+<script src="supabase.js"></script>
+<style>
+  body { background:#fff; padding-bottom:90px; font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; color:#2E3A2A; line-height:normal; }
+  .cpt { max-width:520px; margin:0 auto; padding:12px 16px 0; }
+  .cpt-logo { display:inline-block; font-size:1.45rem; font-weight:800; color:#385C3B; letter-spacing:-.02em; text-decoration:none; }
+  .cpt h1 { font-size:1.45rem; font-weight:800; color:#385C3B; letter-spacing:-.02em; margin:14px 0 0; font-family:inherit; }
+  .cpt-mail { margin-top:6px; font-size:.85rem; color:#777; }
+  .cpt-liste { margin-top:22px; display:flex; flex-direction:column; gap:12px; }
+  .cpt-liste a { display:flex; justify-content:space-between; align-items:center; border:2px solid #385C3B; color:#385C3B; border-radius:18px; padding:18px; font-weight:700; font-size:1rem; text-decoration:none; background:#fff; }
+  .cpt-liste a small { display:block; font-weight:500; font-size:.75rem; color:#777; margin-top:3px; }
+  .cpt-liste a[hidden] { display:none; }
+  .cpt-liste a.cpt-vendre { border-color:#83C13D; color:#5E9A22; }
+  .cpt-liste a i { font-style:normal; font-size:1.4rem; }
+  .cpt-nav { position:fixed; left:0; right:0; bottom:12px; height:62px; z-index:50; display:none; align-items:center; justify-content:space-between; padding:0 6px; background:#fff; border:1px solid #eee; border-radius:999px; box-shadow:0 4px 18px rgba(0,0,0,.2); }
+  .cpt-nav a { flex:1 1 0; height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:.6rem; font-weight:600; color:#777; border-radius:999px; text-decoration:none; }
+  .cpt-nav a.on { background:#E6EFE3; color:#385C3B; margin:0 2px; }
+  .cpt-nav svg { width:22px; height:22px; }
+  @media (max-width: 700px), (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) { .cpt-nav { display:flex; } }
+  @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
+    body { padding-bottom:70px; }
+    .cpt-liste { flex-direction:row; }
+    .cpt-liste a { flex:1; }
+    .cpt-nav { height:46px; bottom:8px; right:auto; width:60%; }
+    .cpt-nav a span { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="cpt">
+  <a class="cpt-logo" href="index.html">Agrivoisin</a>
+  <h1>Mon compte</h1>
+  <div class="cpt-mail" id="cptMail">Connecté</div>
+  <div class="cpt-liste">
+    <a href="mes-commandes.html">Mes commandes<i>›</i></a>
+    <a href="mes-informations.html" id="cptInfos" hidden><span>Mes informations<small>Nom, e-mail, adresses</small></span><i>›</i></a>
+    <a href="vendre.html" id="cptVendre" class="cpt-vendre" hidden><span>Devenir vendeur<small>Publiez vos récoltes et recevez vos paiements</small></span><i>›</i></a>
+  </div>
+</div>
+<nav class="cpt-nav" aria-label="Menu">
+  <a href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10H3z"/></svg><span>Accueil</span></a>
+  <a href="annonces.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Annonces</span></a>
+  <a href="publier-annonce.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Publier</span></a>
+  <a href="panier.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1 12H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg><span>Panier</span></a>
+  <a class="on" href="compte.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 15-5 16 0"/></svg><span>Compte</span></a>
+</nav>
+<script>
+  const supabaseClient = window.supabase.createClient(
+    'https://eipksfszadhratfvavvs.supabase.co',
+    'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
+  );
+  supabaseClient.auth.getSession().then(({ data: { session } }) => {
+    if (!session) { window.location.replace('inscription.html'); return; }
+    const email = (session.user && session.user.email) || '';
+    document.getElementById('cptMail').textContent = email ? 'Connecté : ' + email : 'Connecté';
+
+    // Un acheteur (pas encore vendeur) voit la ligne « Devenir vendeur »
+    fetch('/api/get-seller-listings', { headers: { Authorization: 'Bearer ' + session.access_token } })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (x) {
+        if (!x.ok && x.d && x.d.error && x.d.error.indexOf('vendeur') !== -1) {
+          document.getElementById('cptVendre').hidden = false;
+        }
+      })
+      .catch(function () {});
+  });
+</script>
+</body>
+</html>

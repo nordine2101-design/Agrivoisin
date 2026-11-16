@@ -561,7 +561,7 @@
     setTimeout(() => {
       const sticky = card && getComputedStyle(card).position === 'sticky';
       const cardBottom = sticky ? Math.max(0, card.getBoundingClientRect().bottom) : 0;
-      window.scrollBy(0, target.getBoundingClientRect().top - (cardBottom + 12));
+      window.scrollBy(0, target.getBoundingClientRect().top - (cardBottom + 40));
     }, 200);
   }
 
@@ -1219,3 +1219,5 @@
 
 </body>
 </html>
+
+

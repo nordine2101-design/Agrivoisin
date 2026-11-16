@@ -17,6 +17,7 @@
   .cpt-liste a small { display:block; font-weight:500; font-size:.75rem; color:#777; margin-top:3px; }
   .cpt-liste a[hidden] { display:none; }
   .cpt-liste a.cpt-vendre { border-color:#83C13D; color:#5E9A22; }
+  .cpt-liste a.cpt-out { justify-content:center; border-color:#C8352F; color:#C8352F; }
   .cpt-liste a i { font-style:normal; font-size:1.4rem; }
   .cpt-nav { position:fixed; left:0; right:0; bottom:12px; height:62px; z-index:50; display:none; align-items:center; justify-content:space-between; padding:0 6px; background:#fff; border:1px solid #eee; border-radius:999px; box-shadow:0 4px 18px rgba(0,0,0,.2); }
   .cpt-nav a { flex:1 1 0; height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:.6rem; font-weight:600; color:#777; border-radius:999px; text-decoration:none; }
@@ -38,9 +39,9 @@
   <h1>Mon compte</h1>
   <div class="cpt-mail" id="cptMail">Connecté</div>
   <div class="cpt-liste">
-    <a href="mes-commandes.html">Mes commandes<i>›</i></a>
     <a href="mes-informations.html" id="cptInfos" hidden><span>Mes informations<small>Nom, e-mail, adresses</small></span><i>›</i></a>
     <a href="vendre.html" id="cptVendre" class="cpt-vendre" hidden><span>Devenir vendeur<small>Publiez vos récoltes et recevez vos paiements</small></span><i>›</i></a>
+    <a href="#" id="cptOut" class="cpt-out">Se déconnecter</a>
   </div>
 </div>
 <nav class="cpt-nav" aria-label="Menu">
@@ -59,6 +60,24 @@
     if (!session) { window.location.replace('inscription.html'); return; }
     const email = (session.user && session.user.email) || '';
     document.getElementById('cptMail').textContent = email ? 'Connecté : ' + email : 'Connecté';
+
+    // « Se déconnecter » : même déconnexion que sur l'accueil
+    document.getElementById('cptOut').addEventListener('click', async function (event) {
+      event.preventDefault();
+      this.textContent = 'Déconnexion...';
+      try {
+        await Promise.race([
+          supabaseClient.auth.signOut(),
+          new Promise((resolve) => setTimeout(resolve, 2000)),
+        ]);
+      } catch (e) { /* on continue : on efface la session de ce navigateur ci-dessous */ }
+      try {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.indexOf('sb-') === 0 && key.indexOf('-auth-token') !== -1) localStorage.removeItem(key);
+        });
+      } catch (e) { /* ignoré */ }
+      window.location.href = 'index.html';
+    });
 
     // Un acheteur (pas encore vendeur) voit la ligne « Devenir vendeur »
     fetch('/api/get-seller-listings', { headers: { Authorization: 'Bearer ' + session.access_token } })

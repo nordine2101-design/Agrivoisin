@@ -108,6 +108,9 @@
   }
 
   /* Curseur de distance autour de la ville */
+  /* Curseur de distance : juste sous la case « Votre ville » ; caché dans la barre réduite */
+  .radius-row { flex:1 1 100%; box-sizing:border-box; }
+  .filters-card.is-compact .radius-row { display:none !important; }
   .radius-row { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:2px 8px 10px; }
   .radius-row b { color:#3E7A4A; font-size:0.95rem; }
   .radius-wrap { flex:1; min-width:260px; max-width:520px; margin-right:16px; position:relative; height:84px; --pct:0; }
@@ -211,6 +214,14 @@
       <input type="text" id="buyerCityInput" placeholder="Votre ville" aria-label="Votre ville" style="flex:1;min-width:140px;padding:10px 20px;border-radius:999px;border:1.5px solid rgba(107,88,66,0.2);font-family:inherit;font-size:0.95rem;">
       
       <button class="btn btn-primary" id="buyerCityBtn" type="button">Valider</button>
+    <div class="radius-row" id="radiusRow">
+      <b id="radiusLabel">Distance autour de votre ville :</b>
+      <div class="radius-wrap" id="radiusWrap">
+        <span class="radius-bubble" id="radiusVal">0 km</span>
+        <input type="range" id="radiusInput" min="0" max="30" step="5" value="0" aria-label="Distance autour de la ville, en kilomètres">
+        <div class="radius-ticks" aria-hidden="true"><span style="left:calc(13px + 0.00000 * (100% - 26px));">0</span><span style="left:calc(13px + 0.16667 * (100% - 26px));">5</span><span style="left:calc(13px + 0.33333 * (100% - 26px));">10</span><span style="left:calc(13px + 0.50000 * (100% - 26px));">15</span><span style="left:calc(13px + 0.66667 * (100% - 26px));">20</span><span style="left:calc(13px + 0.83333 * (100% - 26px));">25</span><span style="left:calc(13px + 1.00000 * (100% - 26px));">30 km</span></div>
+      </div>
+    </div>
       <div class="seller-type-filter" role="group" aria-label="Type de vendeur">
         <label class="type-check"><input type="checkbox" id="typeParticulier"><span>Particuliers</span></label>
         <label class="type-check"><input type="checkbox" id="typeProfessionnel"><span>Professionnels</span></label>
@@ -226,14 +237,6 @@
 <!-- ============ FILTRES ============ -->
 <section class="filters-bar">
   <div class="container">
-    <div class="radius-row" id="radiusRow" style="display:none;">
-      <b id="radiusLabel">Autour de votre ville :</b>
-      <div class="radius-wrap" id="radiusWrap">
-        <span class="radius-bubble" id="radiusVal">0 km</span>
-        <input type="range" id="radiusInput" min="0" max="30" step="5" value="0" aria-label="Distance autour de la ville, en kilomètres">
-        <div class="radius-ticks" aria-hidden="true"><span style="left:calc(13px + 0.00000 * (100% - 26px));">0</span><span style="left:calc(13px + 0.16667 * (100% - 26px));">5</span><span style="left:calc(13px + 0.33333 * (100% - 26px));">10</span><span style="left:calc(13px + 0.50000 * (100% - 26px));">15</span><span style="left:calc(13px + 0.66667 * (100% - 26px));">20</span><span style="left:calc(13px + 0.83333 * (100% - 26px));">25</span><span style="left:calc(13px + 1.00000 * (100% - 26px));">30 km</span></div>
-      </div>
-    </div>
     <div class="choice-row" id="cityChoiceRow" style="display:none;">
       <b id="cityChoiceTitle">Plusieurs villes portent ce nom. Choisissez la vôtre :</b>
       <div class="choice-pills" id="cityChoicePills"></div>
@@ -474,7 +477,8 @@
       radiusLabel.textContent = 'Autour de ' + (buyerLocation.label || buyerLocation.city) + ' :';
       radiusRow.style.display = '';
     } else {
-      radiusRow.style.display = 'none';
+      radiusRow.style.display = '';
+      radiusLabel.textContent = 'Distance autour de votre ville :';
     }
     radiusInput.value = String(buyerRadius);
     radiusVal.textContent = buyerRadius + ' km';

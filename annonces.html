@@ -552,17 +552,26 @@
     }
   });
 
-  // Après « Valider » : la page descend toute seule jusqu'aux annonces (juste sous la carte des filtres collée en haut)
+  // Après « Valider » : la page descend toute seule jusqu'aux annonces, juste sous la carte des filtres collée en haut.
+  // Le défilement est immédiat (pas d'animation) et la position est recalée plusieurs fois :
+  // la carte se réduit pendant la descente, ce qui décale les annonces vers le haut.
   function scrollToResults() {
     const target = noListingsMessage.style.display === 'block' ? noListingsMessage : container;
     const card = document.querySelector('.filters-card');
-    window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - 20));
-    // La carte se réduit pendant la descente : on se replace juste sous elle
-    setTimeout(() => {
+    let stopped = false;
+    const stop = () => { stopped = true; };
+    window.addEventListener('touchstart', stop, { once: true, passive: true });
+    window.addEventListener('wheel', stop, { once: true, passive: true });
+    const place = (rough) => {
+      if (stopped) return;
       const sticky = card && getComputedStyle(card).position === 'sticky';
-      const cardBottom = sticky ? Math.max(0, card.getBoundingClientRect().bottom) : 0;
-      window.scrollBy(0, target.getBoundingClientRect().top - (cardBottom + 40));
-    }, 200);
+      // Au premier passage, on descend franchement (la carte se réduit) ; ensuite on se recale sous la carte réduite
+      const cardBottom = sticky && !rough ? Math.max(0, card.getBoundingClientRect().bottom) : -20;
+      const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - (cardBottom + 40));
+      window.scrollTo({ top, left: 0, behavior: 'instant' });
+    };
+    place(true);
+    [80, 200, 400, 700, 1100].forEach((ms) => setTimeout(place, ms));
   }
 
   // Valide une commune de l'annuaire : c'est elle (et sa position officielle) qui sert de centre
@@ -1219,5 +1228,8 @@
 
 </body>
 </html>
+
+
+
 
 

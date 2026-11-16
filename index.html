@@ -150,7 +150,6 @@
     <a class="mob-c" href="annonces.html"><div class="mob-im mob-i2"><span class="mob-tg">Bio</span></div><div class="mob-tr"><b>Pommes Gala</b><img src="favori-banane-trans.png" alt=""></div><span class="mob-p">3,50 €/kg</span><small>Livraison possible</small></a>
     <a class="mob-c" href="annonces.html"><div class="mob-im mob-i3"></div></a>
   </div>
-  <div class="mob-acc"><a href="connexion.html" id="mobLogin">Se connecter</a></div>
 </div>
 <nav class="mob-fl mob-nav" aria-label="Menu">
   <a class="on" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10H3z"/></svg><span>Accueil</span></a>
@@ -620,18 +619,6 @@
       // Accueil téléphone : l'onglet « Compte » ouvre la page « Mon compte » quand on est connecté (sinon « Rejoindre Agrivoisin »)
       const mobCompte = document.getElementById('mobCompte');
       if (mobCompte) mobCompte.setAttribute('href', 'compte.html');
-
-      // Accueil téléphone : la pastille « Se connecter » devient « Se déconnecter » (même déconnexion que ci-dessus)
-      const mobLogin = document.getElementById('mobLogin');
-      if (mobLogin) {
-        mobLogin.textContent = 'Se déconnecter';
-        mobLogin.setAttribute('href', '#');
-        mobLogin.addEventListener('click', function (event) {
-          event.preventDefault();
-          mobLogin.textContent = 'Déconnexion...';
-          loginLink.click();
-        });
-      }
     }
   });
 </script>

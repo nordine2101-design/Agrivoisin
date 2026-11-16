@@ -70,7 +70,10 @@
     .mob-app * { box-sizing:border-box; }
     .mob-app a { text-decoration:none; color:inherit; }
     .mob-bar { display:flex; align-items:center; justify-content:space-between; padding:12px 16px 2px; }
-    .mob-bar .mob-logo { font-size:1.45rem; font-weight:800; color:#385C3B; letter-spacing:-.02em; }
+    .mob-bar .mob-logo { font-size:1.05rem; font-weight:800; display:flex; align-items:center; gap:8px; visibility:hidden; }
+    .mob-logo:before { content:""; width:11px; height:11px; border-radius:50%; background:currentColor; display:block; }
+    .mob-logo.pret { visibility:visible; }
+    .mob-logo.ok { color:#3E8A2E; } .mob-logo.ko { color:#C8352F; }
     .mob-ic { display:flex; align-items:center; gap:14px; }
     .mob-fav { display:flex; gap:0; }
     .mob-fav img { width:30px; height:30px; object-fit:contain; }
@@ -138,7 +141,7 @@
 <!-- ============ ACCUEIL TÉLÉPHONE (visible seulement sur téléphone) ============ -->
 <div class="mob-app">
   <div class="mob-bar">
-    <a class="mob-logo" href="index.html">Agrivoisin</a>
+    <a class="mob-logo" id="mobStatus" href="connexion.html"></a>
     <div class="mob-ic">
       <a class="mob-fav" href="favoris.html" aria-label="Mes favoris"><span class="mob-fav-t">Favoris</span><img src="favori-banane-trans.png" alt=""><img src="cerise-trans.png" alt=""></a>
     </div>
@@ -588,6 +591,13 @@
 
   supabaseClient.auth.getSession().then(({ data: { session } }) => {
     const emailDisplay = document.getElementById('userEmailDisplay');
+    // Accueil téléphone : en haut, « Connecté » en vert ou « Déconnecté » en rouge
+    const mobStatus = document.getElementById('mobStatus');
+    if (mobStatus) {
+      mobStatus.textContent = session ? 'Connecté' : 'Déconnecté';
+      mobStatus.className = 'mob-logo pret ' + (session ? 'ok' : 'ko');
+      mobStatus.setAttribute('href', session ? 'compte.html' : 'connexion.html');
+    }
     if (session) {
       const email = (session.user && session.user.email) || 'Connecté';
       emailDisplay.textContent = '🍏 ';

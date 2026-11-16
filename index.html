@@ -134,6 +134,31 @@
     .mob-fl { height:46px; bottom:8px; right:auto; width:60%; }
     .mob-fl a span { display:none; }
   }
+
+  .mob-sec{padding-left:16px}
+  @media (max-width:700px){ .mob-row{padding-left:16px} }
+
+  .mob-rot{margin:12px 12px 6px;padding:12px 0 28px;background:#F3F8EF;border-radius:18px}
+  .mob-rot .rs{display:none}
+  .mob-rot .rs.on{display:block;animation:rsin .5s ease}
+  .mob-rot .rs:not(.rs-a):not(.rs-b).on{display:flex;align-items:center;gap:14px;padding:6px 14px;min-height:150px}
+  .mob-rot .rs-a .mob-row{padding:0 12px}
+  .mob-rot .rt{display:flex;justify-content:space-between;align-items:baseline;padding:0 14px 8px}
+  .mob-rot .rt b{font-size:1rem;color:#2E3A2A}
+  .mob-rot .rt a{font-size:.8rem;color:#385C3B;font-weight:700;text-decoration:none}
+  .mob-rot .bm{display:flex;flex-direction:column;justify-content:center;gap:6px;min-height:150px;margin:0 14px;padding:0 6px;text-decoration:none;color:#2E3A2A}
+  .mob-rot .bm b{font-size:1.15rem;color:#385C3B}
+  .mob-rot .bm span{font-size:.9rem;line-height:1.4}
+  .mob-rot .bm em{font-style:normal;font-weight:800;color:#5E9A22;font-size:.9rem}
+  @keyframes rsin{from{opacity:0}to{opacity:1}}
+  .mob-rot p{margin:0;font-size:.9rem;line-height:1.4;color:#2E3A2A}
+  .mob-rot .big{width:80px;height:80px;object-fit:contain;flex:none}
+  .mob-rot .fi{flex:none;width:80px;display:flex;flex-wrap:wrap;justify-content:center}
+  .mob-rot .fi img{width:64px;height:64px}
+  .mob-rot .rd{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:8px}
+  .mob-rot{position:relative}
+  .mob-rot .rd button{width:8px;height:8px;border-radius:50%;border:0;padding:0;background:#C9D6C4}
+  .mob-rot .rd button.on{background:#385C3B}
 </style>
 </head>
 <body>
@@ -150,12 +175,21 @@
     <img class="mob-ph" src="accueil-telephone3.jpg" alt="Agrivoisin - Le frais tout près">
     <div class="mob-t"><a class="mob-b m" href="annonces.html">Les annonces</a><a class="mob-b s" href="publier-annonce.html">Publier une annonce</a></div>
   </div>
-  <div class="mob-sec"><span>Récoltes du moment</span><a href="annonces.html">Tout voir ›</a></div>
-  <div class="mob-row">
-    <a class="mob-c" href="annonces.html"><div class="mob-im mob-i1"><span class="mob-tg">Très frais</span></div><div class="mob-tr"><b>Tomates anciennes</b><img src="cerise-trans.png" alt=""></div><span class="mob-p">3,50 €/kg</span><small>Récolté il y a 3 h</small></a>
-    <a class="mob-c" href="annonces.html"><div class="mob-im mob-i2"><span class="mob-tg">Bio</span></div><div class="mob-tr"><b>Pommes Gala</b><img src="favori-banane-trans.png" alt=""></div><span class="mob-p">3,50 €/kg</span><small>Livraison possible</small></a>
-    <a class="mob-c" href="annonces.html"><div class="mob-im mob-i3"></div></a>
+  <div class="mob-rot" id="mobRot">
+    <div class="rs rs-a on"><div class="rt"><b>Fraîchement publié</b><a href="annonces.html">Tout voir ›</a></div><div class="mob-row"><a class="mob-c" href="annonces.html"><div class="mob-im mob-i1"><span class="mob-tg">Très frais</span></div><div class="mob-tr"><b>Carottes</b></div><span class="mob-p">3,50 €/kg</span><small>Marie · à 1,2 km</small></a><a class="mob-c" href="annonces.html"><div class="mob-im mob-i2"></div><div class="mob-tr"><b>Pommes Gala</b></div><span class="mob-p">4,00 €/kg</span><small>Julien · à 800 m</small></a><a class="mob-c" href="annonces.html"><div class="mob-im mob-i3"><span class="mob-tg">Bio</span></div><div class="mob-tr"><b>Miel de fleurs</b></div><span class="mob-p">8,00 €/pot</span><small>Sophie · à 2 km</small></a></div>
+</div>
+    <div class="rs rs-b"><a class="bm" href="bientot-mur.html"><b>Des récoltes arrivent bientôt</b><span>Prévenez-moi ! ou réservez avant tout le monde.</span><em>Voir Bientôt mûr ›</em></a></div>
+    <div class="rs"><img class="big" src="fraise-mascotte.png" alt=""><p><b>Les fraises = les avis</b><br>Chaque acheteur note son jardinier après la remise.</p></div>
+    <div class="rs"><span class="fi"><img src="flocon.png" alt=""></span><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.</p></div>
+    <div class="rs"><img class="big" src="expedition-possible%20(1).png" alt=""><p><b>Le lapin = expédition possible</b><br>Le vendeur peut envoyer sa récolte.</p></div>
+    <div class="rd"><button type="button" class="on"></button><button type="button"></button><button type="button"></button><button type="button"></button><button type="button"></button></div>
   </div>
+  <script>
+  (function(){var r=document.getElementById('mobRot');if(!r)return;var sl=r.querySelectorAll('.rs'),dt=r.querySelectorAll('.rd button'),k=0,t,n=sl.length;
+  function go(i){k=i;sl.forEach(function(e,j){e.classList.toggle('on',j===i)});dt.forEach(function(e,j){e.classList.toggle('on',j===i)})}
+  function arm(){clearInterval(t);t=setInterval(function(){go((k+1)%n)},5000)}
+  dt.forEach(function(e,i){e.addEventListener('click',function(){go(i);arm()})});var x0=null;r.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});r.addEventListener('touchend',function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(d)>40){go((k+(d<0?1:n-1))%n);arm()}},{passive:true});arm();})();
+  </script>
 </div>
 <nav class="mob-fl mob-nav" aria-label="Menu">
   <a class="on" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10H3z"/></svg><span>Accueil</span></a>

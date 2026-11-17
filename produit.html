@@ -659,13 +659,16 @@
   window.addEventListener('load', fitListingTitle);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitListingTitle);
 
-  // Téléphone couché : la fiche est rétrécie pour tenir à l'écran ; l'encadré des flocons reprend sa taille réelle pour rester lisible
+  // Encadré des flocons : il s'ouvre à droite des flocons et reste toujours entièrement dans l'écran.
+  // Téléphone couché : la fiche est rétrécie pour tenir à l'écran, l'encadré reprend sa taille réelle pour rester lisible.
+  // Téléphone debout et tablette : sa largeur s'adapte à la place restante à droite des flocons.
   function fitFreshnessTip() {
     const tip = document.querySelector('.freshness-tip');
     if (!tip) return;
     tip.style.zoom = '';
     tip.style.left = '';
     tip.style.width = '';
+    tip.style.marginTop = '';
     const card = document.querySelector('.fiche-carte');
     const z = card ? parseFloat(getComputedStyle(card).zoom) : 1;
     const zoom = z && z > 0 && z < 1 ? z : 1;
@@ -673,16 +676,26 @@
       if (zoom < 1) tip.style.zoom = String(1 / zoom);
       return;
     }
-    // Téléphone debout : l'encadré s'ouvre à droite des flocons, sa largeur s'adapte à la place restante
-    if (window.matchMedia('(max-width: 700px)').matches) {
+    if (window.matchMedia('(max-width: 899px)').matches) {
       const group = tip.parentNode;
       const box = document.getElementById('listingFreshness');
       if (!group || !box) return;
       const gr = group.getBoundingClientRect();
       const br = box.getBoundingClientRect();
       tip.style.left = ((gr.right - br.left + 8) / zoom) + 'px';
-      tip.style.width = (Math.min(260, window.innerWidth - gr.right - 16) / zoom) + 'px';
+      tip.style.width = (Math.max(140, Math.min(260, window.innerWidth - gr.right - 16)) / zoom) + 'px';
     }
+  }
+  // Une fois l'encadré ouvert : s'il dépasse en haut ou en bas de l'écran, on le remonte ou on le descend juste ce qu'il faut
+  function keepFreshnessTipOnScreen() {
+    const tip = document.querySelector('.freshness-tip');
+    if (!tip || tip.offsetHeight === 0) return;
+    const r = tip.getBoundingClientRect();
+    const scale = r.height / tip.offsetHeight || 1;
+    let dy = 0;
+    if (r.bottom > window.innerHeight - 6) dy = window.innerHeight - 6 - r.bottom;
+    if (r.top + dy < 6) dy = 6 - r.top;
+    if (dy) tip.style.marginTop = (dy / scale) + 'px';
   }
   window.addEventListener('resize', fitFreshnessTip);
 
@@ -693,6 +706,7 @@
     fitFreshnessTip();
     if (group.contains(e.target)) group.classList.toggle('open');
     else group.classList.remove('open');
+    if (group.classList.contains('open')) keepFreshnessTipOnScreen();
   });
 
   // La touche Échap ferme l'encadré
@@ -783,6 +797,8 @@
   }
 </script>
 <style>
+  /* Téléphone couché : le téléphone n'agrandit pas les textes tout seul (sinon les longs textes deviennent énormes et se chevauchent) */
+  html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
   .listing-pill { font-size:1rem; text-align:center; margin:0; display:inline-block; background:#CDE8C8; color:#1F4D00; padding:5px 18px; border-radius:28px; position:absolute; left:50%; top:0; transform:translate(-50%,-50%); width:max-content; max-width:min(520px, calc(100% - 220px)); }
   .listing-pill::before { content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:calc(50% + 2px); box-sizing:border-box; border:2px solid #fff; border-bottom:none; border-radius:30px 30px 0 0; pointer-events:none; }
   .listing-chip { position:absolute; top:22px; right:32px; font-size:0.72rem; font-weight:700; color:#2F5A33; background:#EAF3E8; border-radius:999px; padding:6px 14px; text-transform:uppercase; letter-spacing:0.05em; }
@@ -916,12 +932,6 @@
     .info-box #addToCartBtn { padding:9px 6px; font-size:0.78rem; }
     #listingLegal { font-size:0.68rem !important; }
 
-    /* Encadré des flocons : à droite des flocons (position et largeur réglées par le script), texte un peu plus petit */
-    .freshness-tip { top:50%; right:auto; transform:translateY(-50%); padding:6px; font-size:0.72rem; line-height:1.25; }
-    .freshness-tip-row { gap:6px; padding:5px; }
-    .freshness-tip-icons { width:50px; }
-    .tip-icon { width:16px; height:16px; }
-
     /* Écran coupé en 2 moitiés égales, sans défilement */
     html, body { height:100%; overflow:hidden; }
     .page-header { height:100svh !important; box-sizing:border-box !important; padding:46px 8px 8px !important; gap:8px !important; }
@@ -957,6 +967,13 @@
     .fiche-carte { flex:0 0 auto !important; overflow:visible !important; }
     .fiche-photo { flex:0 0 auto !important; height:auto !important; min-height:300px !important; }
     .site-footer { display:none; }
+  }
+  /* Encadré des flocons sur téléphone debout et tablette : à droite des flocons (position et largeur réglées par le script), texte un peu plus petit */
+  @media (max-width: 899px) {
+    .freshness-tip { left:calc(100% + 8px); width:230px; top:50%; right:auto; transform:translateY(-50%); padding:6px; font-size:0.72rem; line-height:1.25; }
+    .freshness-tip-row { gap:6px; padding:5px; }
+    .freshness-tip-icons { width:50px; }
+    .tip-icon { width:16px; height:16px; }
   }
   /* Téléphone couché */
   @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {

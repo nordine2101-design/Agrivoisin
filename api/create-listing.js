@@ -73,6 +73,11 @@ function validatePickupHours(input) {
 // Toutes les autres sont réservées aux vendeurs professionnels.
 const PARTICULIER_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin'];
 
+// Catégories ouvertes à tous (particuliers et professionnels), sans case de confirmation :
+// les produits frais ci-dessus, plus les fruits à coque (noix, châtaignes… dont ceux des DOM-TOM).
+// Les règles « produit frais » (expédition, « Bientôt mûr ») restent liées à PARTICULIER_CATEGORIES.
+const OPEN_CATEGORIES = [...PARTICULIER_CATEGORIES, 'Fruits à coque'];
+
 // Catégories où un professionnel peut expédier : toutes celles réservées aux professionnels (produits qui se conservent),
 // plus les aromates (frais ou séchés). Jamais les fruits, les légumes ni les fleurs du jardin.
 function isShippableCategory(category) {
@@ -279,16 +284,16 @@ export default async function handler(req, res) {
 
     // 2 bis. Les catégories de produits transformés, de miel, de plants et de graines
     //        sont réservées aux vendeurs professionnels
-    if (seller.seller_type !== 'professionnel' && !PARTICULIER_CATEGORIES.includes(category)) {
+    if (seller.seller_type !== 'professionnel' && !OPEN_CATEGORIES.includes(category)) {
       return res.status(403).json({
-        error: 'Cette catégorie est réservée aux vendeurs professionnels. En tant que particulier, vous pouvez vendre des fruits, des légumes, des aromates et des fleurs du jardin.',
+        error: 'Cette catégorie est réservée aux vendeurs professionnels. En tant que particulier, vous pouvez vendre des fruits, des légumes, des aromates, des fleurs du jardin et des fruits à coque.',
       });
     }
 
     // 2 ter. Un professionnel qui vend une catégorie réservée aux professionnels doit avoir confirmé
     //        (case à cocher) qu'il a déclaré son activité et respecte l'étiquetage : on garde la date
     let proAttestedAt = null;
-    if (seller.seller_type === 'professionnel' && !PARTICULIER_CATEGORIES.includes(category)) {
+    if (seller.seller_type === 'professionnel' && !OPEN_CATEGORIES.includes(category)) {
       if (proAttest !== true) {
         return res.status(400).json({
           error: "Pour publier cette annonce, cochez la case de confirmation : vous avez déclaré votre activité aux autorités compétentes et vous respectez l'étiquetage obligatoire de vos produits.",

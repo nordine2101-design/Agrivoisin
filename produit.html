@@ -659,10 +659,23 @@
   window.addEventListener('load', fitListingTitle);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitListingTitle);
 
+  // Téléphone couché : la fiche est rétrécie pour tenir à l'écran ; l'encadré des flocons reprend sa taille réelle pour rester lisible
+  function fitFreshnessTip() {
+    const tip = document.querySelector('.freshness-tip');
+    if (!tip) return;
+    tip.style.zoom = '';
+    if (!window.matchMedia('(min-width: 701px) and (max-width: 1000px) and (max-height: 520px)').matches) return;
+    const card = document.querySelector('.fiche-carte');
+    const z = card ? parseFloat(getComputedStyle(card).zoom) : 1;
+    if (z && z > 0 && z < 1) tip.style.zoom = String(1 / z);
+  }
+  window.addEventListener('resize', fitFreshnessTip);
+
   // Sur téléphone (pas de souris) : un toucher sur les flocons ouvre ou ferme l'encadré, un toucher ailleurs le ferme
   document.addEventListener('click', (e) => {
     const group = document.querySelector('.freshness-group');
     if (!group || !window.matchMedia('(hover: none)').matches) return;
+    fitFreshnessTip();
     if (group.contains(e.target)) group.classList.toggle('open');
     else group.classList.remove('open');
   });
@@ -929,6 +942,9 @@
     .page-header { gap:12px !important; padding:46px 10px 18px !important; }
     .fiche-carte { flex:1 1 0; min-width:0; width:auto !important; padding:30px 14px 14px !important; }
     .fiche-photo { width:300px !important; height:340px !important; top:10px !important; }
+    /* Encadré des flocons : à droite des flocons, lisible (la fiche est rétrécie en couché : il est remis à sa taille réelle par le script) */
+    .freshness-group { position:relative; }
+    .freshness-tip { left:calc(100% + 14px); right:auto; top:50%; transform:translateY(-50%); width:300px; padding:10px; font-size:0.85rem; }
     .listing-pill, h1.listing-pill { max-width:calc(100% - 20px); font-size:1.05rem !important; padding:4px 16px; }
     .site-footer { display:none; }
   }

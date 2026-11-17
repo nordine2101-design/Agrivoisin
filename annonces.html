@@ -32,6 +32,8 @@
   .produce-card-body p.freshness-badge { display:flex; flex-direction:column; align-items:flex-start; }
   .freshness-icons { display:flex; gap:2px; }
   .freshness-label { color:#4169E1; }
+  /* Annonce sans photo : le logo s'affiche en entier (pas rogné), sur son fond crème */
+  .produce-card-image img.no-photo { object-fit:contain; background:#FAF3E9; }
   .freshness-icon { width:56px; height:56px; object-fit:contain; flex-shrink:0; }
   .card-rating { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin:2px 0 8px; font-size:0.9rem; font-weight:700; color:var(--leaf-deep); }
   .card-rating-icon { width:22px; height:22px; object-fit:contain; mix-blend-mode:multiply; flex-shrink:0; }
@@ -837,7 +839,7 @@
       card.innerHTML = `
         <a href="produit.html?id=${escapeHtml(item.id)}" class="produce-card-image" style="display:block;position:relative;">
           ${sellerTypeHtml}
-          <img src="${escapeHtml(item.image_url || 'agrivoisin-logo-final.png')}" alt="${escapeHtml(item.title)}">
+          <img${item.image_url ? '' : ' class="no-photo"'} src="${escapeHtml(item.image_url || 'agrivoisin-logo-final.png')}" alt="${escapeHtml(item.title)}">
         </a>
         <div class="produce-card-body">
           <span class="tag">${escapeHtml(item.subcategory || item.category || 'Récolte')}</span>${item.is_bio === true ? '<span class="bio-pill">BIO</span>' : ''}${promoPill}${lotPill}
@@ -1252,7 +1254,6 @@
 
 </body>
 </html>
-
 
 
 

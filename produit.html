@@ -664,10 +664,25 @@
     const tip = document.querySelector('.freshness-tip');
     if (!tip) return;
     tip.style.zoom = '';
-    if (!window.matchMedia('(min-width: 701px) and (max-width: 1000px) and (max-height: 520px)').matches) return;
+    tip.style.left = '';
+    tip.style.width = '';
     const card = document.querySelector('.fiche-carte');
     const z = card ? parseFloat(getComputedStyle(card).zoom) : 1;
-    if (z && z > 0 && z < 1) tip.style.zoom = String(1 / z);
+    const zoom = z && z > 0 && z < 1 ? z : 1;
+    if (window.matchMedia('(min-width: 701px) and (max-width: 1000px) and (max-height: 520px)').matches) {
+      if (zoom < 1) tip.style.zoom = String(1 / zoom);
+      return;
+    }
+    // Téléphone debout : l'encadré s'ouvre à droite des flocons, sa largeur s'adapte à la place restante
+    if (window.matchMedia('(max-width: 700px)').matches) {
+      const group = tip.parentNode;
+      const box = document.getElementById('listingFreshness');
+      if (!group || !box) return;
+      const gr = group.getBoundingClientRect();
+      const br = box.getBoundingClientRect();
+      tip.style.left = ((gr.right - br.left + 8) / zoom) + 'px';
+      tip.style.width = (Math.min(260, window.innerWidth - gr.right - 16) / zoom) + 'px';
+    }
   }
   window.addEventListener('resize', fitFreshnessTip);
 
@@ -900,6 +915,12 @@
     #listingStock { font-size:0.76rem; margin:-4px 0 8px !important; }
     .info-box #addToCartBtn { padding:9px 6px; font-size:0.78rem; }
     #listingLegal { font-size:0.68rem !important; }
+
+    /* Encadré des flocons : à droite des flocons (position et largeur réglées par le script), texte un peu plus petit */
+    .freshness-tip { top:50%; right:auto; transform:translateY(-50%); padding:6px; font-size:0.72rem; line-height:1.25; }
+    .freshness-tip-row { gap:6px; padding:5px; }
+    .freshness-tip-icons { width:50px; }
+    .tip-icon { width:16px; height:16px; }
 
     /* Écran coupé en 2 moitiés égales, sans défilement */
     html, body { height:100%; overflow:hidden; }

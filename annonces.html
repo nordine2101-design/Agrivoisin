@@ -1153,7 +1153,14 @@
         card.classList.add('is-compact');
         extra.style.display = 'none';
         const after = card.offsetHeight;
-        if (!phone.matches) card.style.marginBottom = (30 + before - after) + 'px';
+        if (!phone.matches) {
+          card.style.marginBottom = (30 + before - after) + 'px';
+        } else {
+          // Téléphone : au moment où la petite carte apparaît, la première annonce doit commencer un peu en dessous d'elle
+          const listTop = container.getBoundingClientRect().top + window.scrollY;
+          const extra = Math.max(0, limitHigh + card.offsetHeight + 40 - listTop);
+          card.style.marginBottom = (30 + extra) + 'px';
+        }
       } else {
         card.classList.remove('is-compact');
         extra.style.display = '';
@@ -1245,6 +1252,9 @@
 
 </body>
 </html>
+
+
+
 
 
 

@@ -60,6 +60,11 @@
       <p style="margin-bottom:12px;"><span id="listingOldPrice" class="price-old" style="display:none;font-size:1.2rem;margin-right:10px;"></span><span id="listingPrice" class="price" style="font-size:1.8rem;font-family:var(--font-display);"></span><span id="listingPromo" class="promo-pill" style="display:none;margin-left:12px;"></span><span id="listingLot" class="promo-pill" style="display:none;margin-left:12px;"></span></p>
       <p id="listingStock" style="display:none;margin:-10px 0 18px;font-weight:700;"></p>
       <button type="button" id="addToCartBtn" class="btn btn-primary" style="width:100%;">Ajouter au panier</button>
+      <div id="qtyCtl" class="qty-ctl" role="group" aria-label="Quantité dans le panier" style="display:none;">
+        <button type="button" id="qtyMinus" aria-label="En retirer un du panier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+        <span id="qtyLabel" aria-live="polite"></span>
+        <button type="button" id="qtyPlus" aria-label="En ajouter un au panier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      </div>
       <p id="listingStockNote" style="display:none;margin-top:12px;font-size:0.9rem;color:#6B5842;"></p>
       <a id="viewCartLink" href="panier.html" style="display:none;margin-top:14px;font-weight:700;color:var(--leaf-deep);">Voir mon panier</a>
         </div>
@@ -149,6 +154,10 @@
   const imageEl = document.getElementById('listingImage');
   const addBtn = document.getElementById('addToCartBtn');
   const viewCartLink = document.getElementById('viewCartLink');
+  const qtyCtl = document.getElementById('qtyCtl');
+  const qtyLabel = document.getElementById('qtyLabel');
+  const qtyPlus = document.getElementById('qtyPlus');
+  const qtyMinus = document.getElementById('qtyMinus');
 
   const listingId = new URLSearchParams(window.location.search).get('id');
 
@@ -530,7 +539,7 @@
     imageEl.style.maxHeight = '533px';
     imageEl.style.borderRadius = '28px';
 
-    // Stock : « Plus que 3 kg » / « Épuisé ». Le bouton devient vert « Dans mon panier » quand l'annonce est dans le panier ; un clic dessus l'enlève.
+    // Stock : « Plus que 3 kg » / « Épuisé ». Dans le panier, le bouton est remplacé par « − 2 kg + » ; à 0, « Ajouter au panier » revient.
     const stock = item.quantity_available == null ? null : Number(item.quantity_available);
     const stockEl = document.getElementById('listingStock');
     const stockNoteEl = document.getElementById('listingStockNote');
@@ -555,44 +564,67 @@
         stockEl.style.display = 'block';
       }
 
-      addBtn.classList.toggle('in-cart', inCart);
-      addBtn.setAttribute('aria-pressed', inCart ? 'true' : 'false');
       viewCartLink.style.display = inCart ? 'inline-block' : 'none';
 
       if (inCart) {
-        addBtn.disabled = false;
-        addBtn.textContent = '✓ Dans mon panier';
-      } else if (stock !== null && stock <= 0) {
-        addBtn.disabled = true;
-        addBtn.textContent = 'Épuisé';
+        // Dans le panier : « − 2 kg + » à la place du bouton
+        const units = unitsInCart();
+        addBtn.style.display = 'none';
+        qtyCtl.style.display = 'flex';
+        qtyLabel.textContent = units + ' ' + unitLabel(item.unit, units);
+        qtyPlus.disabled = stock !== null && units >= stock;
       } else {
-        addBtn.disabled = false;
-        addBtn.textContent = 'Ajouter au panier';
+        qtyCtl.style.display = 'none';
+        addBtn.style.display = '';
+        if (stock !== null && stock <= 0) {
+          addBtn.disabled = true;
+          addBtn.textContent = 'Épuisé';
+        } else {
+          addBtn.disabled = false;
+          addBtn.textContent = 'Ajouter au panier';
+        }
       }
     }
 
     refreshStock();
 
-    addBtn.addEventListener('click', () => {
-      if (addBtn.disabled) return;
+    // delta = +1 : une unité de plus ; delta = -1 : une unité de moins (à 0, le bouton « Ajouter au panier » revient)
+    function changeCart(delta) {
       let cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
-      const inCart = cart.some((c) => String(c.listingId) === String(item.id));
-
-      if (inCart) {
-        // Second clic : on enlève le produit du panier
-        cart = cart.filter((c) => String(c.listingId) !== String(item.id));
-      } else {
+      const units = cart.filter((c) => String(c.listingId) === String(item.id)).length;
+      if (delta > 0) {
+        if (stock !== null && units >= stock) return;
         cart.push({
           name: item.title,
           price: priceText,
           stripeAccountId: item.sellers ? item.sellers.stripe_account_id : '',
           listingId: item.id,
         });
+      } else {
+        for (let k = cart.length - 1; k >= 0; k--) {
+          if (String(cart[k].listingId) === String(item.id)) { cart.splice(k, 1); break; }
+        }
       }
       localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
       const cartCountEl = document.querySelector('.cart-count');
       if (cartCountEl) cartCountEl.textContent = cart.length;
       refreshStock();
+      fitListingTitle();
+    }
+
+    addBtn.addEventListener('click', () => {
+      if (addBtn.disabled) return;
+      changeCart(1);
+      qtyPlus.focus();
+    });
+    qtyPlus.addEventListener('click', () => {
+      if (qtyPlus.disabled) return;
+      changeCart(1);
+      if (!qtyPlus.disabled) qtyPlus.focus(); else qtyMinus.focus();
+    });
+    qtyMinus.addEventListener('click', () => {
+      changeCart(-1);
+      if (unitsInCart() === 0) addBtn.focus(); else qtyMinus.focus();
     });
 
     // Au retour sur la page (bouton « précédent »), le panier a pu changer : on remet le bouton à jour
@@ -889,8 +921,19 @@
   .report-check input { margin-top:3px; flex-shrink:0; }
   .report-error { margin:0 0 12px; padding:10px 12px; border-radius:10px; background:#FDECEA; color:#C8352F; font-size:0.88rem; font-weight:600; }
   .report-cancel { color:var(--leaf-deep); font-weight:700; font-size:0.9rem; text-decoration:none; }
-  #addToCartBtn.in-cart { background:#2F8F3A; box-shadow:0 4px 14px rgba(47,143,58,.4); }
-  #addToCartBtn.in-cart:hover { background:#27782F; box-shadow:0 6px 18px rgba(47,143,58,.48); }
+  /* Dans le panier : « − 2 kg + » (le nombre est toujours suivi de son unité) */
+  .qty-ctl { align-items:center; gap:6px; background:#fff; border:2px solid #2F8F3A; border-radius:999px; padding:4px; width:100%; box-sizing:border-box; }
+  .qty-ctl button { flex:0 0 auto; width:44px; height:44px; border-radius:50%; background:#2F8F3A; color:#fff; border:0; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+  .qty-ctl button:hover { background:#27782F; }
+  .qty-ctl button svg { width:20px; height:20px; }
+  .qty-ctl button:disabled { opacity:0.35; cursor:not-allowed; }
+  .qty-ctl span { flex:1 1 auto; min-width:0; text-align:center; font-weight:700; font-size:1.05rem; line-height:1.15; color:#1f5a27; overflow-wrap:anywhere; }
+  @media (max-width: 899px) {
+    .qty-ctl { gap:3px; padding:3px; border-width:1.5px; }
+    .qty-ctl button { width:32px; height:32px; }
+    .qty-ctl button svg { width:15px; height:15px; }
+    .qty-ctl span { font-size:0.8rem; }
+  }
   /* Téléphone debout : les 4 cadres en haut (toute la largeur), la photo juste en dessous. L'ordinateur ne change pas. */
   @media (max-width: 700px) {
     .page-header { flex-direction:column !important; align-items:stretch !important; gap:12px !important; padding:58px 8px 20px !important; }
@@ -984,6 +1027,11 @@
     .freshness-group { position:relative; }
     .freshness-tip { left:calc(100% + 14px); right:auto; top:50%; transform:translateY(-50%); width:300px; padding:10px; font-size:0.85rem; }
     .listing-pill, h1.listing-pill { max-width:calc(100% - 20px); font-size:1.05rem !important; padding:4px 16px; }
+    /* La fiche est rétrécie en couché : la case « − 2 kg + » est agrandie pour rester facile à toucher */
+    .qty-ctl { gap:6px; padding:4px; border-width:3px; }
+    .qty-ctl button { width:60px; height:60px; }
+    .qty-ctl button svg { width:28px; height:28px; }
+    .qty-ctl span { font-size:1.5rem; }
     .site-footer { display:none; }
   }
 </style>
@@ -1121,3 +1169,6 @@
 </script>
 </body>
 </html>
+
+
+

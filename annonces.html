@@ -288,6 +288,7 @@
   let currentSearch = '';
   let buyerLocation = null;
   let buyerRadius = 0; // en km : 0 = la ville seule, puis 5, 10 ... 30
+  let holdCompact = false; // téléphone : après « Valider », la petite carte reste en place jusqu'au prochain toucher
 
   // Nombre d'annonces affichées par page
   const PAGE_SIZE = 30;
@@ -563,7 +564,8 @@
     const target = noListingsMessage.style.display === 'block' ? noListingsMessage : container;
     const card = document.querySelector('.filters-card');
     let stopped = false;
-    const stop = () => { stopped = true; };
+    holdCompact = true;
+    const stop = () => { stopped = true; holdCompact = false; };
     window.addEventListener('touchstart', stop, { once: true, passive: true });
     window.addEventListener('wheel', stop, { once: true, passive: true });
     const place = (rough) => {
@@ -1132,17 +1134,26 @@
       // Sur téléphone, la petite carte n'apparaît (et ne se colle en haut) qu'une fois la page descendue
       // jusqu'en dessous de la case « Votre ville »
       if (phone.matches && banner) measureCity();
-      const limit = phone.matches && banner ? banner.offsetHeight + parseFloat(getComputedStyle(card).marginTop) + (cityOffset || 0) : 300;
-      const shouldCompact = (wide.matches || phone.matches) && window.scrollY > limit;
+      // Téléphone : la petite carte apparaît sous la case « Votre ville » (limite haute) et reste jusqu'à ce que
+      // la page soit remontée à la place de la carte (limite basse) ; la grande carte revient alors
+      const limitLow = phone.matches && banner ? banner.offsetHeight + parseFloat(getComputedStyle(card).marginTop) : 300;
+      const limitHigh = phone.matches && banner ? limitLow + (cityOffset || 0) : 300;
+      let shouldCompact;
+      if (phone.matches) {
+        shouldCompact = compact ? (window.scrollY >= limitLow || holdCompact) : window.scrollY > limitHigh;
+      } else {
+        shouldCompact = wide.matches && window.scrollY > 300;
+      }
       if (shouldCompact === compact) return;
       compact = shouldCompact;
       if (compact) {
-        // On garde exactement la même hauteur de page pour que les annonces ne sautent pas
+        // Ordinateur : on garde exactement la même hauteur de page pour que les annonces ne sautent pas.
+        // Téléphone : les annonces remontent juste sous la petite carte, sans espace vide.
         const before = card.offsetHeight;
         card.classList.add('is-compact');
         extra.style.display = 'none';
         const after = card.offsetHeight;
-        card.style.marginBottom = (30 + before - after) + 'px';
+        if (!phone.matches) card.style.marginBottom = (30 + before - after) + 'px';
       } else {
         card.classList.remove('is-compact');
         extra.style.display = '';
@@ -1234,7 +1245,6 @@
 
 </body>
 </html>
-Mémoire mise à jour. Voir la mémoire
 
 
 

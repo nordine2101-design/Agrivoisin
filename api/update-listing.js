@@ -182,6 +182,10 @@ async function ordersToHonor(listingId, unit) {
 // Toutes les autres sont réservées aux vendeurs professionnels.
 const PARTICULIER_CATEGORIES = ['Fruits', 'Légumes', 'Aromates', 'Fleurs du jardin'];
 
+// Catégories ouvertes à tous (particuliers et professionnels), sans case de confirmation :
+// les produits frais ci-dessus, plus les fruits à coque.
+const OPEN_CATEGORIES = [...PARTICULIER_CATEGORIES, 'Fruits à coque'];
+
 // Vérifie les horaires de retrait reçus du navigateur : on ne leur fait jamais confiance sur parole.
 function validatePickupHours(input) {
   if (!Array.isArray(input) || input.length === 0) {
@@ -547,17 +551,18 @@ export default async function handler(req, res) {
     if (typeof category !== 'string' || !category) {
       return res.status(400).json({ error: 'Choisissez une catégorie.' });
     }
-    if (!isPro && !PARTICULIER_CATEGORIES.includes(category)) {
+    if (!isPro && !OPEN_CATEGORIES.includes(category)) {
       return res.status(403).json({
-        error: 'Cette catégorie est réservée aux vendeurs professionnels. En tant que particulier, vous pouvez vendre des fruits, des légumes, des aromates et des fleurs du jardin.',
+        error: 'Cette catégorie est réservée aux vendeurs professionnels. En tant que particulier, vous pouvez vendre des fruits, des légumes, des aromates, des fleurs du jardin et des fruits à coque.',
       });
     }
     const cleanSubcategory = typeof subcategory === 'string' && subcategory ? subcategory : null;
 
     // Un professionnel qui vend une catégorie réservée aux professionnels doit avoir confirmé son activité
     const proOnlyCategory = isPro && !PARTICULIER_CATEGORIES.includes(category);
+    const needsAttest = isPro && !OPEN_CATEGORIES.includes(category);
     let proAttestedAt = null;
-    if (proOnlyCategory) {
+    if (needsAttest) {
       if (existing.pro_attested_at) {
         proAttestedAt = existing.pro_attested_at;
       } else if (proAttest === true) {
@@ -573,7 +578,7 @@ export default async function handler(req, res) {
     let bio = false;
     if (isBio === true) {
       if (!isPro) {
-        return res.status(400).json({ error: 'La mention « Bio » est réservée aux vendeurs professionnels.' });
+        return res.status(400).json({ error: 'La mention « Bio » est réservée aux professionnels.' });
       }
       bio = true;
     }

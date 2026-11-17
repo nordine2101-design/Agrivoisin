@@ -40,10 +40,14 @@
   .card-rating-count { font-size:0.8rem; font-weight:400; color:#6B5842; }
   .card-rating-new { font-size:0.8rem; color:#6B5842; }
   .icon-btn:disabled { opacity:0.4; cursor:not-allowed; }
-  /* Annonce dans le panier : bouton vert avec une coche */
-  .icon-btn.is-selected { background:#2F8F3A; }
-  .icon-btn.is-selected svg { color:#fff; }
-  .icon-btn.is-selected:hover { background:#27782F; }
+  /* Annonce dans le panier : « − 2 kg + » (le nombre est toujours suivi de son unité) */
+  .cart-ctl { flex:0 1 auto; min-width:0; max-width:100%; margin-left:8px; }
+  .qty { display:flex; align-items:center; gap:2px; background:#fff; border:1.5px solid #2F8F3A; border-radius:999px; padding:2px; max-width:100%; box-sizing:border-box; }
+  .qty button { flex:0 0 auto; width:32px; height:32px; border-radius:50%; background:#2F8F3A; color:#fff; display:flex; align-items:center; justify-content:center; border:0; cursor:pointer; }
+  .qty button:hover { background:#27782F; }
+  .qty button svg { width:15px; height:15px; color:#fff; }
+  .qty button:disabled { opacity:0.35; cursor:not-allowed; }
+  .qty span { flex:1 1 auto; min-width:48px; text-align:center; font-weight:700; font-size:0.85rem; line-height:1.15; color:#1f5a27; padding:0 4px; overflow-wrap:anywhere; }
 
   /* Favoris : la banane épluchée, dans l'angle haut droit sous la photo */
   .title-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
@@ -372,9 +376,10 @@
     return '';
   }
 
-  // Affiche le bouton « + » (pas dans le panier) ou la coche verte (dans le panier)
+  // Icônes des boutons « + » et « − » de la fiche
   const ICON_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
-  const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+  const ICON_MINUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>';
 
   // Combien d'unités de cette annonce l'acheteur a déjà dans son panier
   function unitsInCart(listingId) {
@@ -806,12 +811,8 @@
         ? '<p class="card-rating card-rating-new">Nouveau vendeur</p>'
         : `<p class="card-rating" role="img" aria-label="Note moyenne du vendeur : ${Number(rating.average).toFixed(1).replace('.', ',')} fraises sur 4, ${ratingCount} avis"><span aria-hidden="true">${Number(rating.average).toFixed(1).replace('.', ',')} ×</span><img src="fraise-mascotte.png" alt="" class="card-rating-icon"><span class="card-rating-count" aria-hidden="true">· ${ratingCount} avis</span></p>`;
 
-      // Le bouton « + » devient une coche verte quand l'annonce est dans le panier ; un second clic l'enlève.
-      // Il est grisé seulement si l'annonce est épuisée et pas dans le panier.
+      // Le bouton du bas : « + » seul, puis « − 2 kg + » une fois dans le panier. Le « + » est grisé quand le stock est atteint.
       const stock = stockOf(item);
-      const inCart = unitsInCart(item.id) > 0;
-      const noMore = !inCart && stock !== null && stock <= 0;
-      const buttonNote = 'Épuisé';
 
       // Promotion en cours : l'ancien prix est barré, le prix promotionnel est le prix payé
       const unitText = escapeHtml(item.unit || 'kg');
@@ -856,9 +857,7 @@
           ${ratingHtml}
           <div class="produce-card-footer">
             ${priceHtml}
-            <button class="icon-btn${inCart ? ' is-selected' : ''}" aria-pressed="${inCart ? 'true' : 'false'}" aria-label="${noMore ? buttonNote : (inCart ? 'Retirer du panier' : 'Ajouter au panier')}" ${noMore ? 'disabled title="' + buttonNote + '"' : ''} data-stock="${stock === null ? '' : stock}" data-stripe-account="${escapeHtml(item.sellers ? item.sellers.stripe_account_id : '')}" data-listing-id="${escapeHtml(item.id)}">
-              ${inCart ? ICON_CHECK : ICON_PLUS}
-            </button>
+            <div class="cart-ctl" data-listing-id="${escapeHtml(item.id)}" data-stock="${stock === null ? '' : stock}" data-unit="${unitText}" data-stripe-account="${escapeHtml(item.sellers ? item.sellers.stripe_account_id : '')}"></div>
           </div>
         </div>
       `;
@@ -867,50 +866,68 @@
 
     placeRowSeparators();
 
-    container.querySelectorAll('.icon-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        if (btn.disabled) return;
-        const card = btn.closest('.produce-card');
-        const name = card.querySelector('h4').textContent;
-        const price = card.querySelector('.price').textContent;
-        const stripeAccountId = btn.dataset.stripeAccount;
-        const listingId = btn.dataset.listingId;
-        const stock = btn.dataset.stock === '' ? null : Number(btn.dataset.stock);
-        let cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
-        const alreadyInCart = cart.filter((c) => String(c.listingId) === String(listingId)).length;
+    container.querySelectorAll('.cart-ctl').forEach(renderCartCtl);
+  }
 
-        if (alreadyInCart > 0) {
-          // Second clic : on enlève le produit du panier
-          cart = cart.filter((c) => String(c.listingId) !== String(listingId));
-        } else {
-          if (stock !== null && stock <= 0) {
-            btn.disabled = true;
-            return;
-          }
-          cart.push({ name, price, stripeAccountId, listingId });
-        }
+  // Dessine le bouton du bas de la fiche : « + » seul si rien dans le panier, « − 2 kg + » sinon
+  function renderCartCtl(ctl) {
+    const units = unitsInCart(ctl.dataset.listingId);
+    const stock = ctl.dataset.stock === '' ? null : Number(ctl.dataset.stock);
+    const unit = ctl.dataset.unit || 'kg';
+    if (units === 0) {
+      const soldOut = stock !== null && stock <= 0;
+      ctl.innerHTML = '<button type="button" class="icon-btn" data-act="add" aria-label="' + (soldOut ? 'Épuisé' : 'Ajouter au panier') + '"' + (soldOut ? ' disabled title="Épuisé"' : '') + '>' + ICON_PLUS + '</button>';
+    } else {
+      const atMax = stock !== null && units >= stock;
+      ctl.innerHTML = '<div class="qty" role="group" aria-label="Quantité dans le panier">'
+        + '<button type="button" data-act="minus" aria-label="En retirer un du panier">' + ICON_MINUS + '</button>'
+        + '<span aria-live="polite">' + units + ' ' + escapeHtml(unitLabel(unit, units)) + '</span>'
+        + '<button type="button" data-act="add" aria-label="En ajouter un au panier"' + (atMax ? ' disabled' : '') + '>' + ICON_PLUS + '</button>'
+        + '</div>';
+    }
+  }
 
-        localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
-        const cartCountEl = document.querySelector('.cart-count');
-        if (cartCountEl) cartCountEl.textContent = cart.length;
-        setButtonState(btn, alreadyInCart === 0);
+  // Un seul écouteur pour tous les boutons « + » et « − » des fiches
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.cart-ctl button');
+    if (!btn || btn.disabled) return;
+    const ctl = btn.closest('.cart-ctl');
+    const card = btn.closest('.produce-card');
+    const listingId = ctl.dataset.listingId;
+    const stock = ctl.dataset.stock === '' ? null : Number(ctl.dataset.stock);
+    let cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
+    const units = cart.filter((c) => String(c.listingId) === String(listingId)).length;
+    const act = btn.dataset.act;
+
+    if (act === 'add') {
+      if (stock !== null && units >= stock) return;
+      cart.push({
+        name: card.querySelector('h4').textContent,
+        price: card.querySelector('.price').textContent,
+        stripeAccountId: ctl.dataset.stripeAccount,
+        listingId
       });
-    });
-  }
+    } else if (act === 'minus') {
+      // On enlève une seule unité (la dernière ajoutée pour cette annonce)
+      for (let k = cart.length - 1; k >= 0; k--) {
+        if (String(cart[k].listingId) === String(listingId)) { cart.splice(k, 1); break; }
+      }
+    } else {
+      return;
+    }
 
-  function setButtonState(btn, selected) {
-    btn.classList.toggle('is-selected', selected);
-    btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    btn.setAttribute('aria-label', selected ? 'Retirer du panier' : 'Ajouter au panier');
-    btn.innerHTML = selected ? ICON_CHECK : ICON_PLUS;
-  }
+    localStorage.setItem('agrivoisin_cart', JSON.stringify(cart));
+    const cartCountEl = document.querySelector('.cart-count');
+    if (cartCountEl) cartCountEl.textContent = cart.length;
+    renderCartCtl(ctl);
+    const next = ctl.querySelector('button[data-act="' + act + '"]:not(:disabled)') || ctl.querySelector('button:not(:disabled)');
+    if (next) next.focus();
+  });
 
   // Au retour sur la page (bouton « précédent »), le panier a pu changer : on remet les boutons à jour
   window.addEventListener('pageshow', (event) => {
     if (!event.persisted) return;
-    document.querySelectorAll('.icon-btn').forEach((btn) => {
-      setButtonState(btn, unitsInCart(btn.dataset.listingId) > 0);
-    });
+    document.querySelectorAll('.cart-ctl').forEach(renderCartCtl);
     const cart = JSON.parse(localStorage.getItem('agrivoisin_cart') || '[]');
     const cartCountEl = document.querySelector('.cart-count');
     if (cartCountEl) cartCountEl.textContent = cart.length;
@@ -1254,7 +1271,6 @@
 
 </body>
 </html>
-
 
 
 

@@ -329,6 +329,8 @@
 
   // Catégories que les particuliers peuvent vendre (produits frais, non transformés)
   const PARTICULIER_CATEGORIES = ["Fruits", "Légumes", "Aromates", "Fleurs du jardin"];
+  // Catégories ouvertes à tous (particuliers et professionnels), sans case de confirmation
+  const OPEN_CATEGORIES = PARTICULIER_CATEGORIES.concat(["Fruits à coque"]);
 
   let currentSellerType = 'particulier';
 
@@ -402,7 +404,7 @@
   function updateProAttest() {
     const needed = currentSellerType === 'professionnel'
       && categorySelect.value !== ''
-      && !PARTICULIER_CATEGORIES.includes(categorySelect.value);
+      && !OPEN_CATEGORIES.includes(categorySelect.value);
     document.getElementById('proAttestWrap').style.display = needed ? '' : 'none';
     document.getElementById('proAttest').required = needed;
     if (!needed) document.getElementById('proAttest').checked = false;
@@ -754,7 +756,7 @@
     currentSellerType = sellerType;
     categorySelect.innerHTML = '<option value="" disabled selected>Choisissez une catégorie</option>';
     Object.keys(CATEGORIES).forEach(function (cat) {
-      if (sellerType !== 'professionnel' && !PARTICULIER_CATEGORIES.includes(cat)) return;
+      if (sellerType !== 'professionnel' && !OPEN_CATEGORIES.includes(cat)) return;
       const opt = document.createElement('option');
       opt.value = cat;
       opt.textContent = cat;

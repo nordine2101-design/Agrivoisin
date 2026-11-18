@@ -72,6 +72,9 @@
             <span><strong>Professionnel</strong><br>J'ai une entreprise (numéro SIRET)</span>
           </label>
         </fieldset>
+        <div id="proNote" style="display:none;background:#FFF3C4;border:2px solid #E8C34A;border-radius:14px;padding:12px 14px;margin:12px 0;color:#5A4500;font-size:0.92rem;line-height:1.4;">
+          <strong>Vous êtes professionnel ?</strong> Un compte acheteur ne peut pas devenir vendeur professionnel. Déconnectez-vous et utilisez une nouvelle adresse e-mail professionnelle.
+        </div>
 
         <div class="pro-offer" id="particulierOffer">
           <strong>Conditions pour les particuliers</strong>
@@ -126,14 +129,14 @@
         <input type="text" id="sellerBirthPlace" placeholder="Ex : Nancy" maxlength="100" autocomplete="off" style="width:100%;box-sizing:border-box;">
       </div>
 
-      <label for="name">Nom complet</label>
+      <label for="name" id="nameLabel">Nom complet</label>
       <input type="text" id="name" placeholder="Votre nom" required>
 
-      <label for="email">Adresse e-mail</label>
+      <label for="email" id="emailLabel">Adresse e-mail</label>
       <input type="email" id="email" placeholder="vous@exemple.com" required>
 
-      <label for="password">Mot de passe</label>
-      <div class="pw-wrap">
+      <label for="password" id="passwordLabel">Mot de passe</label>
+      <div class="pw-wrap" id="pwWrap">
         <input type="password" id="password" placeholder="8 caractères minimum" minlength="8" required>
         <button type="button" class="pw-eye" id="pwEye" aria-label="Afficher le mot de passe" title="Afficher le mot de passe">
           <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -172,7 +175,7 @@
     <p class="auth-switch" id="signupError" style="color:#C8352F;display:none;"></p>
     <p class="auth-switch" id="signupSuccess" style="color:#4C7A50;display:none;"></p>
 
-    <p class="auth-switch">Déjà un compte ? <a href="connexion.html">Se connecter</a></p>
+    <p class="auth-switch" id="alreadyAccount">Déjà un compte ? <a href="connexion.html">Se connecter</a></p>
     </div>
   </div>
 
@@ -488,6 +491,31 @@
     });
   });
 
+  // Acheteur déjà connecté : il ne peut que devenir vendeur particulier, sur le même compte (pas de nouveau nom, e-mail ni mot de passe)
+  let upgradeSession = null;
+  function enableUpgradeMode(session) {
+    upgradeSession = session;
+    document.querySelector('.account-type-btn[data-type="acheteur"]').style.display = 'none';
+    document.querySelector('.account-type-btn[data-type="jardinier"]').click();
+    const proRadio = signupForm.querySelector('input[name="sellerType"][value="professionnel"]');
+    if (proRadio && proRadio.closest('label')) proRadio.closest('label').style.display = 'none';
+    document.getElementById('proNote').style.display = 'block';
+    ['nameLabel', 'name', 'emailLabel', 'email', 'passwordLabel', 'pwWrap', 'alreadyAccount'].forEach((id) => {
+      document.getElementById(id).style.display = 'none';
+    });
+    ['name', 'email', 'password'].forEach((id) => { document.getElementById(id).required = false; });
+    document.getElementById('signupBtn').textContent = 'Créer mon compte vendeur';
+  }
+  supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
+    if (!session) return;
+    try {
+      const r = await fetch('/api/get-seller-listings', { headers: { Authorization: 'Bearer ' + session.access_token } });
+      const d = await r.json().catch(() => ({}));
+      // Le serveur répond par une erreur « vendeur » quand le compte n'est pas encore vendeur : c'est un acheteur
+      if (!r.ok && d && d.error && d.error.indexOf('vendeur') !== -1) enableUpgradeMode(session);
+    } catch (e) { /* sans réponse : la page reste la page d'inscription normale */ }
+  });
+
   // Œil du mot de passe : afficher / cacher le code (le même pour acheteur et vendeur)
   const pwInput = document.getElementById('password');
   const pwEye = document.getElementById('pwEye');
@@ -573,6 +601,25 @@
         btn.disabled = false;
         return;
       }
+    }
+
+    if (upgradeSession) {
+      try {
+        const response = await fetch('/api/create-connect-account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + upgradeSession.access_token },
+          body: JSON.stringify({ email: upgradeSession.user.email, city, postalCode, address: sellerAddress, sellerType: 'particulier', siret: '', phone: '', pledge: false, pseudo, tax }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Une erreur est survenue');
+        window.location.href = data.onboardingUrl;
+      } catch (err) {
+        errorEl.textContent = 'Erreur : ' + err.message;
+        errorEl.style.display = 'block';
+        btn.textContent = 'Créer mon compte vendeur';
+        btn.disabled = false;
+      }
+      return;
     }
 
     if (selectedType === 'jardinier') {

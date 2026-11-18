@@ -171,7 +171,7 @@
 <!-- ============ ACCUEIL TÉLÉPHONE (visible seulement sur téléphone) ============ -->
 <div class="mob-app">
   <div class="mob-bar">
-    <a class="mob-logo" id="mobStatus" href="connexion.html"></a>
+    <span class="mob-logo" id="mobStatus"></span>
     <div class="mob-ic">
       <a class="mob-fav" href="favoris.html" aria-label="Mes favoris"><span class="mob-fav-t">Favoris</span><img src="favori-banane-trans.png" alt=""><img src="cerise-trans.png" alt=""></a>
     </div>
@@ -197,11 +197,11 @@
   </script>
 </div>
 <nav class="mob-fl mob-nav" aria-label="Menu">
-  <a class="on" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10H3z"/></svg><span>Accueil</span></a>
+  <a class="on" href="connexion.html" id="mobLogin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8v10H3z"/></svg><span>Se connecter</span></a>
   <a href="mes-annonces.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg><span>Mes annonces</span></a>
   <a href="mes-commandes.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Mes commandes</span></a>
   <a href="panier.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1 12H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg><span>Panier</span><b class="mob-badge" id="mobCartCount"></b></a>
-  <a href="inscription.html" id="mobCompte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 15-5 16 0"/></svg><span>Compte</span></a>
+  <a href="inscription.html" id="mobCompte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-5 15-5 16 0"/></svg><span>Créer un compte</span></a>
 </nav>
 
 <!-- ============ HEADER ============ -->
@@ -619,7 +619,6 @@
     if (mobStatus) {
       mobStatus.textContent = session ? 'Connecté' : 'Déconnecté';
       mobStatus.className = 'mob-logo pret ' + (session ? 'ok' : 'ko');
-      mobStatus.setAttribute('href', session ? 'compte.html' : 'connexion.html');
     }
     if (session) {
       // Connecté : plus de « Créer un compte » sous le titre ; dans la case du bas, le bouton devient « Publier une annonce »
@@ -672,9 +671,14 @@
       const footSignup = document.getElementById('footSignup');
       if (footSignup) { footSignup.textContent = 'Mon compte'; footSignup.setAttribute('href', 'compte.html'); }
 
-      // Accueil téléphone : l'onglet « Compte » ouvre la page « Mon compte » quand on est connecté (sinon « Rejoindre Agrivoisin »)
-      const mobCompte = document.getElementById('mobCompte');
-      if (mobCompte) mobCompte.setAttribute('href', 'compte.html');
+      // Accueil téléphone : en bas, « Se connecter » devient « Se déconnecter » ; « Créer un compte » reste
+      const mobLogin = document.getElementById('mobLogin');
+      if (mobLogin) {
+        mobLogin.querySelector('span').textContent = 'Se déconnecter';
+        window.dispatchEvent(new Event('resize'));
+        mobLogin.setAttribute('href', '#');
+        mobLogin.addEventListener('click', (event) => { event.preventDefault(); loginLink.click(); });
+      }
     }
   });
 </script>
@@ -696,7 +700,4 @@
 </script>
 </body>
 </html>
-
-
-
 

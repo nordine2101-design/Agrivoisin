@@ -59,6 +59,14 @@
       </button>
     </div>
 
+    <div id="sellerBuyPart" style="display:none;background:#FFF5F8;border:2px solid #EC407A;border-radius:14px;padding:16px;margin:14px 0;text-align:center;color:#880E4F;font-size:1rem;line-height:1.4;">
+      <strong>Votre compte peut déjà acheter.</strong><br>
+      <a href="annonces.html" class="btn btn-primary" style="display:inline-block;margin-top:12px;">Voir les annonces</a>
+    </div>
+    <div id="sellerBuyPro" style="display:none;background:#FFF3C4;border:2px solid #E8C34A;border-radius:14px;padding:12px 14px;margin:14px 0;color:#5A4500;font-size:0.92rem;line-height:1.4;">
+      <strong>Un compte professionnel ne peut pas acheter.</strong> Déconnectez-vous et créez un compte acheteur avec une autre adresse e-mail.
+    </div>
+
     <form class="auth-form" id="signupForm">
       <div id="sellerTypeBlock" style="display:none;">
         <fieldset class="seller-type">
@@ -506,6 +514,14 @@
     ['name', 'email', 'password'].forEach((id) => { document.getElementById(id).required = false; });
     document.getElementById('signupBtn').textContent = 'Créer mon compte vendeur';
   }
+  // Vendeur déjà connecté : il ne voit que « Je veux acheter », sans formulaire
+  function enableSellerMode(isPro) {
+    document.querySelector('.account-type-btn[data-type="jardinier"]').style.display = 'none';
+    document.querySelector('.account-type-btn[data-type="acheteur"]').style.pointerEvents = 'none';
+    signupForm.style.display = 'none';
+    document.getElementById('alreadyAccount').style.display = 'none';
+    document.getElementById(isPro ? 'sellerBuyPro' : 'sellerBuyPart').style.display = 'block';
+  }
   supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
     if (!session) return;
     try {
@@ -513,6 +529,8 @@
       const d = await r.json().catch(() => ({}));
       // Le serveur répond par une erreur « vendeur » quand le compte n'est pas encore vendeur : c'est un acheteur
       if (!r.ok && d && d.error && d.error.indexOf('vendeur') !== -1) enableUpgradeMode(session);
+      // Le serveur répond normalement quand le compte est déjà vendeur : particulier ou professionnel
+      else if (r.ok) enableSellerMode(d && d.sellerType === 'professionnel');
     } catch (e) { /* sans réponse : la page reste la page d'inscription normale */ }
   });
 

@@ -165,8 +165,10 @@
   .mob-rot .rs-f .fx{display:none;width:100%}
   .mob-rot .rs-f.ex > .fi, .mob-rot .rs-f.ex > p{display:none}
   .mob-rot .rs-f.ex{align-items:stretch;padding-top:10px;padding-bottom:10px}
-  .mob-rot .rs-f.ex .fx{display:flex;flex-direction:column;justify-content:space-between;gap:6px}
-  .mob-rot .rs-f .fl{display:flex;align-items:center;gap:10px;font-size:clamp(.88rem,4.2vw,1.08rem);line-height:1.25;color:#1F3550;margin:0;flex:1;padding:6px 12px;border-radius:12px}
+  .mob-rot .rs-f.ex .fx{display:flex;flex-direction:column;justify-content:space-between;gap:0}
+  .mob-rot .rs-f .fl{display:flex;align-items:center;gap:10px;font-size:clamp(.88rem,4.2vw,1.08rem);line-height:1.25;color:#1F3550;margin:0;flex:1;padding:6px 12px;border-radius:0}
+  .mob-rot .rs-f .fl:nth-child(1){border-radius:12px 12px 0 0}
+  .mob-rot .rs-f .fl:nth-child(3){border-radius:0 0 12px 12px}
   .mob-rot .rs-f .fl:nth-child(1){background:#A9CDF2}
   .mob-rot .rs-f .fl:nth-child(2){background:#C9E0F6}
   .mob-rot .rs-f .fl:nth-child(3){background:#E6F1FB}
@@ -714,6 +716,8 @@
 </script>
 </body>
 </html>
+
+
 
 
 

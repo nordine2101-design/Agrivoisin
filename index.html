@@ -135,6 +135,8 @@
     .mob-rot .bm { min-height:84px; }
     .mob-rot .big { width:84px; height:84px; }
     .mob-rot .fi { width:84px; } .mob-rot .fi img { width:80px; height:80px; }
+    .mob-rot .rs-f .fl { font-size:.74rem; gap:6px; } .mob-rot .rs-f .fn { width:48px; } .mob-rot .rs-f .fn img { width:16px; height:16px; }
+    .mob-rot .rs-f.ex { padding-top:4px; padding-bottom:4px; }
     .mob-fl { height:54px; bottom:4px; left:0; right:auto; width:50%; }
     .mob-fl a { height:46px; }
   }
@@ -162,11 +164,14 @@
   .mob-rot .tip{display:inline-block;margin-top:3px;font-size:.78rem;font-weight:700;color:#4169E1}
   .mob-rot .rs-f .fx{display:none;width:100%}
   .mob-rot .rs-f.ex > .fi, .mob-rot .rs-f.ex > p{display:none}
-  .mob-rot .rs-f.ex .fx{display:block}
-  .mob-rot .rs-f .fx > b{display:block;font-size:.95rem;color:#2E3A2A;margin-bottom:4px}
-  .mob-rot .rs-f .fl{display:flex;align-items:center;gap:8px;font-size:.84rem;line-height:1.25;color:#2E3A2A;margin:3px 0}
-  .mob-rot .rs-f .fn{flex:none;width:58px;display:flex;justify-content:flex-start}
-  .mob-rot .rs-f .fn img{width:19px;height:19px}
+  .mob-rot .rs-f.ex{align-items:stretch;padding-top:10px;padding-bottom:10px}
+  .mob-rot .rs-f.ex .fx{display:flex;flex-direction:column;justify-content:space-between;gap:6px}
+  .mob-rot .rs-f .fl{display:flex;align-items:center;gap:10px;font-size:clamp(.88rem,4.2vw,1.08rem);line-height:1.25;color:#1F3550;margin:0;flex:1;padding:6px 12px;border-radius:12px}
+  .mob-rot .rs-f .fl:nth-child(1){background:#A9CDF2}
+  .mob-rot .rs-f .fl:nth-child(2){background:#C9E0F6}
+  .mob-rot .rs-f .fl:nth-child(3){background:#E6F1FB}
+  .mob-rot .rs-f .fn{flex:none;width:calc(3 * clamp(26px,9.6vw,38px) + 6px);display:flex;justify-content:flex-start}
+  .mob-rot .rs-f .fn img{width:clamp(26px,9.6vw,38px);height:clamp(26px,9.6vw,38px)}
   .mob-rot .rs-f button.fi{border:0;background:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .mob-rot .rd{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:8px}
   .mob-rot{position:relative}
@@ -193,7 +198,7 @@
 </div>
     <div class="rs rs-b"><a class="bm" href="bientot-mur.html"><b>Des récoltes arrivent bientôt</b><span>Prévenez-moi ! ou réservez avant tout le monde.</span><em>Voir Bientôt mûr ›</em></a></div>
     <div class="rs"><img class="big" src="fraise-mascotte.png" alt=""><p><b>Les fraises = les avis</b><br>Chaque acheteur note son jardinier après la remise.</p></div>
-    <div class="rs rs-f" id="mobFr"><button type="button" class="fi" id="mobFrBtn" aria-label="Voir ce que veulent dire les flocons"><img src="flocon.png" alt=""></button><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.<br><span class="tip">Touchez le flocon !</span></p><div class="fx"><b>La fraîcheur</b><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Très frais</b> : récolté il y a moins de 24&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Frais</b> : récolté entre 24 et 48&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""></span><span><b>Fraîcheur minimale</b> : récolté il y a plus de 48&nbsp;h</span></div></div></div>
+    <div class="rs rs-f" id="mobFr"><button type="button" class="fi" id="mobFrBtn" aria-label="Voir ce que veulent dire les flocons"><img src="flocon.png" alt=""></button><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.<br><span class="tip">Touchez le flocon !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Très frais</b> : récolté il y a moins de 24&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Frais</b> : récolté entre 24 et 48&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""></span><span><b>Fraîcheur minimale</b> : récolté il y a plus de 48&nbsp;h</span></div></div></div>
     <div class="rs"><img class="big" src="expedition-possible%20(1).png" alt=""><p><b>Le lapin = expédition possible</b><br>Le vendeur peut envoyer sa récolte.</p></div>
     <div class="rd"><button type="button" class="on"></button><button type="button"></button><button type="button"></button><button type="button"></button><button type="button"></button></div>
   </div>
@@ -709,6 +714,9 @@
 </script>
 </body>
 </html>
+
+
+
 
 
 

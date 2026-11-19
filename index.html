@@ -187,6 +187,22 @@
   .mob-rot{position:relative}
   .mob-rot .rd button{width:8px;height:8px;border-radius:50%;border:0;padding:0;background:#C9D6C4}
   .mob-rot .rd button.on{background:#385C3B}
+
+  @media (max-width:700px){
+    .mob-rot .rs-s.ex{height:150px;min-height:150px;padding:0 14px;align-items:stretch}
+    .mob-rot .rs-s.ex .fx{height:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;grid-auto-flow:row;gap:0}
+    .mob-rot .rs-s.ex .fl{flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:3px 8px;font-size:clamp(.66rem,3.1vw,.82rem);line-height:1.15;border-radius:0}
+    .mob-rot .rs-s.ex .fn{width:auto}
+    .mob-rot .rs-s.ex .fn img{width:17px;height:17px}
+    .mob-rot .rs-s.ex .fl:nth-child(1){border-radius:12px 0 0 0}
+    .mob-rot .rs-s.ex .fl:nth-child(2){border-radius:0 12px 0 0}
+    .mob-rot .rs-s.ex .fl:nth-child(3){border-radius:0 0 0 12px}
+    .mob-rot .rs-s.ex .fl:nth-child(4){border-radius:0 0 12px 0}
+    .mob-rot .rs-f:not(.rs-s).ex{height:150px;min-height:150px;padding-top:0;padding-bottom:0}
+    .mob-rot .rs-f:not(.rs-s).ex .fl{padding:2px 8px;font-size:clamp(.6rem,2.9vw,.76rem);line-height:1.15;gap:8px}
+    .mob-rot .rs-f:not(.rs-s).ex .fn{width:calc(3 * 15px + 6px)}
+    .mob-rot .rs-f:not(.rs-s).ex .fn img{width:15px;height:15px}
+  }
   html,body{overflow-anchor:none}
   @media (max-width:1000px){ html{scroll-behavior:auto !important} }
 </style>
@@ -223,7 +239,7 @@
   function unex(){clearTimeout(ft);if(fr)fr.classList.remove('ex');if(st)st.classList.remove('ex');back()}
   function go(i){unex();k=i;sl.forEach(function(e,j){e.classList.toggle('on',j===i)});dt.forEach(function(e,j){e.classList.toggle('on',j===i)})}
   function arm(){clearInterval(t);t=setInterval(function(){go((k+1)%n)},5000)}
-  dt.forEach(function(e,i){e.addEventListener('click',function(){go(i);arm()})});var x0=null;r.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});r.addEventListener('touchend',function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(d)>40){go((k+(d<0?1:n-1))%n);arm()}},{passive:true});[['mobFrBtn',fr],['mobStBtn',st]].forEach(function(q){var b=document.getElementById(q[0]),c=q[1];if(b&&c)b.addEventListener('click',function(){clearInterval(t);c.classList.add('ex');var mn=document.querySelector('.mob-fl'),cb=r.getBoundingClientRect().bottom,mt=mn?mn.getBoundingClientRect().top:innerHeight,dy=cb-mt+12;var fresh=false;if(want!==null){clearInterval(rl);sy0=want;want=null}else if(sy0===null){sy0=pos();fresh=true}if(dy>0&&document.documentElement.scrollHeight>innerHeight){window.scrollBy(0,dy)}else if(fresh){sy0=null}clearTimeout(ft);ft=setTimeout(function(){c.classList.remove('ex');back();arm()},5000)})});arm();})();
+  dt.forEach(function(e,i){e.addEventListener('click',function(){go(i);arm()})});var x0=null;r.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});r.addEventListener('touchend',function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(d)>40){go((k+(d<0?1:n-1))%n);arm()}},{passive:true});[['mobFrBtn',fr],['mobStBtn',st]].forEach(function(q){var b=document.getElementById(q[0]),c=q[1];if(b&&c)b.addEventListener('click',function(){clearInterval(t);c.classList.add('ex');clearTimeout(ft);ft=setTimeout(function(){c.classList.remove('ex');back();arm()},5000)})});arm();})();
   </script>
 </div>
 <nav class="mob-fl mob-nav" aria-label="Menu">
@@ -730,4 +746,5 @@
 </script>
 </body>
 </html>
+
 

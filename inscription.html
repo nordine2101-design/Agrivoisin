@@ -514,10 +514,10 @@
     ['name', 'email', 'password'].forEach((id) => { document.getElementById(id).required = false; });
     document.getElementById('signupBtn').textContent = 'Créer mon compte vendeur';
   }
-  // Vendeur déjà connecté : il ne voit que « Je veux acheter », sans formulaire
+  // Vendeur déjà connecté : il ne voit que le message (pas d'image, pas de phrase d'accueil, pas de formulaire)
   function enableSellerMode(isPro) {
-    document.querySelector('.account-type-btn[data-type="jardinier"]').style.display = 'none';
-    document.querySelector('.account-type-btn[data-type="acheteur"]').style.pointerEvents = 'none';
+    document.querySelector('.account-type-toggle').style.display = 'none';
+    document.querySelector('.my-panel .auth-subtitle').style.display = 'none';
     signupForm.style.display = 'none';
     document.getElementById('alreadyAccount').style.display = 'none';
     document.getElementById(isPro ? 'sellerBuyPro' : 'sellerBuyPart').style.display = 'block';
@@ -726,3 +726,5 @@
 </script>
 </body>
 </html>
+
+

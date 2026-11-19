@@ -160,6 +160,14 @@
   .mob-rot .fi{flex:none;width:120px;display:flex;flex-wrap:wrap;justify-content:center}
   .mob-rot .fi img{width:110px;height:110px}
   .mob-rot .tip{display:inline-block;margin-top:3px;font-size:.78rem;font-weight:700;color:#4169E1}
+  .mob-rot .rs-f .fx{display:none;width:100%}
+  .mob-rot .rs-f.ex > .fi, .mob-rot .rs-f.ex > p{display:none}
+  .mob-rot .rs-f.ex .fx{display:block}
+  .mob-rot .rs-f .fx > b{display:block;font-size:.95rem;color:#2E3A2A;margin-bottom:4px}
+  .mob-rot .rs-f .fl{display:flex;align-items:center;gap:8px;font-size:.84rem;line-height:1.25;color:#2E3A2A;margin:3px 0}
+  .mob-rot .rs-f .fn{flex:none;width:58px;display:flex;justify-content:flex-start}
+  .mob-rot .rs-f .fn img{width:19px;height:19px}
+  .mob-rot .rs-f button.fi{border:0;background:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .mob-rot .rd{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:8px}
   .mob-rot{position:relative}
   .mob-rot .rd button{width:8px;height:8px;border-radius:50%;border:0;padding:0;background:#C9D6C4}
@@ -185,15 +193,16 @@
 </div>
     <div class="rs rs-b"><a class="bm" href="bientot-mur.html"><b>Des récoltes arrivent bientôt</b><span>Prévenez-moi ! ou réservez avant tout le monde.</span><em>Voir Bientôt mûr ›</em></a></div>
     <div class="rs"><img class="big" src="fraise-mascotte.png" alt=""><p><b>Les fraises = les avis</b><br>Chaque acheteur note son jardinier après la remise.</p></div>
-    <div class="rs"><span class="fi"><img src="flocon.png" alt=""></span><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.<br><span class="tip">Touchez le flocon !</span></p></div>
+    <div class="rs rs-f" id="mobFr"><button type="button" class="fi" id="mobFrBtn" aria-label="Voir ce que veulent dire les flocons"><img src="flocon.png" alt=""></button><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.<br><span class="tip">Touchez le flocon !</span></p><div class="fx"><b>La fraîcheur</b><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Très frais</b> : récolté il y a moins de 24&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Frais</b> : récolté entre 24 et 48&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""></span><span><b>Fraîcheur minimale</b> : récolté il y a plus de 48&nbsp;h</span></div></div></div>
     <div class="rs"><img class="big" src="expedition-possible%20(1).png" alt=""><p><b>Le lapin = expédition possible</b><br>Le vendeur peut envoyer sa récolte.</p></div>
     <div class="rd"><button type="button" class="on"></button><button type="button"></button><button type="button"></button><button type="button"></button><button type="button"></button></div>
   </div>
   <script>
   (function(){var r=document.getElementById('mobRot');if(!r)return;var sl=r.querySelectorAll('.rs'),dt=r.querySelectorAll('.rd button'),k=0,t,n=sl.length;
-  function go(i){k=i;sl.forEach(function(e,j){e.classList.toggle('on',j===i)});dt.forEach(function(e,j){e.classList.toggle('on',j===i)})}
+  var fr=document.getElementById('mobFr'),ft;function unex(){clearTimeout(ft);if(fr)fr.classList.remove('ex')}
+  function go(i){unex();k=i;sl.forEach(function(e,j){e.classList.toggle('on',j===i)});dt.forEach(function(e,j){e.classList.toggle('on',j===i)})}
   function arm(){clearInterval(t);t=setInterval(function(){go((k+1)%n)},5000)}
-  dt.forEach(function(e,i){e.addEventListener('click',function(){go(i);arm()})});var x0=null;r.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});r.addEventListener('touchend',function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(d)>40){go((k+(d<0?1:n-1))%n);arm()}},{passive:true});arm();})();
+  dt.forEach(function(e,i){e.addEventListener('click',function(){go(i);arm()})});var x0=null;r.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});r.addEventListener('touchend',function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(d)>40){go((k+(d<0?1:n-1))%n);arm()}},{passive:true});var fb=document.getElementById('mobFrBtn');if(fb)fb.addEventListener('click',function(){clearInterval(t);fr.classList.add('ex');clearTimeout(ft);ft=setTimeout(function(){fr.classList.remove('ex');arm()},5000)});arm();})();
   </script>
 </div>
 <nav class="mob-fl mob-nav" aria-label="Menu">
@@ -700,4 +709,6 @@
 </script>
 </body>
 </html>
+
+
 

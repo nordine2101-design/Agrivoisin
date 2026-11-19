@@ -174,6 +174,14 @@
   .mob-rot .rs-f .fl:nth-child(3){background:#E6F1FB}
   .mob-rot .rs-f .fn{flex:none;width:calc(3 * clamp(26px,9.6vw,38px) + 6px);display:flex;justify-content:flex-start}
   .mob-rot .rs-f .fn img{width:clamp(26px,9.6vw,38px);height:clamp(26px,9.6vw,38px)}
+
+  .mob-rot .rs-s .fl:nth-child(1){background:#F2A9A9;border-radius:12px 12px 0 0}
+  .mob-rot .rs-s .fl:nth-child(2){background:#F6C2C2;border-radius:0}
+  .mob-rot .rs-s .fl:nth-child(3){background:#F9D7D7;border-radius:0}
+  .mob-rot .rs-s .fl:nth-child(4){background:#FCEAEA;border-radius:0 0 12px 12px}
+  .mob-rot .rs-s .fl{color:#4A1818;font-size:clamp(.74rem,3.5vw,.95rem)}
+  .mob-rot .rs-s .fn{width:calc(4 * clamp(20px,6.6vw,28px) + 4px)}
+  .mob-rot .rs-s .fn img{width:clamp(20px,6.6vw,28px);height:clamp(20px,6.6vw,28px);mix-blend-mode:multiply}
   .mob-rot .rs-f button.fi{border:0;background:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .mob-rot .rd{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:8px}
   .mob-rot{position:relative}
@@ -199,17 +207,17 @@
     <div class="rs rs-a on"><div class="rt"><b>Fraîchement publié</b><a href="annonces.html">Tout voir ›</a></div><div class="mob-row"><a class="mob-c" href="annonces.html"><div class="mob-im mob-i1"><span class="mob-tg">Très frais</span></div><div class="mob-tr"><b>Carottes</b></div><span class="mob-p">3,50 €/kg</span><small>Marie · à 1,2 km</small></a><a class="mob-c" href="annonces.html"><div class="mob-im mob-i2"></div><div class="mob-tr"><b>Pommes Gala</b></div><span class="mob-p">4,00 €/kg</span><small>Julien · à 800 m</small></a><a class="mob-c" href="annonces.html"><div class="mob-im mob-i3"><span class="mob-tg">Bio</span></div><div class="mob-tr"><b>Miel de fleurs</b></div><span class="mob-p">8,00 €/pot</span><small>Sophie · à 2 km</small></a></div>
 </div>
     <div class="rs rs-b"><a class="bm" href="bientot-mur.html"><b>Des récoltes arrivent bientôt</b><span>Prévenez-moi ! ou réservez avant tout le monde.</span><em>Voir Bientôt mûr ›</em></a></div>
-    <div class="rs"><img class="big" src="fraise-mascotte.png" alt=""><p><b>Les fraises = les avis</b><br>Chaque acheteur note son jardinier après la remise.</p></div>
+    <div class="rs rs-f rs-s" id="mobSt"><button type="button" class="fi" id="mobStBtn" aria-label="Voir ce que veulent dire les fraises"><img src="fraise-mascotte.png" alt=""></button><p><b>Les fraises = les avis</b><br>Chaque acheteur note son jardinier après la remise.<br><span class="tip">Touchez la fraise !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Excellent</b> : produit superbe, vendeur au top, je recommande</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Bien</b> : produit conforme à l’annonce</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Moyen</b> : correct, mais j’attendais mieux</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""></span><span><b>Décevant</b> : produit différent de l’annonce</span></div></div></div>
     <div class="rs rs-f" id="mobFr"><button type="button" class="fi" id="mobFrBtn" aria-label="Voir ce que veulent dire les flocons"><img src="flocon.png" alt=""></button><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.<br><span class="tip">Touchez le flocon !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Très frais</b> : récolté il y a moins de 24&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Frais</b> : récolté entre 24 et 48&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""></span><span><b>Fraîcheur minimale</b> : récolté il y a plus de 48&nbsp;h</span></div></div></div>
     <div class="rs"><img class="big" src="expedition-possible%20(1).png" alt=""><p><b>Le lapin = expédition possible</b><br>Le vendeur peut envoyer sa récolte.</p></div>
     <div class="rd"><button type="button" class="on"></button><button type="button"></button><button type="button"></button><button type="button"></button><button type="button"></button></div>
   </div>
   <script>
   (function(){var r=document.getElementById('mobRot');if(!r)return;var sl=r.querySelectorAll('.rs'),dt=r.querySelectorAll('.rd button'),k=0,t,n=sl.length;
-  var fr=document.getElementById('mobFr'),ft;function unex(){clearTimeout(ft);if(fr)fr.classList.remove('ex')}
+  var fr=document.getElementById('mobFr'),st=document.getElementById('mobSt'),ft;function unex(){clearTimeout(ft);if(fr)fr.classList.remove('ex');if(st)st.classList.remove('ex')}
   function go(i){unex();k=i;sl.forEach(function(e,j){e.classList.toggle('on',j===i)});dt.forEach(function(e,j){e.classList.toggle('on',j===i)})}
   function arm(){clearInterval(t);t=setInterval(function(){go((k+1)%n)},5000)}
-  dt.forEach(function(e,i){e.addEventListener('click',function(){go(i);arm()})});var x0=null;r.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});r.addEventListener('touchend',function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(d)>40){go((k+(d<0?1:n-1))%n);arm()}},{passive:true});var fb=document.getElementById('mobFrBtn');if(fb)fb.addEventListener('click',function(){clearInterval(t);fr.classList.add('ex');clearTimeout(ft);ft=setTimeout(function(){fr.classList.remove('ex');arm()},5000)});arm();})();
+  dt.forEach(function(e,i){e.addEventListener('click',function(){go(i);arm()})});var x0=null;r.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});r.addEventListener('touchend',function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(d)>40){go((k+(d<0?1:n-1))%n);arm()}},{passive:true});[['mobFrBtn',fr],['mobStBtn',st]].forEach(function(q){var b=document.getElementById(q[0]),c=q[1];if(b&&c)b.addEventListener('click',function(){clearInterval(t);c.classList.add('ex');clearTimeout(ft);ft=setTimeout(function(){c.classList.remove('ex');arm()},5000)})});arm();})();
   </script>
 </div>
 <nav class="mob-fl mob-nav" aria-label="Menu">
@@ -716,7 +724,6 @@
 </script>
 </body>
 </html>
-
 
 
 

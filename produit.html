@@ -896,6 +896,19 @@
   .freshness-tip-icons { display:flex; gap:1px; width:94px; flex-shrink:0; }
   .tip-icon { width:30px; height:30px; object-fit:contain; }
   .freshness-tip-text strong { color:#4169E1; }
+  /* Ordinateur : les trois niveaux en bandes bleues collées, du plus foncé (3 flocons) au plus clair (1 flocon) */
+  @media (min-width: 900px) and (min-height: 521px) {
+    .freshness-tip { padding:8px; width:380px; }
+    .freshness-tip-row { padding:10px 14px; border-radius:0; border-left:5px solid transparent; }
+    .freshness-tip-row + .freshness-tip-row { margin-top:0; }
+    .freshness-tip-row:nth-child(1) { background:#A9CDF2; border-radius:12px 12px 0 0; }
+    .freshness-tip-row:nth-child(2) { background:#C9E0F6; }
+    .freshness-tip-row:nth-child(3) { background:#E6F1FB; border-radius:0 0 12px 12px; }
+    .freshness-tip-row.current { border-left-color:#4169E1; }
+    .freshness-tip-icons { width:114px; }
+    .tip-icon { width:36px; height:36px; }
+    .freshness-tip-text { color:#1F3550; }
+  }
   @media (max-width: 899px) {
     .freshness-group { position:static; }
     #listingFreshness { position:relative; }
@@ -1169,6 +1182,11 @@
 </script>
 </body>
 </html>
+
+
+
+
+Claude est une IA et peut commettre des erreurs.
 
 
 

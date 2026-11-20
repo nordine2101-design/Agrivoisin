@@ -100,7 +100,7 @@
     .mob-c small { display:block; color:#777; font-size:.68rem; }
     .mob-c { min-width:0; }
     .mob-tr b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .mob-im.mob-logo { background-color:#fff; background-size:contain; background-repeat:no-repeat; background-position:center; }
+    .mob-im.mob-sans { background-color:#fff; background-size:contain; background-repeat:no-repeat; background-position:center; }
     .mob-im { background-position:center; }
     .mob-empty { display:block; padding:30px 14px; font-size:.85rem; color:#2E3A2A; text-align:center; width:100%; text-decoration:none; }
     .mob-empty b { color:#385C3B; }
@@ -657,7 +657,7 @@
       var unit = escapeHtml(it.unit || 'kg');
       var price = Number(it.price).toFixed(2).replace('.', ',') + ' €/' + unit;
       var city = it.sellers && it.sellers.city ? it.sellers.city : '';
-      var photo = it.image_url ? '' : ' mob-logo';
+      var photo = it.image_url ? '' : ' mob-sans';
       var bg = 'background-image:url(\'' + (it.image_url ? encodeURI(it.image_url).replace(/'/g, '%27') : 'agrivoisin-logo-final.png') + '\')';
       return '<a class="mob-c" href="produit.html?id=' + encodeURIComponent(it.id) + '">' +
         '<div class="mob-im' + photo + '" style="' + bg + '"></div>' +

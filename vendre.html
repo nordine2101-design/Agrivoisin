@@ -35,7 +35,7 @@
         </label>
       </fieldset>
       <div id="proNote" style="background:#FFF3C4;border:2px solid #E8C34A;border-radius:14px;padding:12px 14px;margin:0 0 12px;color:#5A4500;font-size:0.92rem;line-height:1.4;">
-        <strong>Vous êtes professionnel ?</strong> Un compte acheteur ne peut pas devenir vendeur professionnel. Déconnectez-vous et utilisez une nouvelle adresse e-mail professionnelle.
+        <strong>Vous êtes professionnel ?</strong> Un compte acheteur ne peut pas devenir vendeur professionnel. <a href="inscription.html" id="proDeconnexion" style="color:#5A4500;font-weight:700;text-decoration:underline;">Déconnectez-vous et créez un compte professionnel avec une autre adresse e-mail.</a>
       </div>
 
       <div class="pro-offer" id="particulierOffer">
@@ -233,6 +233,16 @@
     }
   });
 
+  // Phrase « Déconnectez-vous et créez un compte professionnel… » : un clic déconnecte puis ouvre l'inscription
+  const proDeconnexion = document.getElementById('proDeconnexion');
+  if (proDeconnexion) {
+    proDeconnexion.addEventListener('click', (e) => {
+      e.preventDefault();
+      const goToSignup = () => { window.location.href = 'inscription.html'; };
+      supabaseClient.auth.signOut().then(goToSignup, goToSignup);
+    });
+  }
+
   const siretBlock = document.getElementById('siretBlock');
   const siretInput = document.getElementById('sellerSiret');
   const phoneInput = document.getElementById('sellerPhone');
@@ -397,6 +407,9 @@
 <script src="vers-vendeur.js"></script>
 </body>
 </html>
+
+
+
 
 
 

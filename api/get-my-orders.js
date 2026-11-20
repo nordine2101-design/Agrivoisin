@@ -399,6 +399,9 @@ async function deleteAccount(req, res, user, token) {
         shop_logo_url: null,
         email: anonymousEmail,
         phone: null,
+        home_address: null,
+        home_postal_code: null,
+        home_city: null,
       });
     }
   }
@@ -443,6 +446,7 @@ async function deleteAccount(req, res, user, token) {
 // - Vendeur : le nom n'est pas modifiable ici (il doit correspondre à sa pièce d'identité) ; l'adresse de retrait
 //   (ville, code postal, adresse complète) ne peut changer que s'il n'a aucune commande en cours.
 //   Ses annonces lisent la ville et la position sur sa fiche : elles suivent donc toutes seules la nouvelle adresse.
+//   Son adresse personnelle (« Mon adresse ») est facultative, jamais montrée aux acheteurs, et modifiable à tout moment.
 // - Acheteur : il peut changer son nom et sa ville.
 // ---------------------------------------------------------------------------
 function normalizeCommuneName(value) {
@@ -518,7 +522,7 @@ async function sellerHasOpenSales(sellerIds) {
 async function readProfileSeller(userId) {
   const { data, error } = await supabase
     .from('sellers')
-    .select('id, city, address')
+    .select('id, city, address, home_address, home_postal_code, home_city')
     .eq('user_id', userId)
     .limit(1);
   if (error) throw error;
@@ -538,6 +542,9 @@ async function getProfile(res, user) {
       city: seller.city || '',
       postalCode: found ? found[0] : '',
       address: seller.address || '',
+      homeAddress: seller.home_address || '',
+      homePostalCode: seller.home_postal_code || '',
+      homeCity: seller.home_city || '',
       locked: await sellerHasOpenSales([seller.id]),
     });
   }
@@ -555,32 +562,73 @@ async function saveProfile(req, res, user) {
   const seller = await readProfileSeller(user.id);
 
   if (seller) {
-    // Vendeur : seulement l'adresse de retrait, et seulement sans commande en cours
-    if (await sellerHasOpenSales([seller.id])) {
-      return res.status(409).json({ error: 'Vous avez une commande en cours. Vous pourrez changer votre adresse de retrait une fois la commande remise.' });
+    const touchesPickup = body.address !== undefined || body.city !== undefined || body.postalCode !== undefined;
+    const touchesHome = body.homeAddress !== undefined || body.homeCity !== undefined || body.homePostalCode !== undefined;
+    if (!touchesPickup && !touchesHome) {
+      return res.status(400).json({ error: 'Rien à enregistrer.' });
     }
-    const postalCode = String(body.postalCode == null ? '' : body.postalCode).trim();
-    const address = String(body.address == null ? '' : body.address).trim().replace(/\s+/g, ' ');
-    if (address.length < 6 || address.length > 200) {
-      return res.status(400).json({ error: 'Indiquez votre adresse complète.' });
-    }
-    // Si l'adresse contient un code postal, il doit être le même que celui indiqué
-    const inAddress = address.match(/\b\d{5}\b/g);
-    if (inAddress && !inAddress.includes(postalCode)) {
-      return res.status(400).json({ error: "Le code postal de l'adresse complète ne correspond pas au code postal indiqué. Vérifiez-les." });
-    }
-    const commune = await lookupCommuneProfile(body.city, postalCode);
-    if (!commune.ok) return res.status(commune.status).json({ error: commune.error });
+    const changes = {};
 
-    const { error } = await supabase
-      .from('sellers')
-      .update({ city: commune.city, address, latitude: commune.latitude, longitude: commune.longitude })
-      .eq('id', seller.id);
+    // Adresse de retrait : seulement sans commande en cours
+    if (touchesPickup) {
+      if (await sellerHasOpenSales([seller.id])) {
+        return res.status(409).json({ error: 'Vous avez une commande en cours. Vous pourrez changer votre adresse de retrait une fois la commande remise.' });
+      }
+      const postalCode = String(body.postalCode == null ? '' : body.postalCode).trim();
+      const address = String(body.address == null ? '' : body.address).trim().replace(/\s+/g, ' ');
+      if (address.length < 6 || address.length > 200) {
+        return res.status(400).json({ error: "Indiquez l'adresse complète de retrait." });
+      }
+      // Si l'adresse contient un code postal, il doit être le même que celui indiqué
+      const inAddress = address.match(/\b\d{5}\b/g);
+      if (inAddress && !inAddress.includes(postalCode)) {
+        return res.status(400).json({ error: "Le code postal de l'adresse de retrait ne correspond pas au code postal indiqué. Vérifiez-les." });
+      }
+      const commune = await lookupCommuneProfile(body.city, postalCode);
+      if (!commune.ok) return res.status(commune.status).json({ error: commune.error });
+      changes.city = commune.city;
+      changes.address = address;
+      changes.latitude = commune.latitude;
+      changes.longitude = commune.longitude;
+    }
+
+    // Adresse personnelle : facultative, jamais montrée aux acheteurs, modifiable même avec une commande en cours.
+    // Les trois cases sont remplies, ou les trois sont vides.
+    let savedHomeCity = null;
+    if (touchesHome) {
+      const homeAddress = String(body.homeAddress == null ? '' : body.homeAddress).trim().replace(/\s+/g, ' ');
+      const homePostal = String(body.homePostalCode == null ? '' : body.homePostalCode).trim();
+      const homeCity = String(body.homeCity == null ? '' : body.homeCity).trim();
+      const filled = [homeAddress, homePostal, homeCity].filter(Boolean).length;
+      if (filled === 0) {
+        changes.home_address = null;
+        changes.home_postal_code = null;
+        changes.home_city = null;
+      } else if (filled < 3) {
+        return res.status(400).json({ error: 'Remplissez les trois cases de « Mon adresse » (code postal, ville, adresse complète), ou videz-les toutes.' });
+      } else {
+        if (homeAddress.length < 6 || homeAddress.length > 200) {
+          return res.status(400).json({ error: "Indiquez votre adresse complète dans « Mon adresse »." });
+        }
+        const inHome = homeAddress.match(/\b\d{5}\b/g);
+        if (inHome && !inHome.includes(homePostal)) {
+          return res.status(400).json({ error: "Le code postal de « Mon adresse » ne correspond pas à l'adresse complète. Vérifiez-les." });
+        }
+        const homeCommune = await lookupCommuneProfile(homeCity, homePostal);
+        if (!homeCommune.ok) return res.status(homeCommune.status).json({ error: 'Mon adresse : ' + homeCommune.error });
+        changes.home_address = homeAddress;
+        changes.home_postal_code = homePostal;
+        changes.home_city = homeCommune.city;
+        savedHomeCity = homeCommune.city;
+      }
+    }
+
+    const { error } = await supabase.from('sellers').update(changes).eq('id', seller.id);
     if (error) {
       console.error('Erreur Supabase (changement d\'adresse du vendeur) :', error);
       return res.status(500).json({ error: "Impossible d'enregistrer pour le moment. Réessayez dans quelques instants." });
     }
-    return res.status(200).json({ success: true, city: commune.city });
+    return res.status(200).json({ success: true, city: changes.city || null, homeCity: savedHomeCity });
   }
 
   // Acheteur : son nom et sa ville

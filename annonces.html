@@ -189,13 +189,11 @@
     .filters-card.is-compact .bar-cart { display:flex; order:3; flex:none; width:34px; height:34px; margin:0; background:none; }
     .filters-card.is-compact .seller-type-filter { order:6; }
   }
-  .to-top{display:none}
-  @media (max-width:700px), (max-width:1000px) and (max-height:520px){
-    .to-top{display:flex;position:fixed;right:12px;bottom:14px;z-index:49;width:32px;height:68px;border-radius:999px;border:3px solid #385C3B;background:#fff;color:#385C3B;box-shadow:0 3px 10px rgba(0,0,0,.25);padding:0;align-items:center;justify-content:center;cursor:pointer;visibility:hidden;opacity:0;transition:opacity .2s,visibility .2s;-webkit-tap-highlight-color:transparent}
-    .to-top.on{visibility:visible;opacity:1}
-    .to-top svg{width:20px;height:20px}
-    .to-top::after{content:"";position:absolute;left:-8px;right:-8px;top:-8px;bottom:-8px}
-  }
+  .to-top{display:flex;position:fixed;right:24px;bottom:24px;z-index:49;width:32px;height:68px;border-radius:999px;border:3px solid #385C3B;background:#fff;color:#385C3B;box-shadow:0 3px 10px rgba(0,0,0,.25);padding:0;align-items:center;justify-content:center;cursor:pointer;visibility:hidden;opacity:0;transition:opacity .2s,visibility .2s;-webkit-tap-highlight-color:transparent}
+  .to-top.on{visibility:visible;opacity:1}
+  .to-top svg{width:20px;height:20px}
+  .to-top::after{content:"";position:absolute;left:-8px;right:-8px;top:-8px;bottom:-8px}
+  @media (max-width:700px), (max-width:1000px) and (max-height:520px){ .to-top{right:12px;bottom:14px} }
 </style>
 <script src="supabase.js"></script>
 </head>

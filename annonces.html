@@ -189,10 +189,19 @@
     .filters-card.is-compact .bar-cart { display:flex; order:3; flex:none; width:34px; height:34px; margin:0; background:none; }
     .filters-card.is-compact .seller-type-filter { order:6; }
   }
+  .to-top{display:none}
+  @media (max-width:700px), (max-width:1000px) and (max-height:520px){
+    .to-top{display:flex;position:fixed;right:12px;bottom:14px;z-index:49;width:32px;height:68px;border-radius:999px;border:3px solid #385C3B;background:#fff;color:#385C3B;box-shadow:0 3px 10px rgba(0,0,0,.25);padding:0;align-items:center;justify-content:center;cursor:pointer;visibility:hidden;opacity:0;transition:opacity .2s,visibility .2s;-webkit-tap-highlight-color:transparent}
+    .to-top.on{visibility:visible;opacity:1}
+    .to-top svg{width:20px;height:20px}
+    .to-top::after{content:"";position:absolute;left:-8px;right:-8px;top:-8px;bottom:-8px}
+  }
 </style>
 <script src="supabase.js"></script>
 </head>
 <body>
+
+<button type="button" class="to-top" id="toTop" aria-label="Remonter en haut de la page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 
 <!-- ============ HEADER ============ -->
 <div style="position:relative;">
@@ -1269,8 +1278,20 @@
 
 <script src="script.js"></script>
 
+<script>
+/* Flèche « remonter en haut » : elle apparaît dès qu'on est descendu d'un écran */
+(function(){
+  var b=document.getElementById('toTop');if(!b)return;
+  function chk(){b.classList.toggle('on',(window.pageYOffset||document.documentElement.scrollTop||0)>=window.innerHeight);}
+  window.addEventListener('scroll',chk,{passive:true});window.addEventListener('resize',chk);chk();
+  b.addEventListener('click',function(){try{window.scrollTo({top:0,left:0,behavior:'smooth'})}catch(e){window.scrollTo(0,0)}});
+})();
+</script>
 </body>
 </html>
+
+
+
 
 
 

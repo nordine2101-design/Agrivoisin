@@ -237,6 +237,207 @@ async function submitReview(req, res, buyer) {
   return res.status(200).json({ success: true });
 }
 
+// ---------------------------------------------------------------------------
+// Suppression du compte (acheteur ou vendeur).
+// 1) « delete_check » : on regarde ce qui bloque (commande en cours, annonce en vente, litige…) sans rien supprimer.
+// 2) « delete_account » : on vérifie encore une fois, puis on supprime. Ce que la loi oblige à garder (commandes, versements,
+//    informations fiscales des vendeurs) reste en base, sans lien avec une personne qui peut encore se connecter.
+// Une commande est « en cours » tant que l'argent de son retrait n'est ni versé ni remboursé.
+// ---------------------------------------------------------------------------
+const OPEN_PAYOUT_STATUSES = ['en_attente', 'en_cours', 'probleme'];
+
+function chunkList(list, size) {
+  const parts = [];
+  for (let i = 0; i < list.length; i += size) parts.push(list.slice(i, i + size));
+  return parts;
+}
+
+function isAdminEmail(email) {
+  const list = String(process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return !!email && list.includes(String(email).trim().toLowerCase());
+}
+
+function todayInParis() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+}
+
+// Une récolte « Bientôt mûr » reste visible jusqu'à 1 jour après sa date prévue
+function isComingSoonStillActive(item, today) {
+  if (item.availability_status !== 'bientot_mur' || !item.planned_date) return false;
+  const [y, m, d] = today.split('-').map(Number);
+  const limit = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+  return String(item.planned_date).slice(0, 10) >= limit;
+}
+
+// Renvoie les raisons qui empêchent la suppression (liste vide = on peut supprimer), et les fiches vendeur du compte
+async function accountBlockers(user) {
+  if (isAdminEmail(user.email)) return { reasons: ['admin'], sellerIds: [], orderIds: [] };
+
+  const reasons = [];
+
+  const { data: sellers, error: sellersError } = await supabase.from('sellers').select('id').eq('user_id', user.id);
+  if (sellersError) throw sellersError;
+  const sellerIds = (sellers || []).map((s) => s.id);
+
+  const { data: orders, error: ordersError } = await supabase.from('orders').select('id').eq('buyer_id', user.id);
+  if (ordersError) throw ordersError;
+  const orderIds = (orders || []).map((o) => o.id);
+
+  // Acheteur : une commande dont l'argent n'est ni versé ni remboursé
+  let buyerOpen = false;
+  let buyerDispute = false;
+  for (const part of chunkList(orderIds, 100)) {
+    const { data: rows, error } = await supabase
+      .from('payouts')
+      .select('status')
+      .in('order_id', part)
+      .in('status', OPEN_PAYOUT_STATUSES);
+    if (error) throw error;
+    (rows || []).forEach((row) => {
+      if (row.status === 'probleme') buyerDispute = true;
+      else buyerOpen = true;
+    });
+  }
+
+  // Vendeur : des ventes pas terminées, des annonces en vente, des récoltes « Bientôt mûr » à venir
+  let sellerOpen = false;
+  let sellerDispute = false;
+  let listingsOnSale = false;
+  let comingSoon = false;
+  if (sellerIds.length > 0) {
+    const { data: rows, error } = await supabase
+      .from('payouts')
+      .select('status')
+      .in('seller_id', sellerIds)
+      .in('status', OPEN_PAYOUT_STATUSES);
+    if (error) throw error;
+    (rows || []).forEach((row) => {
+      if (row.status === 'probleme') sellerDispute = true;
+      else sellerOpen = true;
+    });
+
+    const { data: listings, error: listingsError } = await supabase
+      .from('listings')
+      .select('id, availability_status, planned_date')
+      .in('seller_id', sellerIds)
+      .is('withdrawn_at', null)
+      .limit(1000);
+    if (listingsError) throw listingsError;
+    const today = todayInParis();
+    (listings || []).forEach((item) => {
+      const status = item.availability_status || 'disponible';
+      if (status === 'disponible') listingsOnSale = true;
+      else if (isComingSoonStillActive(item, today)) comingSoon = true;
+    });
+  }
+
+  if (listingsOnSale) reasons.push('seller_listings');
+  if (comingSoon) reasons.push('seller_coming');
+  if (sellerOpen) reasons.push('seller_sales');
+  if (buyerOpen) reasons.push('buyer_order');
+  if (buyerDispute) reasons.push('buyer_dispute');
+  if (sellerDispute) reasons.push('seller_dispute');
+
+  return { reasons, sellerIds, orderIds };
+}
+
+async function checkAccountDeletion(res, user) {
+  const { reasons } = await accountBlockers(user);
+  return res.status(200).json({ blocked: reasons.length > 0, reasons });
+}
+
+// Essaie de tout modifier d'un coup ; si la base refuse un champ, on réessaie champ par champ (un refus n'arrête rien)
+async function updateWhatWeCan(table, column, value, fields) {
+  const { error } = await supabase.from(table).update(fields).eq(column, value);
+  if (!error) return;
+  console.error('Suppression de compte : modification de ' + table + ' refusée, essai champ par champ :', error.message);
+  for (const key of Object.keys(fields)) {
+    const { error: oneError } = await supabase.from(table).update({ [key]: fields[key] }).eq(column, value);
+    if (oneError) console.error('Suppression de compte : ' + table + '.' + key + ' non modifié :', oneError.message);
+  }
+}
+
+async function deleteQuietly(label, run) {
+  try {
+    const { error } = await run();
+    if (error) console.error('Suppression de compte : ' + label + ' non effacé :', error.message);
+  } catch (err) {
+    console.error('Suppression de compte : ' + label + ' non effacé :', err.message);
+  }
+}
+
+async function deleteAccount(req, res, user, token) {
+  if (!req.body || req.body.confirm !== true) {
+    return res.status(400).json({ error: 'Confirmation manquante.' });
+  }
+
+  const { reasons, sellerIds, orderIds } = await accountBlockers(user);
+  if (reasons.length > 0) {
+    return res.status(409).json({ blocked: true, reasons });
+  }
+
+  const userId = user.id;
+  const anonymousEmail = 'compte-supprime-' + userId + '@agrivoisin.invalid';
+
+  // Ce que la personne a fait elle-même et qui ne sert à personne d'autre : favoris, alertes, réservations, paniers en attente
+  await deleteQuietly('favoris', () => supabase.from('favorites').delete().eq('user_id', userId));
+  await deleteQuietly('alertes', () => supabase.from('listing_alerts').delete().eq('user_id', userId));
+  await deleteQuietly('réservations', () => supabase.from('listing_reservations').delete().eq('user_id', userId));
+  await deleteQuietly('paniers en attente', () => supabase.from('checkout_carts').delete().eq('buyer_id', userId));
+
+  // Vendeur : les avis reçus disparaissent avec le compte ; il ne reste ni annonce ni boutique visible
+  if (sellerIds.length > 0) {
+    await deleteQuietly('avis reçus', () => supabase.from('reviews').delete().in('seller_id', sellerIds));
+    await deleteQuietly('annonces', () => supabase.from('listings').delete().in('seller_id', sellerIds));
+    for (const sellerId of sellerIds) {
+      // La fiche vendeur reste (adresse, SIRET, informations fiscales : conservés comme la loi l'impose) mais sans nom ni boutique
+      await updateWhatWeCan('sellers', 'id', sellerId, {
+        pseudo: 'compte-supprime-' + String(sellerId).slice(0, 8),
+        shop_name: null,
+        shop_description: null,
+        shop_cover_url: null,
+        shop_logo_url: null,
+        email: anonymousEmail,
+        phone: null,
+      });
+    }
+  }
+
+  // Les avis écrits par la personne restent, sans son nom (« Ancien membre ») : son compte devient anonyme
+  const { data: writtenReviews } = await supabase.from('reviews').select('order_id').eq('buyer_id', userId).limit(1);
+  const mustKeepTrace = orderIds.length > 0 || sellerIds.length > 0 || (writtenReviews && writtenReviews.length > 0);
+
+  // On coupe toutes les connexions en cours de cette personne
+  try { await supabase.auth.admin.signOut(token, 'global'); } catch (err) { /* la suite rend la connexion impossible de toute façon */ }
+
+  let removed = false;
+  if (!mustKeepTrace) {
+    // Aucune commande, aucune fiche vendeur, aucun avis : on efface le compte pour de bon
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+    if (!deleteError) removed = true;
+    else console.error('Suppression de compte : effacement complet refusé, on anonymise :', deleteError.message);
+  }
+
+  if (!removed) {
+    // Le compte reste en base sous un nom anonyme, sans adresse e-mail réelle, sans mot de passe utilisable, et sans possibilité de se connecter
+    const randomPassword = Array.from({ length: 4 }, () => Math.random().toString(36).slice(2)).join('') + 'Aa1!';
+    const { error: anonymiseError } = await supabase.auth.admin.updateUserById(userId, {
+      email: anonymousEmail,
+      email_confirm: true,
+      password: randomPassword,
+      user_metadata: {},
+      ban_duration: '876000h',
+    });
+    if (anonymiseError) {
+      console.error('Suppression de compte : anonymisation impossible :', anonymiseError.message);
+      return res.status(500).json({ error: "Impossible de supprimer le compte pour le moment. Réessayez dans quelques instants." });
+    }
+  }
+
+  console.log('Suppression de compte : ' + userId + (removed ? ' effacé' : ' anonymisé') + ' le ' + new Date().toISOString());
+  return res.status(200).json({ success: true });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -260,6 +461,9 @@ export default async function handler(req, res) {
 
     // Envoi d'un avis sur un vendeur
     if (req.method === 'POST') {
+      const action = req.body && typeof req.body.action === 'string' ? req.body.action : '';
+      if (action === 'delete_check') return await checkAccountDeletion(res, userData.user);
+      if (action === 'delete_account') return await deleteAccount(req, res, userData.user, token);
       return await submitReview(req, res, userData.user);
     }
 

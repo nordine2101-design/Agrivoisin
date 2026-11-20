@@ -107,6 +107,8 @@
       var p = window.agrivoisinConfirm({ title: titre, message: message, confirmText: boutonLien || 'OK', cancelText: 'Fermer', danger: false });
       var ic = document.querySelector('.agv-ic');
       if (ic) ic.textContent = '!';
+      // Sans lien à suivre, un seul bouton « Fermer »
+      if (!lien) { var btns = document.querySelectorAll('.agv-btn'); if (btns.length > 1) btns[1].style.display = 'none'; }
       return p.then(function (oui) { if (oui && lien) window.location.href = lien; });
     }
     function messageBlocage(raisons) {
@@ -192,6 +194,5 @@
 </script>
 </body>
 </html>
-
 
 

@@ -120,7 +120,8 @@
     var p = window.agrivoisinConfirm({ title: 'Vos informations sont enregistrées.', message: '', confirmText: 'Retour', cancelText: '', danger: false });
     var ic = document.querySelector('.agv-ic'); if (ic) ic.textContent = '✓';
     var b = document.querySelectorAll('.agv-btn'); if (b.length > 1) b[0].style.display = 'none';
-    return p;
+    // Retour (ou fermeture de la fenêtre) : on quitte la page et on revient sur « Mon compte »
+    return p.then(function () { window.location.href = 'compte.html'; });
   }
   function message(texte, bon) {
     var m = $('miMsg');
@@ -209,6 +210,8 @@
 </script>
 </body>
 </html>
+
+
 
 
 

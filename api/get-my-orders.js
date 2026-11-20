@@ -438,6 +438,174 @@ async function deleteAccount(req, res, user, token) {
   return res.status(200).json({ success: true });
 }
 
+// ---------------------------------------------------------------------------
+// « Mes informations » : lecture et modification du profil (acheteur ou vendeur).
+// - Vendeur : le nom n'est pas modifiable ici (il doit correspondre à sa pièce d'identité) ; l'adresse de retrait
+//   (ville, code postal, adresse complète) ne peut changer que s'il n'a aucune commande en cours.
+//   Ses annonces lisent la ville et la position sur sa fiche : elles suivent donc toutes seules la nouvelle adresse.
+// - Acheteur : il peut changer son nom et sa ville.
+// ---------------------------------------------------------------------------
+function normalizeCommuneName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\bsaint\b/g, 'st')
+    .replace(/\bsainte\b/g, 'ste');
+}
+
+function communeNameMatches(typed, official) {
+  if (typed.length < 3) return false;
+  return official === typed || official.startsWith(typed + ' ') || typed.startsWith(official + ' ');
+}
+
+// Vérifie que la ville va avec le code postal (annuaire officiel des communes) et donne sa position
+async function lookupCommuneProfile(city, postalCode) {
+  const typed = normalizeCommuneName(city);
+  const cp = String(postalCode || '').trim();
+  if (!typed) return { ok: false, status: 400, error: 'Indiquez le nom de votre ville ou village.' };
+  if (!/^\d{5}$/.test(cp)) return { ok: false, status: 400, error: 'Le code postal doit comporter 5 chiffres.' };
+
+  let communes;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(
+      'https://geo.api.gouv.fr/communes?codePostal=' + cp + '&fields=nom,centre&format=json',
+      { signal: controller.signal, headers: { Accept: 'application/json' } }
+    );
+    if (!response.ok) throw new Error('Réponse ' + response.status);
+    communes = await response.json();
+  } catch (err) {
+    console.error('Erreur annuaire des communes :', err);
+    return { ok: false, status: 503, error: 'Le service de vérification des communes est momentanément indisponible. Réessayez dans quelques instants.' };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!Array.isArray(communes) || communes.length === 0) {
+    return { ok: false, status: 400, error: 'Ce code postal est introuvable. Vérifiez-le.' };
+  }
+  const match = communes.find((c) => communeNameMatches(typed, normalizeCommuneName(c.nom)));
+  if (!match) {
+    const names = communes.map((c) => c.nom).join(', ');
+    return { ok: false, status: 400, error: 'Ce code postal correspond à : ' + names + '. Vérifiez le nom de votre ville ou village.' };
+  }
+  const coords = match.centre && match.centre.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2) {
+    return { ok: false, status: 503, error: 'Position de la commune indisponible pour le moment. Réessayez dans quelques instants.' };
+  }
+  return { ok: true, city: match.nom, latitude: coords[1], longitude: coords[0] };
+}
+
+// Vrai tant qu'une vente de ce vendeur n'est ni versée ni remboursée (litige compris)
+async function sellerHasOpenSales(sellerIds) {
+  if (!sellerIds || sellerIds.length === 0) return false;
+  const { data, error } = await supabase
+    .from('payouts')
+    .select('status')
+    .in('seller_id', sellerIds)
+    .in('status', OPEN_PAYOUT_STATUSES)
+    .limit(1);
+  if (error) throw error;
+  return !!(data && data.length > 0);
+}
+
+async function readProfileSeller(userId) {
+  const { data, error } = await supabase
+    .from('sellers')
+    .select('id, city, address')
+    .eq('user_id', userId)
+    .limit(1);
+  if (error) throw error;
+  return data && data.length > 0 ? data[0] : null;
+}
+
+async function getProfile(res, user) {
+  const meta = user.user_metadata && typeof user.user_metadata === 'object' ? user.user_metadata : {};
+  const seller = await readProfileSeller(user.id);
+
+  if (seller) {
+    // Le code postal figure dans l'adresse complète : on le retrouve de là
+    const found = String(seller.address || '').match(/\b\d{5}\b/);
+    return res.status(200).json({
+      role: 'vendeur',
+      name: meta.full_name || '',
+      city: seller.city || '',
+      postalCode: found ? found[0] : '',
+      address: seller.address || '',
+      locked: await sellerHasOpenSales([seller.id]),
+    });
+  }
+
+  return res.status(200).json({
+    role: 'acheteur',
+    name: meta.full_name || '',
+    city: meta.city || '',
+    postalCode: meta.postal_code || '',
+  });
+}
+
+async function saveProfile(req, res, user) {
+  const body = req.body || {};
+  const seller = await readProfileSeller(user.id);
+
+  if (seller) {
+    // Vendeur : seulement l'adresse de retrait, et seulement sans commande en cours
+    if (await sellerHasOpenSales([seller.id])) {
+      return res.status(409).json({ error: 'Vous avez une commande en cours. Vous pourrez changer votre adresse de retrait une fois la commande remise.' });
+    }
+    const postalCode = String(body.postalCode == null ? '' : body.postalCode).trim();
+    const address = String(body.address == null ? '' : body.address).trim().replace(/\s+/g, ' ');
+    if (address.length < 6 || address.length > 200) {
+      return res.status(400).json({ error: 'Indiquez votre adresse complète.' });
+    }
+    // Si l'adresse contient un code postal, il doit être le même que celui indiqué
+    const inAddress = address.match(/\b\d{5}\b/g);
+    if (inAddress && !inAddress.includes(postalCode)) {
+      return res.status(400).json({ error: "Le code postal de l'adresse complète ne correspond pas au code postal indiqué. Vérifiez-les." });
+    }
+    const commune = await lookupCommuneProfile(body.city, postalCode);
+    if (!commune.ok) return res.status(commune.status).json({ error: commune.error });
+
+    const { error } = await supabase
+      .from('sellers')
+      .update({ city: commune.city, address, latitude: commune.latitude, longitude: commune.longitude })
+      .eq('id', seller.id);
+    if (error) {
+      console.error('Erreur Supabase (changement d\'adresse du vendeur) :', error);
+      return res.status(500).json({ error: "Impossible d'enregistrer pour le moment. Réessayez dans quelques instants." });
+    }
+    return res.status(200).json({ success: true, city: commune.city });
+  }
+
+  // Acheteur : son nom et sa ville
+  const name = String(body.name == null ? '' : body.name).trim().replace(/\s+/g, ' ');
+  if (name.length < 2 || name.length > 80) {
+    return res.status(400).json({ error: 'Indiquez votre nom.' });
+  }
+  if (findForbiddenText(name)) {
+    return res.status(400).json({ error: "Ce nom n'est pas accepté : il contient des propos injurieux ou discriminatoires." });
+  }
+  const postalCode = String(body.postalCode == null ? '' : body.postalCode).trim();
+  const commune = await lookupCommuneProfile(body.city, postalCode);
+  if (!commune.ok) return res.status(commune.status).json({ error: commune.error });
+
+  const meta = user.user_metadata && typeof user.user_metadata === 'object' ? user.user_metadata : {};
+  const { error } = await supabase.auth.admin.updateUserById(user.id, {
+    user_metadata: { ...meta, full_name: name, city: commune.city, postal_code: postalCode },
+  });
+  if (error) {
+    console.error('Erreur Supabase (changement du profil acheteur) :', error);
+    return res.status(500).json({ error: "Impossible d'enregistrer pour le moment. Réessayez dans quelques instants." });
+  }
+  return res.status(200).json({ success: true, city: commune.city });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
@@ -464,6 +632,8 @@ export default async function handler(req, res) {
       const action = req.body && typeof req.body.action === 'string' ? req.body.action : '';
       if (action === 'delete_check') return await checkAccountDeletion(res, userData.user);
       if (action === 'delete_account') return await deleteAccount(req, res, userData.user, token);
+      if (action === 'profile_get') return await getProfile(res, userData.user);
+      if (action === 'profile_save') return await saveProfile(req, res, userData.user);
       return await submitReview(req, res, userData.user);
     }
 

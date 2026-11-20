@@ -206,6 +206,23 @@
     .mob-rot .rs-f:not(.rs-s).ex .fn{width:calc(3 * clamp(26px,8.4vw,36px) + 6px)}
     .mob-rot .rs-f:not(.rs-s).ex .fn img{width:clamp(26px,8.4vw,36px);height:clamp(26px,8.4vw,36px)}
   }
+  @media (max-width:700px){
+    .mob-rot{min-height:271px}
+    .mob-rot .rs:not(.rs-a):not(.rs-b).on{min-height:231px}
+    .mob-rot .bm{min-height:231px}
+    .mob-rot .big{width:150px;height:150px}
+    .mob-rot .fi{width:150px}
+    .mob-rot .fi img{width:140px;height:140px}
+    .mob-rot .rs-s.ex{height:243px;min-height:243px}
+    .mob-rot .rs-f:not(.rs-s).ex{height:243px;min-height:243px}
+    .mob-rot .rs-s.ex .fl{padding:6px 12px;font-size:clamp(.7rem,3.3vw,.9rem);line-height:1.2}
+    .mob-rot .rs-s.ex .fn img{width:clamp(28px,9.6vw,42px);height:clamp(28px,9.6vw,42px)}
+    .mob-rot .rs-s.ex .fl b{display:table;margin-bottom:3px;background:#fff;color:#8E1D1D;border:2px solid #B3262A;border-radius:999px;padding:0 9px;line-height:1.35}
+    .mob-rot .rs-f:not(.rs-s).ex .fl{font-size:clamp(.74rem,3.7vw,.98rem);gap:12px}
+    .mob-rot .rs-f:not(.rs-s).ex .fl b{display:table;margin-bottom:3px;background:#fff;color:#1F3550;border:2px solid #2F5F9E;border-radius:999px;padding:0 9px;line-height:1.35}
+    .mob-rot .rs-f:not(.rs-s).ex .fn{width:calc(3 * clamp(30px,10vw,46px) + 6px)}
+    .mob-rot .rs-f:not(.rs-s).ex .fn img{width:clamp(30px,10vw,46px);height:clamp(30px,10vw,46px)}
+  }
   html,body{overflow-anchor:none}
   @media (max-width:1000px){ html{scroll-behavior:auto !important} }
 </style>
@@ -228,8 +245,8 @@
     <div class="rs rs-a on"><div class="rt"><b>Fraîchement publié</b><a href="annonces.html">Tout voir ›</a></div><div class="mob-row"><a class="mob-c" href="annonces.html"><div class="mob-im mob-i1"><span class="mob-tg">Très frais</span></div><div class="mob-tr"><b>Carottes</b></div><span class="mob-p">3,50 €/kg</span><small>Marie · à 1,2 km</small></a><a class="mob-c" href="annonces.html"><div class="mob-im mob-i2"></div><div class="mob-tr"><b>Pommes Gala</b></div><span class="mob-p">4,00 €/kg</span><small>Julien · à 800 m</small></a><a class="mob-c" href="annonces.html"><div class="mob-im mob-i3"><span class="mob-tg">Bio</span></div><div class="mob-tr"><b>Miel de fleurs</b></div><span class="mob-p">8,00 €/pot</span><small>Sophie · à 2 km</small></a></div>
 </div>
     <div class="rs rs-b"><a class="bm" href="bientot-mur.html"><b>Des récoltes arrivent bientôt</b><span>Prévenez-moi ! ou réservez avant tout le monde.</span><em>Voir Bientôt mûr ›</em></a></div>
-    <div class="rs rs-f rs-s" id="mobSt"><button type="button" class="fi" id="mobStBtn" aria-label="Voir ce que veulent dire les fraises"><img src="fraise-mascotte.png" alt=""></button><p><b>Les fraises = les avis</b><br>Chaque acheteur note son jardinier après la remise.<br><span class="tip">Touchez la fraise !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Excellent</b> : produit superbe, vendeur au top, je recommande</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Bien</b> : produit conforme à l’annonce</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Moyen</b> : correct, mais j’attendais mieux</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""></span><span><b>Décevant</b> : produit différent de l’annonce</span></div></div></div>
-    <div class="rs rs-f" id="mobFr"><button type="button" class="fi" id="mobFrBtn" aria-label="Voir ce que veulent dire les flocons"><img src="flocon.png" alt=""></button><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.<br><span class="tip">Touchez le flocon !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Très frais</b> : récolté il y a moins de 24&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Frais</b> : récolté entre 24 et 48&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""></span><span><b>Fraîcheur minimale</b> : récolté il y a plus de 48&nbsp;h</span></div></div></div>
+    <div class="rs rs-f rs-s" id="mobSt"><button type="button" class="fi" id="mobStBtn" aria-label="Voir ce que veulent dire les fraises"><img src="fraise-mascotte.png" alt=""></button><p><b>Les fraises = les avis</b><br>Chaque acheteur note son jardinier après la remise.<br><span class="tip">Touchez la fraise !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Excellent</b> produit superbe, vendeur au top, je recommande</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Bien</b> produit conforme à l’annonce</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Moyen</b> correct, mais j’attendais mieux</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""></span><span><b>Décevant</b> produit différent de l’annonce</span></div></div></div>
+    <div class="rs rs-f" id="mobFr"><button type="button" class="fi" id="mobFrBtn" aria-label="Voir ce que veulent dire les flocons"><img src="flocon.png" alt=""></button><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.<br><span class="tip">Touchez le flocon !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Très frais</b> récolté il y a moins de 24&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Frais</b> récolté entre 24 et 48&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""></span><span><b>Fraîcheur minimale</b> récolté il y a plus de 48&nbsp;h</span></div></div></div>
     <div class="rs"><img class="big" src="expedition-possible%20(1).png" alt=""><p><b>Le lapin = expédition possible</b><br>Le vendeur peut envoyer sa récolte.</p></div>
     <div class="rd"><button type="button" class="on"></button><button type="button"></button><button type="button"></button><button type="button"></button><button type="button"></button></div>
   </div>
@@ -749,6 +766,8 @@
 </script>
 </body>
 </html>
+
+
 
 
 

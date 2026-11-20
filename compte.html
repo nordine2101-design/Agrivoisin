@@ -6,6 +6,7 @@
 <title>Mon compte — Agrivoisin</title>
 <link rel="stylesheet" href="style.css">
 <script src="supabase.js"></script>
+<script src="script.js" defer></script>
 <style>
   body { background:#fff; padding-bottom:90px; font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; color:#2E3A2A; line-height:normal; }
   .cpt { max-width:520px; margin:0 auto; padding:12px 16px 0; }
@@ -18,6 +19,9 @@
   .cpt-liste a[hidden] { display:none; }
   .cpt-liste a.cpt-vendre { border-color:#83C13D; color:#5E9A22; }
   .cpt-liste a.cpt-out { justify-content:center; border-color:#C8352F; color:#C8352F; }
+  .cpt-liste a.cpt-del { justify-content:center; border-color:#C8352F; background:#FDF0EF; color:#C8352F; }
+  .cpt-liste a.cpt-del svg { width:26px; height:26px; flex:none; margin-right:10px; }
+  .cpt-liste a.cpt-del.busy { opacity:.6; pointer-events:none; }
   .cpt-liste a i { font-style:normal; font-size:1.4rem; }
   .cpt-nav { position:fixed; left:0; right:0; bottom:12px; height:62px; z-index:50; display:none; align-items:center; justify-content:space-between; padding:0 6px; background:#fff; border:1px solid #eee; border-radius:999px; box-shadow:0 4px 18px rgba(0,0,0,.2); }
   .cpt-nav a { flex:1 1 0; height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:.6rem; font-weight:600; color:#777; border-radius:999px; text-decoration:none; }
@@ -42,6 +46,7 @@
     <a href="mes-informations.html" id="cptInfos" hidden><span>Mes informations<small>Nom, e-mail, adresses</small></span><i>›</i></a>
     <a href="vendre.html" id="cptVendre" class="cpt-vendre" hidden><span>Devenir vendeur<small>Publiez vos récoltes et recevez vos paiements</small></span><i>›</i></a>
     <a href="#" id="cptOut" class="cpt-out">Se déconnecter</a>
+    <a href="#" id="cptDel" class="cpt-del"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></svg><span>Supprimer mon compte</span></a>
   </div>
 </div>
 <nav class="cpt-nav" aria-label="Menu">
@@ -79,6 +84,101 @@
       window.location.href = 'index.html';
     });
 
+    // « Supprimer mon compte » : on vérifie d'abord côté serveur, puis on demande confirmation
+    function viderSession() {
+      try {
+        Object.keys(localStorage).forEach(function (key) {
+          if (key.indexOf('sb-') === 0 && key.indexOf('-auth-token') !== -1) localStorage.removeItem(key);
+        });
+      } catch (e) { /* ignoré */ }
+    }
+    function appelCompte(action, extra) {
+      var corps = { action: action };
+      if (extra) Object.keys(extra).forEach(function (k) { corps[k] = extra[k]; });
+      return fetch('/api/get-my-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify(corps)
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; });
+      });
+    }
+    function fenetreInfo(titre, message, boutonLien, lien) {
+      var p = window.agrivoisinConfirm({ title: titre, message: message, confirmText: boutonLien || 'OK', cancelText: 'Fermer', danger: false });
+      var ic = document.querySelector('.agv-ic');
+      if (ic) ic.textContent = '!';
+      return p.then(function (oui) { if (oui && lien) window.location.href = lien; });
+    }
+    function messageBlocage(raisons) {
+      if (raisons.indexOf('admin') !== -1) {
+        return { message: "Un compte administrateur ne peut pas être supprimé depuis cette page.", bouton: 'OK', lien: '' };
+      }
+      if (raisons.length === 1 && raisons[0] === 'buyer_order') {
+        return { message: "Vous avez une commande en cours.\nVous pourrez supprimer votre compte une fois la commande remise.", bouton: 'Voir mes commandes', lien: 'mes-commandes.html' };
+      }
+      var lignes = [];
+      var lien = 'mes-commandes.html', bouton = 'Voir mes commandes';
+      if (raisons.indexOf('seller_listings') !== -1) { lignes.push('retirer vos annonces en cours'); lien = 'mes-annonces.html'; bouton = 'Voir mes annonces'; }
+      if (raisons.indexOf('seller_coming') !== -1) { lignes.push('honorer ou annuler vos récoltes « Bientôt mûr »'); if (lignes.length === 1) { lien = 'mes-recoltes-a-venir.html'; bouton = 'Voir mes récoltes à venir'; } }
+      if (raisons.indexOf('seller_sales') !== -1) { lignes.push('remettre ou annuler vos commandes à livrer'); if (lignes.length === 1) { lien = 'mes-ventes.html'; bouton = 'Voir mes ventes'; } }
+      if (raisons.indexOf('buyer_order') !== -1) { lignes.push('attendre la fin de vos commandes en cours'); if (lignes.length === 1) { lien = 'mes-commandes.html'; bouton = 'Voir mes commandes'; } }
+      if (raisons.indexOf('buyer_dispute') !== -1 || raisons.indexOf('seller_dispute') !== -1) { lignes.push('attendre la résolution de votre litige en cours'); }
+      if (!lignes.length) lignes.push('terminer vos opérations en cours');
+      return { message: 'Avant de supprimer votre compte, il faut :\n' + lignes.map(function (l, i) { return '• ' + l + (i === lignes.length - 1 ? '.' : ' ;'); }).join('\n'), bouton: bouton, lien: lien };
+    }
+    var delBtn = document.getElementById('cptDel');
+    var delEnCours = false;
+    delBtn.addEventListener('click', function (event) {
+      event.preventDefault();
+      if (delEnCours) return;
+      delEnCours = true;
+      delBtn.classList.add('busy');
+      var fin = function () { delEnCours = false; delBtn.classList.remove('busy'); };
+      var erreur = function () {
+        fin();
+        return fenetreInfo('Suppression impossible', "Un problème est survenu. Vos données n'ont pas été modifiées. Réessayez dans un instant.", 'OK', '');
+      };
+      appelCompte('delete_check').then(function (x) {
+        if (!x.ok) return erreur();
+        if (x.d && x.d.blocked) {
+          fin();
+          var m = messageBlocage(x.d.reasons || []);
+          return fenetreInfo('Suppression impossible pour le moment', m.message, m.bouton, m.lien);
+        }
+        fin();
+        return window.agrivoisinConfirm({
+          title: 'Supprimer votre compte ?',
+          message: 'Attention, cette action entraînera la suppression définitive de votre compte !',
+          confirmText: 'Oui, supprimer mon compte',
+          cancelText: 'Non, revenir',
+          danger: true
+        }).then(function (oui) {
+          if (!oui) return;
+          delEnCours = true;
+          delBtn.classList.add('busy');
+          return appelCompte('delete_account', { confirm: true }).then(function (y) {
+            if (y.status === 409) {
+              fin();
+              var m2 = messageBlocage((y.d && y.d.reasons) || []);
+              return fenetreInfo('Suppression impossible pour le moment', m2.message, m2.bouton, m2.lien);
+            }
+            if (!y.ok) return erreur();
+            viderSession();
+            try { supabaseClient.auth.signOut(); } catch (e) {}
+            var pOk = window.agrivoisinConfirm({
+              title: 'Compte supprimé',
+              message: 'Votre compte a bien été supprimé. À bientôt sur Agrivoisin.',
+              confirmText: "Retour à l'accueil",
+              cancelText: 'Fermer',
+              danger: false
+            });
+            var ic2 = document.querySelector('.agv-ic'); if (ic2) ic2.textContent = '✓';
+            return pOk.then(function () { window.location.href = 'index.html'; });
+          });
+        });
+      }).catch(erreur);
+    });
+
     // Un acheteur (pas encore vendeur) voit la ligne « Devenir vendeur »
     fetch('/api/get-seller-listings', { headers: { Authorization: 'Bearer ' + session.access_token } })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
@@ -92,3 +192,6 @@
 </script>
 </body>
 </html>
+
+
+

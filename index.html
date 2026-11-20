@@ -749,6 +749,13 @@
         mobLogin.setAttribute('href', '#');
         mobLogin.addEventListener('click', (event) => { event.preventDefault(); loginLink.click(); });
       }
+      // Accueil téléphone : en bas, « Créer un compte » devient « Mon compte » (page compte.html) une fois connecté
+      const mobCompte = document.getElementById('mobCompte');
+      if (mobCompte) {
+        mobCompte.querySelector('span').textContent = 'Mon compte';
+        mobCompte.setAttribute('href', 'compte.html');
+        window.dispatchEvent(new Event('resize'));
+      }
     }
   });
 </script>
@@ -779,6 +786,8 @@
 </script>
 </body>
 </html>
+
+
 
 
 

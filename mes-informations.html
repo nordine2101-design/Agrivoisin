@@ -18,6 +18,8 @@
   .mi-bloc label { display:block; font-size:.8rem; font-weight:700; color:#385C3B; margin:12px 0 4px; }
   .mi-bloc input { width:100%; box-sizing:border-box; border:2px solid #385C3B; border-radius:14px; padding:13px 14px; font-size:1rem; font-family:inherit; color:#2E3A2A; background:#fff; }
   .mi-bloc input:disabled { border-color:#d5d5d5; background:#f3f3f3; color:#8a8a8a; }
+  .mi-sep { margin-top:26px; padding-top:22px; border-top:2px solid #d9d9d9; }
+  .mi-sep h2 { display:inline-block; border:2px solid #C8352F; color:#C8352F; background:#fff; border-radius:12px; padding:6px 14px; margin-bottom:8px; }
   .mi-ligne { display:flex; gap:10px; }
   .mi-ligne > div { flex:1; min-width:0; }
   .mi-ligne > div.cp { flex:0 0 38%; }
@@ -55,7 +57,17 @@
       <label for="miMail">Adresse e-mail</label>
       <input type="email" id="miMail" disabled>
     </div>
-    <div class="mi-bloc" id="miAdr" hidden>
+    <div class="mi-bloc" id="miDom" hidden>
+      <h2>Mon adresse</h2>
+      <p class="mi-aide">Votre adresse personnelle. Elle n'est jamais montrée aux acheteurs.</p>
+      <div class="mi-ligne">
+        <div class="cp"><label for="miDomCp">Code postal</label><input type="text" id="miDomCp" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div>
+        <div><label for="miDomVille">Ville ou village</label><input type="text" id="miDomVille" maxlength="80" autocomplete="address-level2"></div>
+      </div>
+      <label for="miDomicile">Adresse complète</label>
+      <input type="text" id="miDomicile" maxlength="200" autocomplete="street-address" placeholder="Ex : 12 rue des Jardins, 75000 Paris">
+    </div>
+    <div class="mi-bloc mi-sep" id="miAdr" hidden>
       <h2>Adresse de retrait</h2>
       <p class="mi-aide">La ville est utilisée pour calculer la distance avec les acheteurs. L'adresse complète n'est donnée à l'acheteur qu'après paiement.</p>
       <div class="mi-bloque" id="miBloque" hidden>Vous avez une commande en cours. Vous pourrez changer votre adresse de retrait une fois la commande remise.</div>
@@ -126,10 +138,14 @@
         $('miCp').value = profil.postalCode || '';
         $('miVille').value = profil.city || '';
         $('miAdresse').value = profil.address || '';
+        $('miDom').hidden = false;
+        $('miDomicile').value = profil.homeAddress || '';
+        $('miDomCp').value = profil.homePostalCode || '';
+        $('miDomVille').value = profil.homeCity || '';
         if (profil.locked) {
+          // Commande en cours : l'adresse de retrait ne peut pas changer, mais l'adresse personnelle oui
           ['miCp', 'miVille', 'miAdresse'].forEach(function (id) { $(id).disabled = true; });
           $('miBloque').hidden = false;
-          $('miBtn').hidden = true;
         }
       } else {
         $('miVilleAch').hidden = false;
@@ -145,18 +161,33 @@
       event.preventDefault();
       if (!profil) return;
       var vendeur = profil.role === 'vendeur';
-      var donnees = vendeur
-        ? { postalCode: $('miCp').value.trim(), city: $('miVille').value.trim(), address: $('miAdresse').value.trim() }
-        : { name: $('miNom').value.trim(), postalCode: $('miCpA').value.trim(), city: $('miVilleA').value.trim() };
-      if (!vendeur && !donnees.name) { message('Indiquez votre nom.', false); return; }
-      if (!/^[0-9]{5}$/.test(donnees.postalCode)) { message('Le code postal comporte 5 chiffres.', false); return; }
-      if (!donnees.city) { message('Indiquez votre ville ou village.', false); return; }
-      if (vendeur && donnees.address.length < 6) { message('Indiquez votre adresse complète.', false); return; }
+      var donnees;
+      if (vendeur) {
+        donnees = { homeAddress: $('miDomicile').value.trim(), homePostalCode: $('miDomCp').value.trim(), homeCity: $('miDomVille').value.trim() };
+        // L'adresse personnelle est facultative, mais si on la remplit, il faut les trois cases
+        var dom = [donnees.homeAddress, donnees.homePostalCode, donnees.homeCity].filter(Boolean).length;
+        if (dom > 0 && dom < 3) { message("Remplissez les trois cases de « Mon adresse » (code postal, ville, adresse complète), ou videz-les toutes.", false); return; }
+        if (dom === 3 && !/^[0-9]{5}$/.test(donnees.homePostalCode)) { message('Le code postal de « Mon adresse » comporte 5 chiffres.', false); return; }
+        if (!profil.locked) {
+          donnees.postalCode = $('miCp').value.trim();
+          donnees.city = $('miVille').value.trim();
+          donnees.address = $('miAdresse').value.trim();
+          if (!/^[0-9]{5}$/.test(donnees.postalCode)) { message('Le code postal comporte 5 chiffres.', false); return; }
+          if (!donnees.city) { message('Indiquez votre ville ou village.', false); return; }
+          if (donnees.address.length < 6) { message("Indiquez l'adresse complète de retrait.", false); return; }
+        }
+      } else {
+        donnees = { name: $('miNom').value.trim(), postalCode: $('miCpA').value.trim(), city: $('miVilleA').value.trim() };
+        if (!donnees.name) { message('Indiquez votre nom.', false); return; }
+        if (!/^[0-9]{5}$/.test(donnees.postalCode)) { message('Le code postal comporte 5 chiffres.', false); return; }
+        if (!donnees.city) { message('Indiquez votre ville ou village.', false); return; }
+      }
       $('miBtn').disabled = true; $('miBtn').textContent = 'Enregistrement...'; $('miMsg').hidden = true;
       appel(session, 'profile_save', donnees).then(function (x) {
         $('miBtn').disabled = false; $('miBtn').textContent = 'Enregistrer';
         if (x.ok) {
           if (x.d && x.d.city) { (vendeur ? $('miVille') : $('miVilleA')).value = x.d.city; }
+          if (vendeur && x.d && x.d.homeCity) { $('miDomVille').value = x.d.homeCity; }
           message('Vos informations sont enregistrées.', true);
         } else {
           message((x.d && x.d.error) || "Impossible d'enregistrer pour le moment. Réessayez dans un instant.", false);
@@ -170,3 +201,6 @@
 </script>
 </body>
 </html>
+
+
+

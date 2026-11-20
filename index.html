@@ -98,6 +98,12 @@
     .mob-tr img { width:30px; height:30px; object-fit:contain; opacity:.85; }
     .mob-p { display:block; color:#C8352F; font-weight:800; font-size:.95rem; }
     .mob-c small { display:block; color:#777; font-size:.68rem; }
+    .mob-c { min-width:0; }
+    .mob-tr b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .mob-im.mob-logo { background-color:#fff; background-size:contain; background-repeat:no-repeat; background-position:center; }
+    .mob-im { background-position:center; }
+    .mob-empty { display:block; padding:30px 14px; font-size:.85rem; color:#2E3A2A; text-align:center; width:100%; text-decoration:none; }
+    .mob-empty b { color:#385C3B; }
     .mob-acc { display:flex; gap:8px; padding:12px 0; }
     .mob-acc a { flex:1 1 0; text-align:center; padding:8px 4px; white-space:nowrap; border:2px solid #385C3B; color:#385C3B; border-radius:999px; font-size:.78rem; font-weight:700; }
     .mob-fl { position:fixed; left:0; right:0; bottom:2px; height:62px; z-index:50; display:flex; align-items:center; justify-content:space-between; padding:0 6px; background:#fff; border:1px solid #eee; border-radius:999px; box-shadow:0 4px 18px rgba(0,0,0,.2); font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; }
@@ -244,8 +250,7 @@
     <div class="mob-t"><a class="mob-b m" href="annonces.html">Les annonces</a><a class="mob-b s" href="publier-annonce.html">Publier une annonce</a></div>
   </div>
   <div class="mob-rot" id="mobRot">
-    <div class="rs rs-a on"><div class="rt"><b>Fraîchement publié</b><a href="annonces.html">Tout voir ›</a></div><div class="mob-row"><a class="mob-c" href="annonces.html"><div class="mob-im mob-i1"><span class="mob-tg">Très frais</span></div><div class="mob-tr"><b>Carottes</b></div><span class="mob-p">3,50 €/kg</span><small>Marie · à 1,2 km</small></a><a class="mob-c" href="annonces.html"><div class="mob-im mob-i2"></div><div class="mob-tr"><b>Pommes Gala</b></div><span class="mob-p">4,00 €/kg</span><small>Julien · à 800 m</small></a><a class="mob-c" href="annonces.html"><div class="mob-im mob-i3"><span class="mob-tg">Bio</span></div><div class="mob-tr"><b>Miel de fleurs</b></div><span class="mob-p">8,00 €/pot</span><small>Sophie · à 2 km</small></a></div>
-</div>
+    <div class="rs rs-a on"><div class="rt"><b>Fraîchement publié</b><a href="annonces.html">Tout voir ›</a></div><div class="mob-row" id="mobRecent"><span class="mob-empty">Chargement…</span></div></div>
     <div class="rs rs-b"><a class="bm" href="bientot-mur.html"><b>Des récoltes arrivent bientôt</b><span>Prévenez-moi ! ou réservez avant tout le monde.</span><em>Voir Bientôt mûr ›</em></a></div>
     <div class="rs rs-f rs-s" id="mobSt"><button type="button" class="fi" id="mobStBtn" aria-label="Voir ce que veulent dire les fraises"><img src="fraise-mascotte.png" alt=""></button><p><b>Les fraises = les avis</b><br>Chaque acheteur note son jardinier après la remise.<br><span class="tip">Touchez la fraise !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Excellent</b> produit superbe, vendeur au top, je recommande</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Bien</b> produit conforme à l’annonce</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""><img src="fraise-mascotte.png" alt=""></span><span><b>Moyen</b> correct, mais j’attendais mieux</span></div><div class="fl"><span class="fn"><img src="fraise-mascotte.png" alt=""></span><span><b>Décevant</b> produit différent de l’annonce</span></div></div></div>
     <div class="rs rs-f" id="mobFr"><button type="button" class="fi" id="mobFrBtn" aria-label="Voir ce que veulent dire les flocons"><img src="flocon.png" alt=""></button><p><b>Les flocons = la fraîcheur</b><br>Plus il y a de flocons, plus la récolte est fraîche.<br><span class="tip">Touchez le flocon !</span></p><div class="fx"><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Très frais</b> récolté il y a moins de 24&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""><img src="flocon.png" alt=""></span><span><b>Frais</b> récolté entre 24 et 48&nbsp;h</span></div><div class="fl"><span class="fn"><img src="flocon.png" alt=""></span><span><b>Fraîcheur minimale</b> récolté il y a plus de 48&nbsp;h</span></div></div></div>
@@ -641,6 +646,26 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  function fillBanner(items) {
+    var row = document.getElementById('mobRecent');
+    if (!row) return;
+    if (!items || !items.length) {
+      row.innerHTML = '<a class="mob-empty" href="publier-annonce.html">Pas encore d’annonce près de chez vous. <b>Soyez le premier à publier ›</b></a>';
+      return;
+    }
+    row.innerHTML = items.slice(0, 3).map(function (it) {
+      var unit = escapeHtml(it.unit || 'kg');
+      var price = Number(it.price).toFixed(2).replace('.', ',') + ' €/' + unit;
+      var city = it.sellers && it.sellers.city ? it.sellers.city : '';
+      var photo = it.image_url ? '' : ' mob-logo';
+      var bg = 'background-image:url(\'' + (it.image_url ? encodeURI(it.image_url).replace(/'/g, '%27') : 'agrivoisin-logo-final.png') + '\')';
+      return '<a class="mob-c" href="produit.html?id=' + encodeURIComponent(it.id) + '">' +
+        '<div class="mob-im' + photo + '" style="' + bg + '"></div>' +
+        '<div class="mob-tr"><b>' + escapeHtml(it.title) + '</b></div>' +
+        '<span class="mob-p">' + price + '</span>' +
+        (city ? '<small>' + escapeHtml(city) + '</small>' : '') + '</a>';
+    }).join('');
+  }
   function loadRecent(session) {
     var section = document.getElementById('homeRecentSection');
     var grid = document.getElementById('homeRecent');
@@ -654,6 +679,7 @@
           return it && it.id && !(it.quantity_available != null && Number(it.quantity_available) <= 0);
         });
         items.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+        fillBanner(items);
         items = items.slice(0, 4);
         if (!items.length) {
           grid.style.display = 'none';
@@ -678,7 +704,7 @@
         }).join('');
         section.style.display = '';
       })
-      .catch(function () { /* échec du chargement : la section reste cachée */ });
+      .catch(function () { fillBanner([]); /* échec du chargement : la section reste cachée */ });
   }
 
   supabaseClient.auth.getSession().then(({ data: { session } }) => {
@@ -786,8 +812,6 @@
 </script>
 </body>
 </html>
-
-
 
 
 

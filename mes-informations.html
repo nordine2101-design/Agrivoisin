@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mes informations — Agrivoisin</title>
 <link rel="stylesheet" href="style.css">
+<script src="script.js" defer></script>
 <script src="supabase.js"></script>
 <style>
   body { background:#fff; padding-bottom:90px; font-family:-apple-system,'Helvetica Neue',Arial,sans-serif; color:#2E3A2A; line-height:normal; }
@@ -114,6 +115,13 @@
       return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; });
     });
   }
+  function confirmation() {
+    if (!window.agrivoisinConfirm) { message('Vos informations sont enregistrées.', true); return; }
+    var p = window.agrivoisinConfirm({ title: 'Vos informations sont enregistrées.', message: '', confirmText: 'Retour', cancelText: '', danger: false });
+    var ic = document.querySelector('.agv-ic'); if (ic) ic.textContent = '✓';
+    var b = document.querySelectorAll('.agv-btn'); if (b.length > 1) b[0].style.display = 'none';
+    return p;
+  }
   function message(texte, bon) {
     var m = $('miMsg');
     m.textContent = texte; m.className = 'mi-msg ' + (bon ? 'ok' : 'err'); m.hidden = false;
@@ -188,7 +196,7 @@
         if (x.ok) {
           if (x.d && x.d.city) { (vendeur ? $('miVille') : $('miVilleA')).value = x.d.city; }
           if (vendeur && x.d && x.d.homeCity) { $('miDomVille').value = x.d.homeCity; }
-          message('Vos informations sont enregistrées.', true);
+          confirmation();
         } else {
           message((x.d && x.d.error) || "Impossible d'enregistrer pour le moment. Réessayez dans un instant.", false);
         }
@@ -201,6 +209,9 @@
 </script>
 </body>
 </html>
+
+
+
 
 
 

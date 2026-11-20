@@ -108,7 +108,7 @@
   }
   supabaseClient.auth.getSession().then(function (res) {
     var session = res.data.session;
-    if (!session) { window.location.replace('inscription.html'); return; }
+    if (!session) { window.location.replace('connexion.html?retour=mes-informations.html'); return; }
     $('miMail').value = (session.user && session.user.email) || '';
     appel(session, 'profile_get').then(function (x) {
       if (!x.ok || !x.d || !x.d.role) {

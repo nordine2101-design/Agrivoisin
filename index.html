@@ -810,6 +810,14 @@
   b.addEventListener('click',function(){try{window.scrollTo({top:0,left:0,behavior:'smooth'})}catch(e){window.scrollTo(0,0)}});
 })();
 </script>
+<script>
+/* À chaque ouverture, la page d'accueil repart tout en haut (le logo entier), même si on l'avait quittée descendue */
+try { history.scrollRestoration = 'manual'; } catch (e) {}
+function versLeHaut() { if (!location.hash) window.scrollTo(0, 0); }
+versLeHaut();
+window.addEventListener('load', versLeHaut);
+window.addEventListener('pageshow', versLeHaut);
+</script>
 <!-- Accueil téléphone : bandeau « Fraîchement publié » avec les vraies annonces -->
 </body>
 </html>
@@ -817,17 +825,4 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Claude est une IA et peut commettre des erreurs.

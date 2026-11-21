@@ -242,17 +242,22 @@
     .mob-rot .rs-a .mob-c small{font-size:.75rem}
     .mob-rot{min-height:240px}
   }
+  .mob-tag, .mob-disc { display:none; }
   @media (max-width:700px){
     .mob-rot{padding-bottom:22px;min-height:240px}
     .mob-rot .rs-a .mob-row{gap:8px;padding:0 8px}
     .mob-rot .rs-a .rt{padding:0 12px 6px}
-    .mob-rot .rs-a .mob-c{flex:1 1 0;min-width:0}
+    .mob-rot .rs-a .mob-c{flex:1 1 0;min-width:0;display:block;background:#fff;border:1px solid #e3efe0;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(76,122,80,.12)}
     .mob-rot .rs-a .mob-c:nth-child(n+3){display:none}
-    .mob-rot .rs-a .mob-im{height:108px;border-radius:12px}
-    .mob-rot .rs-a .mob-tr{margin-top:3px}
-    .mob-rot .rs-a .mob-tr b{font-size:.98rem}
-    .mob-rot .rs-a .mob-p{font-size:1.08rem;line-height:1.2}
-    .mob-rot .rs-a .mob-c small{font-size:.84rem;line-height:1.2}
+    .mob-rot .rs-a .mob-im{height:80px;border-radius:0}
+    .mob-rot .rs-a .mob-im.mob-sans{background-color:#FAF3E9}
+    .mob-rot .rs-a .mob-disc{display:block;position:absolute;top:0;right:0;z-index:2;background:#fff;color:#C8352F;font-size:.6rem;font-weight:700;padding:3px 8px 3px 7px;border-radius:0 0 0 9px;box-shadow:inset 0 0 0 1.5px #C8352F}
+    .mob-rot .rs-a .mob-bd{padding:6px 9px 8px}
+    .mob-rot .rs-a .mob-tag{display:block;font-size:.62rem;font-weight:700;color:#4C7A50;text-transform:uppercase;letter-spacing:.05em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mob-rot .rs-a .mob-tr{margin-top:1px}
+    .mob-rot .rs-a .mob-tr b{font-family:'Fraunces',serif;font-size:.98rem;font-weight:600;color:#2E3A2A}
+    .mob-rot .rs-a .mob-c small{display:block;font-size:.78rem;color:#6B5842;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mob-rot .rs-a .mob-p{font-size:1rem;color:#D97D45;line-height:1.3}
   }
 </style>
 </head>
@@ -680,11 +685,14 @@
       var city = it.sellers && it.sellers.city ? it.sellers.city : '';
       var photo = it.image_url ? '' : ' mob-sans';
       var bg = 'background-image:url(\'' + (it.image_url ? encodeURI(it.image_url).replace(/'/g, '%27') : 'agrivoisin-logo-final.png') + '\')';
+      var pro = it.sellers && it.sellers.seller_type === 'professionnel';
+      var tag = it.subcategory || it.category || 'Récolte';
       return '<a class="mob-c" href="produit.html?id=' + encodeURIComponent(it.id) + '">' +
-        '<div class="mob-im' + photo + '" style="' + bg + '"></div>' +
+        '<div class="mob-im' + photo + '" style="' + bg + '"><span class="mob-disc">' + (pro ? 'Professionnel' : 'Particulier') + '</span></div>' +
+        '<div class="mob-bd"><span class="mob-tag">' + escapeHtml(tag) + '</span>' +
         '<div class="mob-tr"><b>' + escapeHtml(it.title) + '</b></div>' +
-        '<span class="mob-p">' + price + '</span>' +
-        (city ? '<small>' + escapeHtml(city) + '</small>' : '') + '</a>';
+        (city ? '<small>' + escapeHtml(city) + '</small>' : '') +
+        '<span class="mob-p">' + price + '</span></div></a>';
     }).join('');
   }
   function loadRecent(session) {
@@ -842,7 +850,6 @@ window.addEventListener('pageshow', versLeHaut);
 <!-- Accueil téléphone : bandeau « Fraîchement publié » avec les vraies annonces -->
 </body>
 </html>
-
 
 
 

@@ -274,6 +274,7 @@
 <!-- ============ GRILLE D'ANNONCES ============ -->
 <section class="listings-section">
   <div class="container">
+    <p id="recentNote" style="display:none;text-align:center;margin:0 0 18px;font-weight:700;color:#4C7A50;">Annonces publiées depuis moins de 24 h</p>
     <div id="realListingsContainer" class="produce-grid listings-grid"></div>
     <p id="noListingsMessage" style="display:none;text-align:center;margin-top:24px;">Aucune annonce ne correspond à votre recherche pour le moment.</p>
     <nav id="pager" class="pager" aria-label="Pages d'annonces" style="display:none;"></nav>
@@ -306,6 +307,14 @@
   // Nombre d'annonces affichées par page
   const PAGE_SIZE = 30;
   let currentPage = Math.max(1, parseInt(new URLSearchParams(location.search).get('page'), 10) || 1);
+  // « Tout voir » de l'accueil : seulement les annonces publiées depuis moins de 24 h
+  const onlyRecent = new URLSearchParams(location.search).get('nouveau') === '1';
+  function urlFor(page) {
+    const q = [];
+    if (onlyRecent) q.push('nouveau=1');
+    if (page > 1) q.push('page=' + page);
+    return location.pathname + (q.length ? '?' + q.join('&') : '');
+  }
 
   const chipsContainer = document.getElementById('categoryChips');
   const container = document.getElementById('realListingsContainer');
@@ -724,7 +733,7 @@
     if (!btn || btn.disabled) return;
     currentPage = Number(btn.dataset.page);
     // Le numéro de page reste dans l'adresse : en revenant d'une annonce, on retrouve sa page
-    try { history.replaceState(null, '', currentPage > 1 ? '?page=' + currentPage : location.pathname); } catch (err) {}
+    try { history.replaceState(null, '', urlFor(currentPage)); } catch (err) {}
     renderListings();
     const grid = document.getElementById('realListingsContainer');
     grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -738,6 +747,11 @@
       : allListings.filter((item) => item.category === currentCategory);
 
     filtered = filtered.filter((item) => matchesSearch(item, currentSearch));
+
+    // Depuis « Tout voir » de l'accueil : seulement les annonces publiées depuis moins de 24 h
+    if (onlyRecent) {
+      filtered = filtered.filter((item) => Date.now() - new Date(item.created_at || 0).getTime() < 24 * 3600 * 1000);
+    }
 
     // Particuliers et/ou professionnels (un vendeur sans type connu est un particulier).
     // Aucun bouton sélectionné : on voit tout. Sinon : seulement les types sélectionnés.
@@ -772,7 +786,7 @@
     if (filtered.length === 0) {
       noListingsMessage.textContent = emptyBecauseOfCity
         ? 'Aucune annonce pour cette ville dans ce rayon. Faites une nouvelle recherche.'
-        : DEFAULT_NO_LISTING_TEXT;
+        : (onlyRecent ? 'Aucune annonce publiée ces dernières 24 heures.' : DEFAULT_NO_LISTING_TEXT);
       noListingsMessage.classList.toggle('city-empty', emptyBecauseOfCity);
       noListingsMessage.style.display = 'block';
       pager.style.display = 'none';
@@ -982,7 +996,7 @@
   // Quand on change un filtre, un tri ou la recherche, on repart de la page 1
   function goToFirstPage() {
     currentPage = 1;
-    try { history.replaceState(null, '', location.pathname); } catch (err) {}
+    try { history.replaceState(null, '', urlFor(1)); } catch (err) {}
   }
 
   // ---------- Favoris ----------
@@ -1132,7 +1146,7 @@
       typeParticulier.checked = !!saved.particulier;
       typeProfessionnel.checked = !!saved.professionnel;
       currentPage = Math.max(1, parseInt(saved.page, 10) || 1);
-      try { history.replaceState(null, '', currentPage > 1 ? '?page=' + currentPage : window.location.pathname); } catch (err) {}
+      try { history.replaceState(null, '', urlFor(currentPage)); } catch (err) {}
       scrollToRestore = Number(saved.y) || 0;
       if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     } catch (err) {}
@@ -1205,6 +1219,8 @@
     window.addEventListener('resize', () => { cityOffset = null; update(); });
     update();
   })();
+
+  if (onlyRecent) document.getElementById('recentNote').style.display = 'block';
 
   // À l'ouverture de la page, aucune ville n'est choisie : on voit toutes les annonces
   syncCityUi();
@@ -1287,8 +1303,6 @@
 </script>
 </body>
 </html>
-
-
 
 
 

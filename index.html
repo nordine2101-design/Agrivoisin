@@ -650,7 +650,7 @@
     var row = document.getElementById('mobRecent');
     if (!row) return;
     if (!items || !items.length) {
-      row.innerHTML = '<a class="mob-empty" href="publier-annonce.html">Pas encore d’annonce près de chez vous. <b>Soyez le premier à publier ›</b></a>';
+      row.innerHTML = '<span class="mob-empty">Pas de nouvelle annonce aujourd’hui. Revenez bientôt !</span>';
       return;
     }
     row.innerHTML = items.slice(0, 3).map(function (it) {
@@ -679,7 +679,7 @@
           return it && it.id && !(it.quantity_available != null && Number(it.quantity_available) <= 0);
         });
         items.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
-        fillBanner(items);
+        fillBanner(items.filter(function (it) { return Date.now() - new Date(it.created_at || 0).getTime() < 24 * 3600 * 1000; }));
         items = items.slice(0, 4);
         if (!items.length) {
           grid.style.display = 'none';
@@ -813,6 +813,9 @@
 <!-- Accueil téléphone : bandeau « Fraîchement publié » avec les vraies annonces -->
 </body>
 </html>
+
+
+
 
 
 

@@ -3,66 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ma vitrine — Agrivoisin</title>
-<meta name="description" content="Présentez votre boutique aux acheteurs d'Agrivoisin : nom, présentation, logo et photo de couverture.">
+<title>Mes ventes — Agrivoisin</title>
+<meta name="description" content="Retrouvez les commandes passées chez vous sur Agrivoisin.">
 <link rel="stylesheet" href="style.css">
 <script src="supabase.js"></script>
 </head>
 <body>
 
-<!-- ============ MA VITRINE ============ -->
-<section class="page-header my-page shop-edit-page">
+<!-- ============ MES VENTES ============ -->
+<section class="page-header my-page">
   <div class="my-panel">
     <div class="my-topbar">
       <a href="mes-annonces.html" class="btn btn-ghost btn-back">Retour</a>
-      <h1>Ma vitrine</h1>
+      <h1>Mes ventes</h1>
     </div>
+    <p id="pageSubtitle">Retrouvez ici les commandes passées chez vous.</p>
 
-    <p class="auth-subtitle" id="pageSubtitle">C'est la page de présentation de votre boutique, que les acheteurs voient en cliquant sur votre nom.</p>
+    <p id="loadingMessage" style="margin-top:16px;color:#C8352F;">Chargement de vos ventes...</p>
+    <p id="notLoggedMessage" style="display:none;margin-top:16px;color:#C8352F;">Vous devez être connecté pour voir vos ventes. <a href="connexion.html?retour=mes-ventes.html" style="color:var(--leaf-deep);font-weight:700;">Se connecter</a></p>
+    <p id="errorMessage" style="display:none;margin-top:16px;color:#C8352F;"></p>
+    <div id="taxContainer" style="text-align:left;"></div>
+    <p id="noSalesMessage" style="display:none;margin-top:16px;">Vous n'avez pas encore de vente. Elles apparaîtront ici dès qu'un acheteur aura passé commande.</p>
 
-    <p id="loadingMessage" style="text-align:center;color:#6B5842;">Chargement de votre vitrine...</p>
-    <p id="notLoggedMessage" style="display:none;text-align:center;">Vous devez être connecté pour modifier votre vitrine. <a href="connexion.html?retour=ma-vitrine.html" style="font-weight:700;">Se connecter</a></p>
-    <div id="notSellerSection" style="display:none;text-align:center;">
+    <div id="notSellerSection" style="display:none;margin-top:16px;">
       <p style="margin-bottom:14px;">Vous n'avez pas encore de compte vendeur.</p>
       <a href="vendre.html" class="btn btn-primary">Devenir vendeur</a>
     </div>
-    <p id="notProMessage" style="display:none;text-align:center;">La vitrine est réservée aux vendeurs professionnels.</p>
-    <p id="loadError" style="display:none;text-align:center;color:#C8352F;"></p>
 
-    <div class="my-form-box">
-    <form class="auth-form" id="shopForm" style="display:none;" novalidate>
-      <label for="shopName">Nom de la boutique</label>
-      <input type="text" id="shopName" maxlength="60" placeholder="Ex : Les Confitures de Marie" autocomplete="off">
-
-      <label for="shopDescription">Présentation</label>
-      <textarea id="shopDescription" rows="5" maxlength="600" placeholder="Parlez de votre exploitation, de vos produits, de votre façon de travailler…"></textarea>
-      <p class="shop-hint" id="descCounter">0 / 600 caractères</p>
-
-      <label for="shopLogoFile">Logo (image carrée)</label>
-      <input type="file" id="shopLogoFile" accept="image/jpeg,image/png,image/webp">
-      <div class="shop-img-row" id="logoRow" style="display:none;">
-        <img id="logoPreview" class="shop-logo-preview" alt="Aperçu du logo">
-        <button type="button" class="shop-img-remove" id="logoRemove">Retirer le logo</button>
-      </div>
-
-      <label for="shopCoverFile">Photo de couverture (image large)</label>
-      <input type="file" id="shopCoverFile" accept="image/jpeg,image/png,image/webp">
-      <div class="shop-img-row" id="coverRow" style="display:none;">
-        <img id="coverPreview" class="shop-cover-preview" alt="Aperçu de la couverture">
-        <button type="button" class="shop-img-remove" id="coverRemove">Retirer la couverture</button>
-      </div>
-      <p class="shop-hint">Images JPG, PNG ou WebP, 5 Mo au maximum.</p>
-
-      <p id="formError" class="shop-error" style="display:none;"></p>
-      <p id="formSuccess" class="shop-success" style="display:none;"></p>
-
-      <button type="submit" class="btn btn-primary" id="saveBtn">Enregistrer ma vitrine</button>
-      <p class="shop-view" id="viewWrap" style="display:none;"><a id="viewLink" href="#">Voir ma vitrine</a></p>
-      <p class="shop-hint" id="viewHint" style="display:none;text-align:center;">Publiez une annonce pour pouvoir voir votre vitrine : elle s'ouvre depuis une annonce.</p>
-    </form>
-    </div>
+    <div id="salesContainer" style="text-align:left;margin-top:16px;"></div>
   </div>
-
   <div class="my-video"></div>
 </section>
 
@@ -117,273 +86,825 @@
     'sb_publishable_sId6ddmX1-3OJOBnVuTLNQ_gAVNQ0Yo'
   );
 
-  const BUCKET = 'shop-images';
-  const MAX_BYTES = 5 * 1024 * 1024;
-  const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  const pageSubtitle = document.getElementById('pageSubtitle');
+  const loadingMessage = document.getElementById('loadingMessage');
+  const notLoggedMessage = document.getElementById('notLoggedMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const noSalesMessage = document.getElementById('noSalesMessage');
+  const notSellerSection = document.getElementById('notSellerSection');
+  const salesContainer = document.getElementById('salesContainer');
+  const taxContainer = document.getElementById('taxContainer');
 
-  const el = (id) => document.getElementById(id);
-  const form = el('shopForm');
-  const nameInput = el('shopName');
-  const descInput = el('shopDescription');
-  const descCounter = el('descCounter');
-  const formError = el('formError');
-  const formSuccess = el('formSuccess');
-  const saveBtn = el('saveBtn');
-
-  // Pour chaque image : l'adresse déjà enregistrée, le fichier choisi (pas encore envoyé), et ses éléments à l'écran
-  const images = {
-    logo: { url: '', file: null, preview: null, input: el('shopLogoFile'), img: el('logoPreview'), row: el('logoRow') },
-    cover: { url: '', file: null, preview: null, input: el('shopCoverFile'), img: el('coverPreview'), row: el('coverRow') },
-  };
-
-  function showError(text) {
-    formSuccess.style.display = 'none';
-    formError.textContent = text;
-    formError.style.display = 'block';
+  // Protège l'affichage : un titre d'annonce n'est jamais interprété comme du code
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
   }
 
-  function showSuccess(text) {
-    formError.style.display = 'none';
-    formSuccess.textContent = text;
-    formSuccess.style.display = 'block';
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString('fr-FR');
   }
 
-  function updateCounter() {
-    descCounter.textContent = descInput.value.length + ' / 600 caractères';
+  function formatAmount(value) {
+    return Number(value).toFixed(2).replace('.', ',') + ' €';
   }
 
-  // Affiche l'aperçu d'une image : celle qui vient d'être choisie, sinon celle déjà enregistrée
-  function refreshImage(kind) {
-    const item = images[kind];
-    const src = item.preview || item.url;
-    if (src) {
-      item.img.src = src;
-      item.row.style.display = 'flex';
-    } else {
-      item.img.removeAttribute('src');
-      item.row.style.display = 'none';
+  // ---------- Unités : une quantité s'écrit toujours avec son unité ----------
+
+  const INVARIABLE_UNITS = ['kg', 'g', 'mg', 'l', 'cl', 'ml', 'dl', 'm', 'cm', 'mm'];
+
+  // Met un mot au pluriel : « botte » -> « bottes », « bocal » -> « bocaux », « kg » reste « kg »
+  function pluralWord(word) {
+    if (INVARIABLE_UNITS.includes(word.toLowerCase())) return word;
+    if (/[sxz]$/i.test(word)) return word;
+    if (/al$/i.test(word)) return word.slice(0, -2) + 'aux';
+    return word + 's';
+  }
+
+  function unitLabel(unit, count) {
+    const u = String(unit == null ? '' : unit).trim() || 'unité';
+    if (count <= 1) return u;
+    // « botte de radis » -> « bottes de radis », « pot de 500g » -> « pots de 500g »
+    const withDe = u.match(/^([^\s\d]+)(\s+(?:de |du |des |d').*)$/i);
+    if (withDe) return pluralWord(withDe[1]) + withDe[2];
+    if (/[\s\d]/.test(u)) return u; // autre unité en plusieurs mots : on n'y touche pas
+    return pluralWord(u);
+  }
+
+  // Une commande expédiée : l'argent rejoint le compte de paiement 14 jours après l'envoi du colis
+  const SHIPPED_RELEASE_DAYS = 14;
+
+  // Les frais de service mensuel d'un vendeur actif (le serveur les prélève une seule fois par mois)
+  const MONTHLY_FEE_EUROS = 2;
+
+  // « 2 € » (entier) ou « 0,43 € » : pour les phrases courantes
+  function shortAmount(value) {
+    const n = Number(value);
+    return Number.isInteger(n) ? n + ' €' : formatAmount(n);
+  }
+
+  // ---------- Informations fiscales demandées au vendeur particulier (règle européenne DAC7) ----------
+
+  function renderTaxBox(taxInfo) {
+    const status = taxInfo && taxInfo.status;
+
+    if (status === 'received') {
+      taxContainer.innerHTML =
+        '<div class="tax-done"><b>Informations fiscales reçues le ' + escapeHtml(formatDate(taxInfo.date)) + '.</b><br>' +
+        'Merci, vous n\'avez rien d\'autre à faire. Pour les modifier, écrivez-nous depuis la <a href="contact.html">page Contact</a>.</div>';
+      return;
+    }
+
+    if (status !== 'needed') {
+      taxContainer.innerHTML = '';
+      return;
+    }
+
+    taxContainer.innerHTML =
+      '<form class="tax-box" id="taxForm" novalidate>' +
+      '<h2>Informations demandées pour les impôts</h2>' +
+      '<p>La loi oblige Agrivoisin à transmettre à l\'administration fiscale l\'identité des vendeurs et les sommes perçues. ' +
+      'Merci de renseigner ces informations pour continuer à vendre sans interruption. Elles ne sont jamais visibles par les acheteurs.</p>' +
+      '<label for="taxName">Nom et prénom</label>' +
+      '<input id="taxName" type="text" maxlength="120" autocomplete="name">' +
+      '<label for="taxBirthDate">Date de naissance</label>' +
+      '<input id="taxBirthDate" type="date" min="1900-01-01" max="' + new Date().toISOString().slice(0, 10) + '" autocomplete="bday">' +
+      '<label for="taxId">Numéro fiscal (13 chiffres)</label>' +
+      '<input id="taxId" type="text" inputmode="numeric" maxlength="20" autocomplete="off">' +
+      '<p class="hint">Vous ne l\'avez pas ? Indiquez à la place votre lieu de naissance.</p>' +
+      '<label for="taxBirthPlace">Lieu de naissance (si pas de numéro fiscal)</label>' +
+      '<input id="taxBirthPlace" type="text" maxlength="100" autocomplete="off">' +
+      '<p class="tax-error" style="display:none;"></p>' +
+      '<button type="submit" class="btn btn-primary">Envoyer mes informations</button>' +
+      '</form>';
+  }
+
+  taxContainer.addEventListener('submit', async (event) => {
+    if (event.target.id !== 'taxForm') return;
+    event.preventDefault();
+
+    const form = event.target;
+    const errorEl = form.querySelector('.tax-error');
+    const button = form.querySelector('button');
+    const showError = (text) => { errorEl.textContent = text; errorEl.style.display = 'block'; };
+    errorEl.style.display = 'none';
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      showError('Session expirée, reconnectez-vous.');
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Envoi...';
+
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({
+          action: 'save_tax_info',
+          legalName: form.querySelector('#taxName').value,
+          birthDate: form.querySelector('#taxBirthDate').value,
+          taxId: form.querySelector('#taxId').value,
+          birthPlace: form.querySelector('#taxBirthPlace').value,
+        }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
+      renderTaxBox(data.taxInfo);
+    } catch (err) {
+      showError(err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message);
+      button.disabled = false;
+      button.textContent = 'Envoyer mes informations';
+    }
+  });
+
+  // État de l'argent pour cette vente
+  function renderMoneyBox(payout, shipment) {
+    // Anciennes ventes (avant l'argent retenu) : rien à afficher
+    if (!payout) return '';
+
+    if (payout.status === 'verse') {
+      const when = payout.releasedAt ? ' le ' + formatDate(payout.releasedAt) : '';
+      return '<div class="money-box money-done">Argent versé' + escapeHtml(when) + '.</div>';
+    }
+    if (payout.status === 'rembourse') {
+      return '<div class="money-box money-refunded">Commande remboursée à l\'acheteur après un problème signalé : cette vente ne vous sera pas versée.</div>';
+    }
+    if (payout.status === 'probleme') {
+      return '<div class="money-box money-problem">Problème signalé par l\'acheteur : le versement est suspendu le temps qu\'Agrivoisin examine la situation.</div>';
+    }
+    if (payout.status === 'en_cours') {
+      return '<div class="money-box">Versement en cours de traitement...</div>';
+    }
+
+    // Commande à expédier, colis pas encore parti : pas de date tant que le colis n'est pas parti
+    if (shipment && !shipment.shippedAt) {
+      return '<div class="money-box">L\'argent est gardé par Agrivoisin. Une fois le colis parti, il rejoint votre compte de paiement ' + SHIPPED_RELEASE_DAYS + ' jours plus tard (ou dès que l\'acheteur confirme la réception), puis votre banque lors du virement mensuel (à partir du 05 de chaque mois).</div>';
+    }
+
+    // En attente : l'argent est gardé par Agrivoisin
+    const releaseDate = payout.autoReleaseAt ? new Date(payout.autoReleaseAt) : null;
+    const when = releaseDate && releaseDate.getTime() > Date.now()
+      ? 'le ' + formatDate(payout.autoReleaseAt)
+      : 'très prochainement';
+    return '<div class="money-box">L\'argent est gardé par Agrivoisin jusqu\'à ce que l\'acheteur confirme avoir reçu sa commande, ou automatiquement ' + escapeHtml(when) + '. Il rejoint alors votre compte de paiement, puis votre banque lors du virement mensuel (à partir du 05 de chaque mois).</div>';
+  }
+
+  // Le détail de l'argent d'une vente, avec les chiffres du vendeur lui-même :
+  // - versé : commission, frais de carte, frais de service du mois (s'il y en a eu) et « Vous recevez »
+  // - en attente : commission, vrais frais de carte, montant exact de la vente (et les 2 € du mois à part)
+  // Pour un retrait (un créneau), on passe ce retrait en second paramètre
+  function renderMoneyDetail(sale, slot, hideFeeNote) {
+    const payout = slot || sale.payout;
+    const m = payout && payout.money;
+    if (!m) return '';
+
+    // Le pourcentage se calcule sur les articles (les frais d'expédition n'ont pas de commission en pourcentage)
+    // Pour un retrait : la vente du créneau = commission + ce qui reste après commission
+    const total = slot
+      ? (m.afterCommission != null ? Number(m.commission) + Number(m.afterCommission) : 0)
+      : (Number(sale.goodsAmount != null ? sale.goodsAmount : sale.totalAmount) || 0);
+    const shipment = slot ? null : sale.shipment;
+    const flatFee = Number(m.flatFee) > 0 ? Number(m.flatFee) : 0;
+    const percent = total > 0 ? Math.round((Number(m.commission) / total) * 100) : null;
+    const commissionLabel = 'Commission Agrivoisin' + (percent != null ? ' (' + percent + ' %)' : '');
+    const line = (label, value, className) =>
+      '<div class="money-line' + (className ? ' ' + className : '') + '"><span>' + escapeHtml(label) +
+      '</span><span class="money-amount">' + escapeHtml(value) + '</span></div>';
+
+    if (payout.status === 'verse') {
+      // Ancienne vente sans montant reçu enregistré : rien d'inventé
+      if (m.received == null) return '';
+      let html = line(commissionLabel, '− ' + formatAmount(m.commission));
+      if (flatFee > 0) html += line('Forfait expédition', '− ' + formatAmount(flatFee));
+      html += line('Frais de carte', '− ' + formatAmount(m.cardFee));
+      if (Number(m.monthlyFee) > 0) {
+        html += line('Frais de service du mois', '− ' + formatAmount(m.monthlyFee));
+      }
+      if (Number(m.refundFees) > 0) {
+        html += line('Frais de carte d\'un retrait annulé', '− ' + formatAmount(m.refundFees));
+      }
+      html += line('Vous recevez', formatAmount(m.received), 'money-total');
+      return '<div class="money-detail">' + html + '</div>';
+    }
+
+    if (m.afterCommission != null) {
+      // Les chiffres EXACTS : les vrais frais de carte relevés chez Stripe dès le paiement.
+      // S'ils ne sont pas connus (ventes d'avant ce changement), on n'affiche rien à leur place.
+      const cardFeeKnown = m.cardFee != null && m.saleAmount != null;
+      let html = '';
+      if (shipment) {
+        html += line('Produits', formatAmount(sale.goodsAmount));
+        html += line('Frais d\'expédition', formatAmount(shipment.shippingAmount));
+      }
+      html += line(commissionLabel, '− ' + formatAmount(m.commission));
+      if (flatFee > 0) html += line('Forfait expédition', '− ' + formatAmount(flatFee));
+      let notes = '';
+
+      if (cardFeeKnown) {
+        html += line('Frais de carte', '− ' + formatAmount(m.cardFee));
+        html += line('Montant de cette vente', formatAmount(m.saleAmount), 'money-total');
+      } else {
+        html += line('Après commission', formatAmount(m.afterCommission), 'money-total');
+        notes += '<p class="money-note">Les frais de carte de Stripe seront retirés au versement.</p>';
+      }
+
+      // Les frais de service du mois, en ligne séparée : retirés une seule fois, du premier versement du mois
+      if (!hideFeeNote && m.monthlyFeeDue != null && Number(m.monthlyFeeDue) > 0) {
+        const due = Number(m.monthlyFeeDue);
+        const text = due >= MONTHLY_FEE_EUROS
+          ? shortAmount(due) + ' de frais de service du mois sont retirés une seule fois, du premier versement du mois.'
+          : 'Il reste ' + shortAmount(due) + ' de frais de service du mois à retirer, une seule fois, du prochain versement du mois.';
+        notes += '<p class="money-note">' + escapeHtml(text) + '</p>';
+      }
+
+      return '<div class="money-detail">' + html + notes + '</div>';
+    }
+    return '';
+  }
+
+  // 0612345678 -> 06 12 34 56 78
+  function formatPhone(phone) {
+    const digits = String(phone == null ? '' : phone).replace(/\D/g, '');
+    return /^0\d{9}$/.test(digits) ? digits.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : String(phone == null ? '' : phone);
+  }
+
+  function badge(text, className) {
+    return ' <span class="ship-badge ' + className + '">' + escapeHtml(text) + '</span>';
+  }
+
+  // L'adresse de livraison de l'acheteur (seulement tant que le colis n'est pas parti) et le bouton « colis parti »
+  function renderShipActions(sale) {
+    const sh = sale.shipment;
+    const payout = sale.payout;
+    if (!sh || sh.shippedAt || !payout || payout.status !== 'en_attente') return '';
+    let html = '';
+    const a = sh.address;
+    if (a) {
+      html += '<div class="ship-addr"><div class="t">Adresse de livraison de l\'acheteur</div><strong>' + escapeHtml(a.name) + '</strong><br>' +
+        escapeHtml(a.address) + '<br>' +
+        (a.address2 ? escapeHtml(a.address2) + '<br>' : '') +
+        escapeHtml(a.postalCode + ' ' + a.city + ', ' + a.country) + '<br>' +
+        'Téléphone : ' + escapeHtml(formatPhone(a.phone)) + '</div>';
+    }
+    html += '<div class="ship-action" data-order="' + escapeHtml(sale.orderId) + '">' +
+      '<label>Numéro de suivi du colis</label>' +
+      '<input type="text" class="ship-tracking" maxlength="30" placeholder="Par exemple : 6A12345678901" autocomplete="off">' +
+      '<button type="button" class="btn btn-primary ship-btn">J\'ai expédié le colis</button>' +
+      '<p>Cliquez seulement quand le colis est remis au transporteur. Le numéro de suivi est obligatoire.</p>' +
+      '<p class="ship-error" style="display:none;"></p></div>';
+    return html;
+  }
+
+  // « Samedi 7 novembre, de 18 h à 20 h » (à l'heure de Paris)
+  function formatSlotRange(startIso, endIso) {
+    const hour = (iso) => {
+      const parts = {};
+      new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+      return parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
+    };
+    const day = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(startIso));
+    return day.charAt(0).toUpperCase() + day.slice(1) + ', de ' + hour(startIso) + ' à ' + hour(endIso);
+  }
+
+  // « dimanche 8 novembre à 19 h 12 » (à l'heure de Paris)
+  function formatMoment(iso) {
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    const day = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(iso));
+    return day + ' à ' + parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
+  }
+
+  // « 18 h » ou « 18 h 30 » (à l'heure de Paris)
+  function formatHourOnly(iso) {
+    const parts = {};
+    new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(iso)).forEach((p) => { parts[p.type] = p.value; });
+    return parseInt(parts.hour, 10) + ' h' + (parts.minute === '00' ? '' : ' ' + parts.minute);
+  }
+
+  // ---------- Autre créneau demandé par l'acheteur ----------
+
+  // Les créneaux que le vendeur peut proposer, par pas de 30 min : au moins 1 h après maintenant, jamais après la limite
+  // (fin du premier créneau + 24 h). Chaque choix garde le vrai moment : aucun calcul d'heure d'été à faire.
+  const reschChoices = {};
+
+  function parisDayKey(iso) {
+    return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(iso));
+  }
+
+  function buildReschChoices(deadlineIso) {
+    const STEP = 30 * 60 * 1000;
+    const limit = new Date(deadlineIso).getTime();
+    const first = Math.ceil((Date.now() + 60 * 60 * 1000 + 2 * 60 * 1000) / STEP) * STEP;
+    const list = [];
+    for (let t = first; t <= limit; t += STEP) list.push(new Date(t).toISOString());
+    if (list.length === 0 || new Date(list[list.length - 1]).getTime() < limit) {
+      if (limit >= first) list.push(new Date(limit).toISOString());
+    }
+    return list;
+  }
+
+  function reschOptionsHtml(items, selected) {
+    return items.map((it) => '<option value="' + escapeHtml(it.iso) + '"' + (it.iso === selected ? ' selected' : '') + '>' + escapeHtml(it.label) + '</option>').join('');
+  }
+
+  // Remplit les heures de début (du jour choisi) et de fin (au moins 1 h après le début) à partir de la liste du créneau
+  function fillReschSelects(box) {
+    const list = reschChoices[box.getAttribute('data-resch')] || [];
+    const daySel = box.querySelector('.resch-day');
+    const fromSel = box.querySelector('.resch-from');
+    const toSel = box.querySelector('.resch-to');
+    const day = daySel.value;
+    const limit = list.length ? list[list.length - 1] : null;
+    const starts = list.filter((iso) => parisDayKey(iso) === day && limit && new Date(iso).getTime() + 60 * 60 * 1000 <= new Date(limit).getTime());
+    const keepFrom = starts.includes(fromSel.value) ? fromSel.value : (starts[0] || '');
+    fromSel.innerHTML = reschOptionsHtml(starts.map((iso) => ({ iso, label: formatHourOnly(iso) })), keepFrom);
+    const fromMs = keepFrom ? new Date(keepFrom).getTime() : 0;
+    const ends = list.filter((iso) => new Date(iso).getTime() >= fromMs + 60 * 60 * 1000);
+    const keepTo = ends.includes(toSel.value) ? toSel.value : (ends[0] || '');
+    toSel.innerHTML = reschOptionsHtml(ends.map((iso) => ({ iso, label: parisDayKey(iso) === day ? formatHourOnly(iso) : formatMoment(iso) })), keepTo);
+  }
+
+  function reschFormHtml(slot) {
+    const list = buildReschChoices(slot.rescheduleDeadlineAt);
+    const limitText = escapeHtml(formatMoment(slot.rescheduleDeadlineAt));
+    const starts = list.filter((iso) => new Date(iso).getTime() + 60 * 60 * 1000 <= new Date(slot.rescheduleDeadlineAt).getTime());
+    if (starts.length === 0) {
+      return '<div class="pickup-wait">Il n\'est plus possible de proposer un créneau : l\'acheteur va être remboursé.</div>';
+    }
+    reschChoices[slot.payoutId] = list;
+    const days = [];
+    starts.forEach((iso) => { const d = parisDayKey(iso); if (!days.includes(d)) days.push(d); });
+    return '<div class="pickup-action resch-box" data-resch="' + escapeHtml(slot.payoutId) + '">' +
+      '<p class="pickup-alert">L\'acheteur dit que vous n\'étiez pas là. Proposez-lui un autre créneau avant ' + limitText + ', sinon il sera remboursé.</p>' +
+      '<div class="resch-row">' +
+      '<div><label>Jour</label><select class="resch-day">' + days.map((d) => '<option value="' + escapeHtml(d) + '">' + escapeHtml(d.charAt(0).toUpperCase() + d.slice(1)) + '</option>').join('') + '</select></div>' +
+      '<div><label>De</label><select class="resch-from"></select></div>' +
+      '<div><label>À</label><select class="resch-to"></select></div></div>' +
+      '<button type="button" class="btn btn-primary resch-btn">Envoyer la proposition</button>' +
+      '<p class="pickup-hint">Le créneau doit finir au plus tard ' + limitText + ', durer au moins 1 h et commencer dans au moins 1 h.</p>' +
+      '<p class="pickup-error" style="display:none;"></p></div>';
+  }
+
+  // Un bloc par retrait : les produits du créneau, puis la saisie du code donné par l'acheteur
+  function renderSlots(sale) {
+    const slots = Array.isArray(sale.slots) ? sale.slots : [];
+    if (slots.length === 0) return '';
+    // La phrase sur les 2 € du mois n'apparaît qu'une seule fois par vente (sous le premier retrait concerné)
+    let feeNoteShown = false;
+    return slots.map((slot, index) => {
+      const title = (slots.length > 1 ? 'Retrait ' + (index + 1) + ' · ' : 'Retrait · ') + formatSlotRange(slot.startAt, slot.endAt);
+      const products = (slot.items || []).map((it) => {
+        const qty = Number(it.quantity) || 1;
+        return escapeHtml(it.title) + ' : ' + escapeHtml(qty + ' ' + unitLabel(it.unit, qty));
+      }).join(' · ');
+
+      let body = '';
+      if (slot.buyerCancelled) {
+        // Retrait annulé par l'acheteur : la moitié de la partie annulée reste au vendeur (rien pour un produit non périssable de professionnel)
+        body = Number(slot.cancelKeptAmount) > 0
+          ? '<div class="cancel-seller-box"><strong>Commande annulée par l\'acheteur.</strong> Vous recevez <strong>' + escapeHtml(formatAmount(slot.cancelKeptAmount)) + '</strong> (la moitié de la partie annulée), avant la commission et les frais de carte. Il n\'y a plus rien à préparer.</div>'
+          : '<div class="cancel-seller-box"><strong>Commande annulée par l\'acheteur</strong> (rétractation de 14 jours, produit non périssable). Aucun paiement pour ce retrait. Il n\'y a plus rien à préparer.</div>';
+      } else if (slot.status === 'verse') {
+        body = slot.pickedUpAt
+          ? '<div class="pickup-done">✓ Retirée. L\'argent a été libéré' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>'
+          : '<div class="pickup-done">Argent versé' + (slot.releasedAt ? ' le ' + escapeHtml(formatDate(slot.releasedAt)) : '') + '.</div>';
+      } else if (slot.status === 'rembourse') {
+        body = slot.cancelReason === 'vendeur_absent'
+          ? '<div class="money-box money-refunded">Annulée : absence de votre part. L\'acheteur a été remboursé. Vous pouvez contester via la page Contact.' + (slot.refundFee
+              ? '<div class="money-detail" style="color:#3b4a7a"><div class="money-line"><span>Frais de carte du remboursement</span><span class="money-amount">− ' + escapeHtml(formatAmount(slot.refundFee.amount)) + '</span></div>' +
+                '<p class="money-note" style="margin-top:4px">' + (slot.refundFee.collected ? 'Stripe ne rend pas ces frais. Ils ont été retirés d\'un de vos versements.' : 'Stripe ne rend pas ces frais. Ils seront retirés de votre prochain versement.') + '</p></div>'
+              : '') + '</div>'
+          : '<div class="money-box money-refunded">Commande remboursée à l\'acheteur après un problème signalé : cette vente ne vous sera pas versée.</div>';
+      } else if (slot.status === 'probleme') {
+        body = '<div class="money-box money-problem">Problème signalé par l\'acheteur : le versement est suspendu le temps qu\'Agrivoisin examine la situation.</div>';
+      } else if (slot.status === 'en_cours') {
+        body = '<div class="money-box">Versement en cours de traitement...</div>';
+      } else if (slot.pickedUpAt) {
+        const release = slot.autoReleaseAt ? new Date(slot.autoReleaseAt) : null;
+        body = '<div class="pickup-done">✓ Retirée. L\'argent sera libéré ' +
+          (release && release.getTime() > Date.now() ? 'le ' + escapeHtml(formatMoment(slot.autoReleaseAt)) : 'très prochainement') +
+          '.</div>';
+      } else if (slot.rescheduleStatus === 'proposee') {
+        body = '<div class="pickup-wait">Vous avez proposé un autre créneau : ' + escapeHtml(formatSlotRange(slot.rescheduleProposedStartAt, slot.rescheduleProposedEndAt)) + '. En attente de la réponse de l\'acheteur.</div>';
+      } else if (slot.rescheduleStatus === 'demandee') {
+        body = new Date(slot.rescheduleDeadlineAt).getTime() > Date.now()
+          ? reschFormHtml(slot)
+          : '<div class="pickup-wait">Le délai est dépassé : l\'acheteur va être remboursé.</div>';
+      } else if (!slot.started) {
+        body = '<div class="pickup-wait">Le code se tape ici à partir de ' + escapeHtml(formatHourOnly(slot.startAt)) +
+          ', quand l\'acheteur vient chercher sa commande.</div>';
+      } else if (slot.locked) {
+        body = '<p class="pickup-error">Ce retrait est bloqué après 5 codes incorrects. Écrivez-nous depuis la <a href="contact.html">page Contact</a>.</p>';
+      } else {
+        const ended = new Date(slot.endAt).getTime() < Date.now();
+        body = '<div class="pickup-action" data-payout="' + escapeHtml(slot.payoutId) + '">' +
+          '<p class="pickup-alert">Demandez le code à l\'acheteur et tapez-le ici pour que l\'argent soit libéré rapidement.</p>' +
+          '<div class="pickup-row"><input type="text" class="pickup-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="Code de retrait à 4 chiffres">' +
+          '<button type="button" class="btn btn-primary pickup-btn">Valider</button></div>' +
+          '<p class="pickup-hint">Les 4 chiffres sont affichés sur sa page « Mes commandes ». Remettez-lui sa commande.' +
+          (slot.attemptsLeft < 5 ? ' Il vous reste ' + slot.attemptsLeft + (slot.attemptsLeft > 1 ? ' essais.' : ' essai.') : '') + '</p>' +
+          (ended && slot.autoReleaseAt ? '<p class="pickup-hint">Le créneau est terminé. Sans code, l\'argent vous est libéré le ' + escapeHtml(formatMoment(slot.autoReleaseAt)) + '.</p>' : '') +
+          '<p class="pickup-error" style="display:none;"></p></div>';
+      }
+
+      const nowClass = slot.status === 'en_attente' && !slot.pickedUpAt && slot.started && !slot.locked && slot.rescheduleStatus !== 'proposee' ? ' pickup-now' : '';
+      const detail = (slot.status === 'en_attente' || slot.status === 'verse') ? renderMoneyDetail(sale, slot, feeNoteShown) : '';
+      if (slot.status === 'en_attente' && slot.money && Number(slot.money.monthlyFeeDue) > 0) feeNoteShown = true;
+      return '<div class="pickup-slot' + nowClass + '">' +
+        '<div class="pickup-when">' + escapeHtml(title) + '</div>' +
+        '<div class="pickup-prod">' + products + '</div>' +
+        body + detail + '</div>';
+    }).join('');
+  }
+
+  function renderSale(sale) {
+    const sh = sale.shipment;
+    let itemsHtml = '';
+    const shippedParts = [];
+    const parcelList = [];
+    (sale.items || []).forEach((item) => {
+      const qty = Number(item.quantity) || 1;
+      const unit = String(item.unit == null ? '' : item.unit).trim() || 'unité';
+      const calc = qty + ' × 1 ' + unit + ' = ' + qty + ' ' + unitLabel(unit, qty) +
+        (item.amount != null ? ', soit ' + formatAmount(item.amount) : '');
+      itemsHtml += '<div class="sale-item"><strong>' + escapeHtml(item.title) + '</strong> : ' + escapeHtml(calc) + '</div>';
+      if (item.shipped) {
+        shippedParts.push(qty + ' ' + unitLabel(unit, qty));
+        // Un colis par entrée : la découpe calculée par le serveur, ou une seule quantité
+        const split = Array.isArray(item.parcels) && item.parcels.length > 1 ? item.parcels : [qty];
+        split.forEach((n) => parcelList.push(Number(n) + ' ' + unitLabel(unit, Number(n))));
+      }
+    });
+    if (sh) {
+      const detail = parcelList.length > 1
+        ? ' en ' + parcelList.length + ' colis (' + escapeHtml(parcelList.map((t, i) => 'Colis ' + (i + 1) + ' : ' + t).join(' · ')) + ')'
+        : (shippedParts.length ? ' (' + escapeHtml(shippedParts.join(' + ')) + ')' : '');
+      itemsHtml += '<div class="sale-item">Expédition' + detail +
+        ' : ' + escapeHtml(formatAmount(sh.shippingAmount)) + '</div>';
+    }
+
+    // L'étiquette à côté de la date : ce qu'il y a à faire, ou comment la commande est remise
+    let tag = badge('Retrait', 'ship-pick');
+    if (sh) {
+      if (sh.shippedAt) tag = badge('Colis parti', 'ship-sent');
+      else if (sale.payout && sale.payout.status === 'en_attente') tag = badge('À expédier', 'ship-todo');
+      else tag = '';
+    }
+
+    // Colis parti, argent encore retenu : la date d'envoi, le suivi et le jour où l'argent rejoint le compte de paiement
+    let shippedHtml = '';
+    let moneyBox = renderMoneyBox(sale.payout, sh);
+    if (sh && sh.shippedAt && sale.payout && sale.payout.status === 'en_attente') {
+      const when = sale.payout.autoReleaseAt ? new Date(sale.payout.autoReleaseAt) : null;
+      shippedHtml = '<div class="ship-done">Colis expédié le ' + escapeHtml(formatDate(sh.shippedAt)) + '.' +
+        (sh.trackingNumber ? ' Suivi : ' + escapeHtml(sh.trackingNumber) : '') + '<br>' +
+        'L\'argent rejoint votre compte de paiement ' +
+        (when && when.getTime() > Date.now() ? 'le ' + escapeHtml(formatDate(sale.payout.autoReleaseAt)) : 'très prochainement') +
+        ' (ou dès que l\'acheteur confirme la réception), puis votre banque lors du virement mensuel à partir du 05.</div>';
+      moneyBox = '';
+    } else if (sh && sh.shippedAt && sh.trackingNumber) {
+      shippedHtml = '<div class="ship-done">Colis expédié le ' + escapeHtml(formatDate(sh.shippedAt)) + '. Suivi : ' + escapeHtml(sh.trackingNumber) + '</div>';
+    }
+
+    return (
+      '<div class="sale-card">' +
+      '<div class="sale-head"><span class="sale-date">Vente du ' + escapeHtml(formatDate(sale.createdAt)) + tag + '</span>' +
+      '<span class="sale-total">' + escapeHtml(formatAmount(sale.totalAmount)) + '</span></div>' +
+      itemsHtml +
+      renderShipActions(sale) +
+      renderSlots(sale) +
+      shippedHtml +
+      moneyBox +
+      renderMoneyDetail(sale, null, (sale.slots || []).some((sl) => sl.status === 'en_attente' && sl.money && Number(sl.money.monthlyFeeDue) > 0)) +
+      '</div>'
+    );
+  }
+
+  // Le vendeur déclare « colis parti » : un seul clic compte, puis la liste est relue
+  salesContainer.addEventListener('click', async (event) => {
+    const button = event.target.closest('.ship-btn');
+    if (!button) return;
+    const box = button.closest('.ship-action');
+    const errorEl = box.querySelector('.ship-error');
+    errorEl.style.display = 'none';
+
+    // Le numéro de suivi est obligatoire : 8 à 20 lettres ou chiffres (espaces et tirets ignorés)
+    const trackingInput = box.querySelector('.ship-tracking');
+    trackingInput.style.borderColor = '';
+    const trackingClean = trackingInput.value.replace(/[\s-]+/g, '');
+    if (!trackingClean) {
+      trackingInput.style.borderColor = '#C8352F';
+      errorEl.textContent = 'Indiquez le numéro de suivi du colis pour continuer.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    if (!/^[A-Za-z0-9]{8,20}$/.test(trackingClean)) {
+      trackingInput.style.borderColor = '#C8352F';
+      errorEl.textContent = 'Le numéro de suivi doit faire entre 8 et 20 caractères, avec seulement des lettres et des chiffres.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    const sure = window.agrivoisinConfirm
+      ? await window.agrivoisinConfirm({
+        title: 'Colis bien remis ?',
+        message: "Cliquez seulement si le transporteur a bien pris le colis. L'acheteur verra que son colis est parti, avec le numéro de suivi.",
+        confirmText: 'Oui, il est parti', cancelText: 'Non, revenir',
+      })
+      : window.confirm('Confirmez-vous que le colis est bien remis au transporteur ?');
+    if (!sure) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      errorEl.textContent = 'Session expirée, reconnectez-vous.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Envoi...';
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({
+          action: 'mark_shipped',
+          orderId: box.getAttribute('data-order'),
+          trackingNumber: box.querySelector('.ship-tracking').value,
+        }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
+      await init();
+    } catch (err) {
+      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.style.display = 'block';
+      button.disabled = false;
+      button.textContent = 'J\'ai expédié le colis';
+    }
+  });
+
+  // Le vendeur tape le code de retrait : le serveur compte les essais et libère l'argent 24 h après le bon code
+  async function submitPickup(button) {
+    const box = button.closest('.pickup-action');
+    const errorEl = box.querySelector('.pickup-error');
+    const input = box.querySelector('.pickup-code');
+    errorEl.style.display = 'none';
+
+    const code = input.value.replace(/\D/g, '');
+    if (code.length !== 4) {
+      errorEl.textContent = 'Tapez les 4 chiffres du code.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      errorEl.textContent = 'Session expirée, reconnectez-vous.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Vérification...';
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({ action: 'confirm_pickup', payoutId: box.getAttribute('data-payout'), code }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) {
+        // Retrait bloqué ou déjà validé : la liste est relue pour afficher le bon état
+        if (data.locked || response.status === 409) {
+          errorEl.textContent = data.error || 'Une erreur est survenue. Réessayez.';
+          errorEl.style.display = 'block';
+          await init();
+          return;
+        }
+        throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
+      }
+      await init();
+    } catch (err) {
+      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.style.display = 'block';
+      button.disabled = false;
+      button.textContent = 'Valider';
+      input.value = '';
+      input.focus();
     }
   }
 
-  function setupImage(kind) {
-    const item = images[kind];
-    item.input.addEventListener('change', function () {
-      const file = item.input.files[0];
-      if (item.preview) {
-        URL.revokeObjectURL(item.preview);
-        item.preview = null;
-      }
-      item.file = null;
-      if (file) {
-        if (!EXTENSIONS[file.type]) {
-          item.input.value = '';
-          showError('Choisissez une image au format JPG, PNG ou WebP.');
-          refreshImage(kind);
+  // Le vendeur envoie son nouveau créneau : le serveur vérifie les limites (24 h, 1 h minimum, 1 h d'avance)
+  async function submitReschedule(button) {
+    const box = button.closest('.resch-box');
+    const errorEl = box.querySelector('.pickup-error');
+    errorEl.style.display = 'none';
+    const startAt = box.querySelector('.resch-from').value;
+    const endAt = box.querySelector('.resch-to').value;
+    if (!startAt || !endAt) {
+      errorEl.textContent = 'Choisissez un jour, une heure de début et une heure de fin.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      errorEl.textContent = 'Session expirée, reconnectez-vous.';
+      errorEl.style.display = 'block';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Envoi...';
+    try {
+      const response = await fetch('/api/get-my-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: JSON.stringify({ action: 'propose_reschedule', payoutId: box.getAttribute('data-resch'), startAt, endAt }),
+      });
+      let data = {};
+      try { data = await response.json(); } catch (e) { data = {}; }
+      if (!response.ok) {
+        if (response.status === 409) {
+          errorEl.textContent = data.error || 'Une erreur est survenue. Réessayez.';
+          errorEl.style.display = 'block';
+          await init();
           return;
         }
-        if (file.size > MAX_BYTES) {
-          item.input.value = '';
-          showError('Cette image est trop lourde (5 Mo au maximum).');
-          refreshImage(kind);
-          return;
-        }
-        formError.style.display = 'none';
-        item.file = file;
-        item.preview = URL.createObjectURL(file);
+        throw new Error(data.error || 'Une erreur est survenue. Réessayez.');
       }
-      refreshImage(kind);
-    });
-
-    // « Retirer » : annule le fichier choisi et enlève l'image enregistrée
-    el(kind + 'Remove').addEventListener('click', function () {
-      if (item.preview) URL.revokeObjectURL(item.preview);
-      item.preview = null;
-      item.file = null;
-      item.url = '';
-      item.input.value = '';
-      refreshImage(kind);
-    });
-  }
-
-  setupImage('logo');
-  setupImage('cover');
-  descInput.addEventListener('input', updateCounter);
-
-  // Envoie une image dans le dossier de ce vendeur et renvoie son adresse publique
-  async function uploadImage(kind, userId) {
-    const item = images[kind];
-    const path = userId + '/' + kind + '-' + Date.now() + '.' + EXTENSIONS[item.file.type];
-    const { error } = await supabaseClient.storage.from(BUCKET).upload(path, item.file, { contentType: item.file.type });
-    if (error) throw new Error("Erreur lors de l'envoi de l'image : " + error.message);
-    const { data } = supabaseClient.storage.from(BUCKET).getPublicUrl(path);
-    return { url: data.publicUrl, path: path };
-  }
-
-  async function callShop(session, body) {
-    const response = await fetch('/api/create-connect-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-      body: JSON.stringify(body),
-    });
-    let data = {};
-    try { data = await response.json(); } catch (e) { data = {}; }
-    return { ok: response.ok, status: response.status, data: data };
-  }
-
-  function showViewLink(listingId) {
-    if (listingId) {
-      el('viewLink').href = 'vendeur.html?listing=' + encodeURIComponent(listingId);
-      el('viewWrap').style.display = 'block';
-      el('viewHint').style.display = 'none';
-    } else {
-      el('viewWrap').style.display = 'none';
-      el('viewHint').style.display = 'block';
+      await init();
+    } catch (err) {
+      errorEl.textContent = err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message;
+      errorEl.style.display = 'block';
+      button.disabled = false;
+      button.textContent = 'Envoyer la proposition';
     }
   }
+
+  salesContainer.addEventListener('click', (event) => {
+    const button = event.target.closest('.pickup-btn');
+    if (button) submitPickup(button);
+    const reschButton = event.target.closest('.resch-btn');
+    if (reschButton) submitReschedule(reschButton);
+  });
+
+  salesContainer.addEventListener('change', (event) => {
+    const cl = event.target.classList;
+    if (!cl) return;
+    const box = event.target.closest('.resch-box');
+    if (box && (cl.contains('resch-day') || cl.contains('resch-from'))) fillReschSelects(box);
+  });
+
+  salesContainer.addEventListener('input', (event) => {
+    if (event.target.classList && event.target.classList.contains('pickup-code')) {
+      event.target.value = event.target.value.replace(/\D/g, '').slice(0, 4);
+    }
+  });
+
+  salesContainer.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && event.target.classList && event.target.classList.contains('pickup-code')) {
+      event.preventDefault();
+      const button = event.target.closest('.pickup-action').querySelector('.pickup-btn');
+      if (button && !button.disabled) submitPickup(button);
+    }
+  });
 
   async function init() {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    el('loadingMessage').style.display = 'none';
 
     if (!session) {
-      el('pageSubtitle').style.display = 'none';
-      el('notLoggedMessage').style.display = 'block';
+      loadingMessage.style.display = 'none';
+      pageSubtitle.style.display = 'none';
+      notLoggedMessage.style.display = 'block';
       return;
     }
 
-    el('loadingMessage').style.display = 'block';
     try {
-      const result = await callShop(session, { action: 'get_shop' });
-      el('loadingMessage').style.display = 'none';
+      const response = await fetch('/api/get-my-sales', {
+        headers: { Authorization: 'Bearer ' + session.access_token },
+      });
+      const data = await response.json();
 
-      if (result.status === 403) {
-        el('pageSubtitle').style.display = 'none';
-        el('notProMessage').style.display = 'block';
-        return;
-      }
-      if (!result.ok) {
-        if (result.data.error && result.data.error.indexOf('vendeur') !== -1 && result.status === 400) {
-          el('pageSubtitle').style.display = 'none';
-          el('notSellerSection').style.display = 'block';
+      loadingMessage.style.display = 'none';
+
+      if (!response.ok) {
+        if (data.error && data.error.includes('vendeur')) {
+          pageSubtitle.style.display = 'none';
+          notSellerSection.style.display = 'block';
           return;
         }
-        throw new Error(result.data.error || 'Erreur');
+        throw new Error(data.error || 'Erreur');
       }
 
-      const shop = result.data.shop || {};
-      nameInput.value = shop.name || '';
-      descInput.value = shop.description || '';
-      images.logo.url = shop.logoUrl || '';
-      images.cover.url = shop.coverUrl || '';
-      refreshImage('logo');
-      refreshImage('cover');
-      updateCounter();
-      showViewLink(result.data.previewListingId);
-      form.style.display = 'flex';
+      renderTaxBox(data.taxInfo);
+
+      const sales = data.sales || [];
+
+      if (sales.length === 0) {
+        noSalesMessage.style.display = 'block';
+        return;
+      }
+
+      salesContainer.innerHTML =
+        '<p class="payout-note">Votre argent est viré à votre banque une fois par mois, à partir du 05.</p>' +
+        sales.map(renderSale).join('');
+      salesContainer.querySelectorAll('.resch-box').forEach(fillReschSelects);
+
     } catch (err) {
       console.error(err);
-      el('loadingMessage').style.display = 'none';
-      el('loadError').textContent = 'Impossible de charger votre vitrine pour le moment. Réessayez dans quelques instants.';
-      el('loadError').style.display = 'block';
+      loadingMessage.style.display = 'none';
+      errorMessage.textContent = 'Impossible de charger vos ventes pour le moment.';
+      errorMessage.style.display = 'block';
     }
   }
-
-  form.addEventListener('submit', async function (event) {
-    event.preventDefault();
-    formError.style.display = 'none';
-    formSuccess.style.display = 'none';
-
-    const name = nameInput.value.replace(/\s+/g, ' ').trim();
-    if (name.length < 2) {
-      showError('Indiquez le nom de votre boutique (2 caractères au moins).');
-      nameInput.focus();
-      return;
-    }
-
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Enregistrement...';
-    const uploaded = [];
-
-    try {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) throw new Error('Session expirée, reconnectez-vous.');
-
-      let logoUrl = images.logo.url;
-      let coverUrl = images.cover.url;
-      if (images.logo.file) {
-        const up = await uploadImage('logo', session.user.id);
-        uploaded.push(up.path);
-        logoUrl = up.url;
-      }
-      if (images.cover.file) {
-        const up = await uploadImage('cover', session.user.id);
-        uploaded.push(up.path);
-        coverUrl = up.url;
-      }
-
-      const result = await callShop(session, {
-        action: 'save_shop',
-        name: name,
-        description: descInput.value,
-        logoUrl: logoUrl,
-        coverUrl: coverUrl,
-      });
-      if (!result.ok) throw new Error(result.data.error || 'Une erreur est survenue. Réessayez.');
-
-      // C'est enregistré : les images choisies deviennent les images de la vitrine
-      const shop = result.data.shop || {};
-      ['logo', 'cover'].forEach(function (kind) {
-        const item = images[kind];
-        if (item.preview) URL.revokeObjectURL(item.preview);
-        item.preview = null;
-        item.file = null;
-        item.input.value = '';
-        item.url = kind === 'logo' ? (shop.logoUrl || '') : (shop.coverUrl || '');
-        refreshImage(kind);
-      });
-      nameInput.value = shop.name || name;
-      showSuccess('Votre vitrine est enregistrée.');
-    } catch (err) {
-      // Les images envoyées pour rien sont supprimées
-      if (uploaded.length) {
-        try { await supabaseClient.storage.from(BUCKET).remove(uploaded); } catch (e) {}
-      }
-      showError(err instanceof TypeError ? 'Connexion impossible, réessayez.' : err.message);
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Enregistrer ma vitrine';
-    }
-  });
 
   init();
 </script>
 
 <style>
-  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; }
-  .my-panel { background:#F7F2FC; border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
-  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#DCCBF3; color:#5B3A8E; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
+  .sale-card { background:#f9f7f2; border-radius:12px; padding:14px; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .sale-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px; }
+  .sale-date { font-family:var(--font-display); font-weight:700; font-size:0.95rem; color:var(--leaf-deep); }
+  .sale-total { font-weight:700; font-size:0.95rem; color:var(--leaf-deep); white-space:nowrap; }
+  .sale-item { font-size:0.9rem; line-height:1.6; }
+  .money-box { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px; margin-top:10px; font-size:0.85rem; line-height:1.5; }
+  .money-detail { margin-top:10px; font-size:0.85rem; color:#6B5842; }
+  .money-line { display:flex; justify-content:space-between; gap:12px; padding:2px 0; }
+  .money-amount { white-space:nowrap; }
+  .money-total { border-top:1px solid #e6e0d3; margin-top:4px; padding-top:6px; font-weight:700; color:var(--leaf-deep); }
+  #salesContainer p.money-note { margin:8px 0 0; font-size:0.8rem; color:#888; line-height:1.4; }
+  #salesContainer p.payout-note { font-size:0.85rem; color:#6B5842; margin:0 0 12px; }
+  .tax-box { text-align:left; border:1px solid #F0C48A; background:#FFF6E8; border-radius:12px; padding:14px; margin-bottom:16px; }
+  .tax-box h2 { font-size:1rem; margin:0 0 6px; color:#B26A0B; }
+  .tax-box p { font-size:0.85rem; line-height:1.5; margin:0 0 10px; color:#5b4a35; }
+  .tax-box label { display:block; font-size:0.78rem; font-weight:700; color:var(--leaf-deep); margin:8px 0 3px; }
+  .tax-box input { width:100%; box-sizing:border-box; padding:9px; border:1px solid #ddd; border-radius:8px; font-size:0.9rem; font-family:inherit; }
+  .tax-box p.hint { font-size:0.78rem; color:#888; margin:4px 0 0; }
+  .tax-box p.tax-error { color:#C8352F; font-weight:700; margin:10px 0 0; }
+  .tax-box .btn { margin-top:12px; width:100%; }
+  .tax-box .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .tax-done { text-align:left; border:1px solid #cfe3cf; background:#f6f9f5; border-radius:12px; padding:12px; margin-bottom:16px; font-size:0.85rem; color:#4C7A50; line-height:1.5; }
+  .tax-done a { color:var(--leaf-deep); font-weight:700; }
+  .ship-badge { display:inline-block; font-family:var(--font-body, inherit); font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  .ship-todo { background:#FFE9C7; color:#B45A00; }
+  .ship-sent { background:#DDEFDB; color:#3E6B42; }
+  .ship-pick { background:#EEE9DD; color:#6B5842; }
+  .ship-addr { background:#fff; border:2px solid #9FC49A; border-radius:10px; padding:10px 12px; margin-top:10px; font-size:0.88rem; line-height:1.55; }
+  .ship-addr .t { font-size:0.72rem; font-weight:700; color:var(--leaf-deep); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:2px; }
+  .ship-action { margin-top:10px; background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:12px; }
+  .ship-action label { display:block; font-size:0.78rem; font-weight:700; color:var(--leaf-deep); margin:0 0 4px; }
+  .ship-action input { width:100%; box-sizing:border-box; padding:9px; border:1px solid #ddd; border-radius:8px; font:inherit; font-size:0.9rem; margin-bottom:10px; }
+  .ship-action .btn { width:100%; }
+  .ship-action .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .ship-action p { font-size:0.8rem; color:#6B5842; margin:8px 0 0; line-height:1.45; }
+  .ship-action p.ship-error { color:#C8352F; font-weight:700; }
+  .ship-done { margin-top:10px; background:#f6f9f5; border:1px solid #cfe3cf; border-radius:10px; padding:10px; font-size:0.85rem; line-height:1.5; color:#4C7A50; }
+  .pickup-slot { background:#fff; border:1px solid #e6e0d3; border-radius:10px; padding:10px 12px; margin-top:10px; }
+  .pickup-slot.pickup-now { border:2px solid #8C1B3C; }
+  .pickup-when { font-weight:700; font-size:0.9rem; color:#8C1B3C; }
+  .pickup-prod { font-size:0.85rem; line-height:1.5; margin:4px 0 8px; }
+  .pickup-wait { background:#f6f2ea; border-radius:8px; padding:8px; font-size:0.8rem; color:#6B5842; line-height:1.45; }
+  .pickup-row { display:flex; gap:8px; align-items:center; }
+  .pickup-row .pickup-code { width:110px; box-sizing:border-box; font:inherit; font-size:1.3rem; letter-spacing:0.35em; text-align:center; padding:6px; border:1px solid #ccc; border-radius:8px; }
+  .pickup-row .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .pickup-slot p.pickup-hint { font-size:0.78rem; color:#6B5842; margin:6px 0 0; line-height:1.45; }
+  .pickup-slot p.pickup-alert { font-size:0.85rem; color:#C8352F; font-weight:700; margin:0 0 8px; line-height:1.45; }
+  .pickup-slot p.pickup-error { font-size:0.8rem; color:#C8352F; font-weight:700; margin:6px 0 0; line-height:1.45; }
+  .resch-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .resch-row label { display:block; font-size:0.75rem; font-weight:700; color:#8C1B3C; margin-bottom:3px; }
+  .resch-row select { font:inherit; font-size:0.9rem; padding:7px; border:1px solid #ccc; border-radius:8px; background:#fff; max-width:100%; }
+  .cancel-seller-box { background:#E4F2DE; border:2px solid #2F6B3A; border-radius:10px; padding:10px; font-size:0.85rem; line-height:1.5; color:#3b2f22; }
+  .pickup-done { background:#f6f9f5; border:1px solid #cfe3cf; border-radius:8px; padding:8px; font-size:0.85rem; line-height:1.5; color:#3E6B42; font-weight:600; }
+  .money-done { border-color:#cfe3cf; background:#f6f9f5; color:#4C7A50; }
+  .money-problem { border-color:#f0c9c6; background:#fdf3f2; color:#C8352F; }
+  .money-refunded { border-color:#cfd9f3; background:#f3f6fe; color:#3b4a7a; }
+  .my-page { display:flex; align-items:flex-start; justify-content:center; gap:24px; background:linear-gradient(180deg,#C98A9B 0%,#E3BCC7 50%,#FAF0F3 100%); }
+  .my-panel { background:var(--white); border-radius:28px; box-shadow:var(--shadow-soft); padding:32px 32px 36px; max-width:780px; width:100%; box-sizing:border-box; text-align:center; }
+  .my-panel h1 { font-size:1.6rem; text-align:center; margin:0; display:inline-block; background:#E3BCC7; color:#4F0A21; padding:8px 26px; border-radius:999px; position:absolute; left:50%; top:-32px; transform:translate(-50%,-50%); white-space:nowrap; }
   .my-panel h1::before { content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:calc(50% + 2px); box-sizing:border-box; border:2px solid #fff; border-bottom:none; border-radius:999px 999px 0 0; pointer-events:none; }
   .my-topbar { position:relative; display:flex; justify-content:space-between; align-items:center; min-height:48px; margin-bottom:16px; }
-  .my-form-box { max-width:560px; margin:0 auto; }
-  .shop-edit-page, body { background:linear-gradient(180deg,#E6DBF7 0%,#F1EAFB 55%,#FAF7FD 100%); }
-  .my-form-box .auth-form > label { align-self:flex-start; background:#8E6BC4; color:#fff; padding:5px 16px; border-radius:999px; font-size:0.9rem; }
-  .my-form-box .auth-form > label:nth-of-type(3n+2) { background:#A583D6; }
-  .my-form-box .auth-form > label:nth-of-type(3n+3) { background:#7452AA; }
-  .my-form-box .auth-form > input:not([type=checkbox]) { border:1.5px solid #C4AEE6; }
-  .my-form-box .auth-form > textarea { width:100%; box-sizing:border-box; border:1.5px solid #C4AEE6; border-radius:12px; padding:12px 14px; font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background:#fff; resize:vertical; min-height:110px; }
-  .my-form-box a { color:#5B3A8E; font-weight:700; }
-  .my-panel p.shop-hint { font-size:0.82rem; color:#888; margin:-6px 0 0; text-align:left; }
-  .shop-img-row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:-6px; }
-  .shop-logo-preview { width:84px; height:84px; object-fit:cover; border-radius:50%; border:2px solid #C4AEE6; background:#fff; }
-  .shop-cover-preview { width:100%; max-width:320px; height:110px; object-fit:cover; border-radius:12px; border:2px solid #C4AEE6; background:#fff; }
-  .shop-img-remove { background:none; border:none; cursor:pointer; font-family:inherit; font-size:0.85rem; color:#C8352F; font-weight:600; padding:4px 0; }
-  .my-panel p.shop-error { font-size:0.9rem; color:#C8352F; font-weight:700; margin:0; text-align:left; }
-  .my-panel p.shop-success { font-size:0.9rem; color:#3E6B42; font-weight:700; margin:0; text-align:left; }
-  .my-form-box .auth-form > textarea:focus, .my-form-box .auth-form > input:focus { outline:none; border-color:#8E6BC4; }
-  .my-panel p.shop-view { text-align:center; margin:0; }
   .my-video { width:500px; height:600px; flex-shrink:0; position:sticky; top:20px; display:flex; align-items:center; justify-content:center; background:var(--cream-soft); border-radius:28px; }
-  @media (max-width: 640px) { .my-panel { padding:20px 16px 26px; border-radius:20px; } .my-panel h1 { font-size:1.2rem; padding:6px 16px; } }
-  /* Téléphone : le titre est tout en haut, puis le cadre de la vidéo, puis le formulaire. L'ordinateur ne change pas. */
+  /* Couleur de la page : une seule, sauf le bouton Retour et les repères d'état */
+  .my-panel #pageSubtitle { color:#6E3040; }
+  .my-panel .sale-card { border:1.5px solid #CE95A5; background:#FAF0F3; }
+  .my-panel .sale-date, .my-panel .sale-total, .my-panel .money-total { color:#8C1B3C; }
+  .my-panel .sale-head { border-bottom-color:#CE95A5; }
+  .my-panel .ship-action label, .my-panel .ship-addr .t, .my-panel .tax-box label { color:#8C1B3C; }
+  .my-panel .ship-addr { border-color:#CE95A5; }
+  .my-panel .btn-primary { background:#8C1B3C; box-shadow:0 4px 14px rgba(140,27,60,0.4); }
+  .my-panel .btn-primary:hover { background:#6E1230; box-shadow:0 6px 18px rgba(140,27,60,0.48); }
+  .my-panel a:not(.btn) { color:#8C1B3C; }
+  /* Téléphone : le titre est tout en haut, puis le cadre de la vidéo, puis les ventes. L'ordinateur ne change pas. */
   @media (max-width: 700px) and (max-aspect-ratio: 1/1), (max-width: 700px) and (min-height: 521px), (min-width: 701px) and (max-width: 1100px) and (max-aspect-ratio: 1/1) {
     .my-page { position:relative; flex-direction:column; align-items:stretch; gap:0; padding:58px 10px 24px; }
     .my-topbar { position:static; margin-bottom:6px; justify-content:flex-start; }
@@ -408,5 +929,7 @@
 </style>
 </body>
 </html>
+
+
 
 

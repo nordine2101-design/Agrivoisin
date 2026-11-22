@@ -851,8 +851,33 @@ window.addEventListener('load', versLeHaut);
 window.addEventListener('pageshow', versLeHaut);
 </script>
 <!-- Accueil téléphone : bandeau « Fraîchement publié » avec les vraies annonces -->
+<script>
+/* Accueil téléphone debout : toute la présentation (logo, boutons, bandeau, menu) se réduit ou s'agrandit d'un bloc selon l'écran, comme sur l'iPhone 15 Pro Max */
+(function(){
+  var app=document.querySelector('.mob-app'),fl=document.querySelector('.mob-fl');
+  if(!app||!fl)return;
+  var lastW=0,lastPortrait=null;
+  function apply(force){
+    var w=window.innerWidth,h=window.innerHeight,portrait=h>w&&w<=700;
+    // Sur iPhone, la barre de Safari fait varier la hauteur en défilant : on ne recalcule que si la largeur ou le sens de l'écran change
+    if(!force&&w===lastW&&portrait===lastPortrait)return;
+    lastW=w;lastPortrait=portrait;
+    if(!portrait){app.style.width='';app.style.margin='';app.style.zoom='';fl.style.zoom='';fl.style.left='';fl.style.right='';document.body.style.paddingBottom='';return;}
+    var k=Math.min(w/430,h/740,1.25);
+    app.style.width='430px';app.style.margin='0 auto';app.style.zoom=k;
+    var side=Math.max(0,(w-430*k)/2/k);
+    fl.style.zoom=k;fl.style.left=side+'px';fl.style.right=side+'px';
+    document.body.style.paddingBottom=(90*k)+'px';
+  }
+  apply(true);
+  window.addEventListener('resize',function(){apply(false);});
+  window.addEventListener('orientationchange',function(){setTimeout(function(){apply(true);},250);});
+})();
+</script>
 </body>
 </html>
+
+
 
 
 

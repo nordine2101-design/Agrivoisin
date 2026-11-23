@@ -35,7 +35,7 @@
   .my-panel .auth-switch a { color:#4C9A12; }
   .pw-eye:focus-visible { outline-color:#5FB41C; }
   /* Téléphone : le titre est tout en haut, puis la vidéo (un tiers de l'écran), puis le formulaire. L'ordinateur ne change pas. */
-  @media (max-width: 700px) {
+  @media (max-width: 700px) and (max-aspect-ratio: 1/1), (max-width: 700px) and (min-height: 521px), (min-width: 701px) and (max-width: 1100px) and (max-aspect-ratio: 1/1) {
     .my-page { position:relative; flex-direction:column; align-items:stretch; gap:14px; padding:58px 10px 24px; }
     .my-topbar { position:static; }
     .my-video { order:-1; width:100%; position:static; height:33vh; min-height:180px; padding:6px; border-radius:22px; }
@@ -54,7 +54,7 @@
     .my-panel h1::before { display:none; }
   }
   /* Téléphone couché : les deux cadres gardent leurs marges et la vidéo s'adapte à la hauteur de l'écran. L'ordinateur ne change pas. */
-  @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
+  @media (min-aspect-ratio: 1/1) and (max-width: 1000px) and (max-height: 520px) {
     .my-page { padding:58px 16px 24px; gap:16px; align-items:flex-start; }
     .my-panel { flex:1; min-width:0; }
     .my-video { width:auto; height:calc(100svh - 80px); aspect-ratio:1082 / 720; flex-shrink:0; top:10px; padding:8px; box-sizing:border-box; }
@@ -272,5 +272,12 @@
     }, 1000);
   });
 </script>
+<style>
+  /* Tablette debout : la vidéo et le formulaire restent de taille raisonnable et centrés. Les autres écrans ne changent pas. */
+  @media (min-width: 701px) and (max-width: 1100px) and (max-aspect-ratio: 1/1) { .my-page { padding-left:24px; padding-right:24px; } .my-video { max-width:480px; height:auto; min-height:0; margin-left:auto; margin-right:auto; } .my-video video { height:auto; aspect-ratio:1082 / 720; object-fit:contain; } .my-panel { max-width:640px; margin-left:auto; margin-right:auto; } }
+</style>
 </body>
 </html>
+
+
+

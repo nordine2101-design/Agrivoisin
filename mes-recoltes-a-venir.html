@@ -614,7 +614,7 @@
   #favToast { position:fixed; left:50%; bottom:24px; transform:translate(-50%,20px); background:#3D5C3E; color:#fff; padding:12px 20px; border-radius:14px; font-size:0.95rem; box-shadow:0 8px 24px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease; z-index:50; max-width:calc(100% - 32px); text-align:center; }
   #favToast.show { opacity:1; transform:translate(-50%,0); pointer-events:auto; }
   /* Téléphone : le titre est tout en haut, puis les récoltes à venir. L'ordinateur ne change pas. */
-  @media (max-width: 700px) {
+  @media (max-width: 700px) and (max-aspect-ratio: 1/1), (max-width: 700px) and (min-height: 521px), (min-width: 701px) and (max-width: 1100px) and (max-aspect-ratio: 1/1) {
     .my-page { position:relative; flex-direction:column; align-items:stretch; gap:0; padding:58px 10px 24px; }
     .my-panel { position:static; padding:14px 14px 22px; border-radius:22px; }
     .my-panel h1 { font-size:1.55rem; padding:11px 28px; top:4px; transform:translateX(-50%); border:2px solid #fff; }
@@ -630,12 +630,18 @@
     .site-footer { display:none; }
   }
   /* Téléphone couché : les récoltes à venir sur 2 colonnes. L'ordinateur ne change pas. */
-  @media (min-width: 701px) and (max-width: 1000px) and (max-height: 520px) {
+  @media (min-aspect-ratio: 1/1) and (max-width: 1000px) and (max-height: 520px) {
     .my-page { padding:58px 16px 24px; gap:16px; align-items:flex-start; }
     .my-panel { flex:1; min-width:0; }
     .my-video:empty { display:none; }
     .site-footer { display:none; }
   }
 </style>
+<style>
+  /* Tablette debout : le cadre et la liste restent centrés, avec des marges. Les autres écrans ne changent pas. */
+  @media (min-width: 701px) and (max-width: 1100px) and (max-aspect-ratio: 1/1) { .my-page { padding-left:24px; padding-right:24px; } .my-video { max-width:480px; margin-left:auto; margin-right:auto; } .my-panel { max-width:640px; margin-left:auto; margin-right:auto; } }
+</style>
 </body>
 </html>
+
+

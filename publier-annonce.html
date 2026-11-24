@@ -46,7 +46,7 @@
 
       <div id="plannedWrap" class="dm-wrap" style="display:none;">
         <label class="dm-pill" for="plannedDate">Date de mise en vente prévue</label>
-        <input type="date" id="plannedDate" class="st-date">
+        <select id="plannedDate" class="st-date" aria-label="Date de mise en vente prévue"></select>
         <p id="plannedHint" style="text-align:left;font-size:0.85rem;line-height:1.4;color:#888;margin:0;"></p>
         <div class="st-note"><b>Important :</b><br>1) Si un acheteur réserve, vous devez lui vendre au prix indiqué, même si les prix montent.<br>2) Un acheteur ne peut pas réserver plus du quart de votre récolte, et tous ensemble pas plus de la moitié.<br>3) Si vous ne mettez pas votre récolte en vente à la date prévue, l'annonce disparaît 1 jour après et les réservations sont annulées.</div>
       </div>
@@ -385,6 +385,26 @@
     return parts[2] + '/' + parts[1] + '/' + parts[0];
   }
 
+  // La date de mise en vente prévue se choisit dans une liste : aujourd'hui et les 3 jours suivants (heure de Paris)
+  function fillPlannedDays(keep) {
+    const today = parisTodayIso();
+    const names = ['Aujourd\'hui', 'Demain', 'Dans 2 jours', 'Dans 3 jours'];
+    let html = '<option value="">--</option>';
+    let found = false;
+    for (let i = 0; i <= MAX_DAYS_AHEAD; i++) {
+      const iso = addDaysIso(today, i);
+      const p = iso.split('-');
+      if (iso === keep) found = true;
+      html += '<option value="' + iso + '">' + names[i] + ' — ' + p[2] + '/' + p[1] + '</option>';
+    }
+    if (keep && !found && keep >= today) {
+      html += '<option value="' + keep + '">le ' + frenchDate(keep) + '</option>';
+      found = true;
+    }
+    plannedInput.innerHTML = html;
+    plannedInput.value = found ? keep : '';
+  }
+
   function isFreshCategory() {
     return PARTICULIER_CATEGORIES.includes(categorySelect.value);
   }
@@ -404,8 +424,7 @@
     if (soon) {
       const today = parisTodayIso();
       const latest = addDaysIso(today, MAX_DAYS_AHEAD);
-      plannedInput.min = today;
-      plannedInput.max = latest;
+      fillPlannedDays(plannedInput.value);
       plannedHint.textContent = 'Choisissez une date entre le ' + frenchDate(today) + ' et le ' + frenchDate(latest) + ' (3 jours au maximum après aujourd\'hui).';
     } else {
       plannedInput.value = '';
@@ -1243,7 +1262,7 @@
       categorySelect.value = l.category;
       categorySelect.dispatchEvent(new Event('change'));
       updateStatusUi();
-      if (editSoon) plannedInput.value = String(l.planned_date || '').slice(0, 10);
+      if (editSoon) fillPlannedDays(String(l.planned_date || '').slice(0, 10));
       if (l.subcategory) subcategorySelect.value = l.subcategory;
 
       if (HARVEST_DATE_REQUIRED_CATEGORIES.includes(l.category)) {
@@ -1712,5 +1731,8 @@
 </style>
 </body>
 </html>
+
+
+
 
 

@@ -52,7 +52,7 @@
       </div>
 
       <label for="harvestDay" id="harvestDateLabel" style="display:none;">Date de récolte</label>
-      <input type="date" id="harvestDay" style="display:none;">
+      <select id="harvestDay" style="display:none;" aria-label="Date de récolte"></select>
       <input type="hidden" id="harvestDate">
       <label for="harvestHour" id="harvestTimeLabel" style="display:none;">Heure de récolte</label>
       <div class="hr-row" id="harvestTimeRow" style="display:none;"><select id="harvestHour" aria-label="Heure de récolte"></select><span>h</span><select id="harvestMin" aria-label="Minutes de récolte"></select><span>min</span></div>
@@ -275,18 +275,49 @@
       harvestWarn.style.display = 'none';
     }
   }
+  // La date de récolte se choisit dans une liste : aujourd'hui et les 13 jours d'avant. Aucune date future n'existe dans la liste.
+  const HARVEST_DAYS_BACK = 14;
+  const JOURS_SEMAINE = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  function harvestDayLabel(iso, index) {
+    const p = iso.split('-');
+    const court = p[2] + '/' + p[1];
+    if (index === 0) return "Aujourd'hui — " + court;
+    if (index === 1) return 'Hier — ' + court;
+    const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    return JOURS_SEMAINE[d.getDay()] + ' — ' + court;
+  }
+  function fillHarvestDays(keepValue) {
+    const keep = keepValue !== undefined ? keepValue : harvestDayInput.value;
+    const now = new Date();
+    let html = '<option value="">--</option>';
+    let found = false;
+    for (let i = 0; i < HARVEST_DAYS_BACK; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const iso = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+      if (iso === keep) found = true;
+      html += '<option value="' + iso + '">' + harvestDayLabel(iso, i) + '</option>';
+    }
+    // Annonce déjà enregistrée avec une récolte plus ancienne : on garde sa date
+    if (keep && !found && keep <= todayIso()) {
+      const p = keep.split('-');
+      html += '<option value="' + keep + '">le ' + p[2] + '/' + p[1] + '/' + p[0] + '</option>';
+      found = true;
+    }
+    harvestDayInput.innerHTML = html;
+    harvestDayInput.value = found ? keep : '';
+  }
   function showHarvestFields(on) {
     harvestFields.forEach(function (el) { el.style.display = on ? '' : 'none'; });
     harvestDayInput.required = on;
     harvestHourSelect.required = on;
     harvestMinSelect.required = on;
-    harvestDayInput.max = todayIso();
+    if (on) fillHarvestDays();
     if (!on) harvestWarn.style.display = 'none';
   }
   // Remplit les champs à partir d'une valeur « AAAA-MM-JJTHH:MM » (ou les vide)
   function setHarvestFields(value) {
     const v = String(value || '');
-    harvestDayInput.value = v ? v.slice(0, 10) : '';
+    fillHarvestDays(v ? v.slice(0, 10) : '');
     harvestHourSelect.value = v ? v.slice(11, 13) : '';
     harvestMinSelect.value = v ? v.slice(14, 16) : '';
     refreshHarvestValue();
@@ -1638,6 +1669,7 @@
   .un-mode:focus-visible { outline:3px solid rgba(131,193,61,0.55); outline-offset:2px; }
   .un-free { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px; font-size:0.9rem; color:var(--soil); font-weight:600; }
   .auth-form .un-free input { width:90px; padding:7px 10px; border:1px solid #e6e0d3; border-radius:8px; font:inherit; font-weight:400; box-sizing:border-box; }
+  #harvestDay { width:100%; box-sizing:border-box; padding:12px 14px; border-radius:var(--radius-sm); border:1.5px solid #9FC49A; font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background:#fff; }
   .hr-row { display:flex; gap:10px; align-items:center; }
   .hr-row select { flex:1; min-width:0; padding:12px 14px; border-radius:var(--radius-sm); border:1.5px solid #9FC49A; font-family:var(--font-body); font-size:0.95rem; color:var(--ink); background:#fff; }
   .hr-row span { font-weight:700; color:var(--leaf-deep); }
@@ -1680,6 +1712,5 @@
 </style>
 </body>
 </html>
-
 
 
